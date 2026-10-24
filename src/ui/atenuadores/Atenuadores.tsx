@@ -19,11 +19,12 @@ import { ATENUACION, FRECUENCIA, POTENCIA, Z1, Z2, Z_POR_DEFECTO } from './campo
 // La Calculadora de atenuadores (spec §10): el T y el π juntos, cada uno con su esquema, sus
 // resistencias, sus fórmulas, la referencia y los pasos intermedios.
 export function Atenuadores() {
-  const a = useCampoEntrada(ATENUACION);
-  const z1 = useCampoEntrada(Z1, Z_POR_DEFECTO);
-  const z2 = useCampoEntrada(Z2, Z_POR_DEFECTO);
-  const potencia = useCampoEntrada(POTENCIA);
-  const frecuencia = useCampoEntrada(FRECUENCIA);
+  const guardado = (campo: string) => ({ calculadora: 'atenuadores', campo });
+  const a = useCampoEntrada(ATENUACION, '', guardado('atenuacion'));
+  const z1 = useCampoEntrada(Z1, Z_POR_DEFECTO, guardado('z1'));
+  const z2 = useCampoEntrada(Z2, Z_POR_DEFECTO, guardado('z2'));
+  const potencia = useCampoEntrada(POTENCIA, '', guardado('potencia'));
+  const frecuencia = useCampoEntrada(FRECUENCIA, '', guardado('frecuencia'));
 
   const mensaje = mensajeDeResultados(
     [a, z1, z2, potencia, frecuencia].map((c) => ({

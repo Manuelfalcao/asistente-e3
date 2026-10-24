@@ -43,6 +43,10 @@ export const CALCULADORAS: readonly Calculadora[] = [
 
 export const CALCULADORA_INICIAL = CALCULADORAS[0];
 
+export function esIdCalculadora(id: string): id is IdCalculadora {
+  return CALCULADORAS.some((c) => c.id === id);
+}
+
 export function calculadora(id: IdCalculadora): Calculadora {
   return CALCULADORAS.find((c) => c.id === id)!;
 }
