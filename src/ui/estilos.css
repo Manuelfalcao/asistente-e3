@@ -1,10 +1,5 @@
-:root {
-  --azul: #1d4ed8;
-  --azul-claro: #dbeafe;
-  --borde: #d4d4d8;
-  --alto-pestanas: 3.5rem;
-  --ancho-menu: 17rem;
-}
+@import './tokens.css';
+@import './comun/componentes.css';
 
 * {
   box-sizing: border-box;
@@ -14,18 +9,27 @@ body {
   margin: 0;
   max-width: 100%;
   overflow-x: clip;
-  font-family:
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
-  color: #18181b;
-  background: #fff;
+  font-family: var(--fuente-texto);
+  font-size: var(--tam-4);
+  line-height: var(--interlineado);
+  color: var(--texto);
+  background: var(--fondo);
+  -webkit-text-size-adjust: 100%;
 }
-button {
+button,
+input,
+select {
   font: inherit;
   color: inherit;
+}
+h1,
+h2,
+h3 {
+  line-height: var(--interlineado-titulo);
+}
+:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 2px;
 }
 
 .armazon {
@@ -44,39 +48,29 @@ button {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  background: var(--azul);
-  color: #fff;
+  gap: var(--esp-3);
+  padding: var(--esp-3) var(--esp-4);
+  background: var(--superficie);
+  border-bottom: 1px solid var(--borde);
 }
 .encabezado h2 {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: var(--tam-5);
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
 .encabezado .version {
-  font-size: 0.75rem;
-  opacity: 0.85;
+  font-size: var(--tam-2);
+  color: var(--texto-suave);
   white-space: nowrap;
 }
 
-.franja-version {
-  padding: 0.5rem 1rem;
-  background: #fef3c7;
-  border-bottom: 1px solid #f59e0b;
-  font-size: 0.9rem;
-}
-.franja-version button {
-  border: 0;
-  background: none;
-  padding: 0;
-  font-weight: 700;
-  text-decoration: underline;
-  cursor: pointer;
-}
-
 .calculadora {
-  padding: 1rem;
+  padding: var(--esp-4);
+}
+.calculadora .vacia {
+  margin: 0;
+  color: var(--texto-suave);
 }
 
 .menu-lateral {
@@ -86,10 +80,11 @@ button {
 .pestanas {
   position: fixed;
   inset: auto 0 0 0;
+  z-index: 10;
   display: flex;
   height: calc(var(--alto-pestanas) + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
-  background: #fff;
+  background: var(--superficie);
   border-top: 1px solid var(--borde);
 }
 .pestanas button {
@@ -99,16 +94,20 @@ button {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.1rem;
+  gap: 2px;
   border: 0;
   background: none;
-  padding: 0.25rem 0;
-  font-size: 0.68rem;
+  padding: var(--esp-1) 0;
+  font-size: var(--tam-1);
+  color: var(--texto-suave);
   cursor: pointer;
 }
 .pestanas .icono {
-  font-size: 1.25rem;
-  line-height: 1;
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 1.875rem;
+  border-radius: var(--radio-pildora);
 }
 .pestanas .nombre {
   max-width: 100%;
@@ -117,8 +116,11 @@ button {
   white-space: nowrap;
 }
 .pestanas button.activa {
-  color: var(--azul);
-  font-weight: 700;
+  color: var(--acento);
+  font-weight: 600;
+}
+.pestanas button.activa .icono {
+  background: var(--acento-suave);
 }
 
 /* Corte entre celular y PC: el único lugar donde está el valor (~900 px). */
@@ -132,6 +134,9 @@ button {
   .contenido {
     padding-bottom: 0;
   }
+  .calculadora {
+    padding: var(--esp-5);
+  }
   .menu-lateral {
     display: flex;
     flex-direction: column;
@@ -142,51 +147,80 @@ button {
     width: var(--ancho-menu);
     flex: none;
     border-right: 1px solid var(--borde);
-    background: #fafafa;
+    background: var(--superficie);
   }
   .menu-lateral .marca {
+    display: flex;
+    align-items: center;
+    gap: var(--esp-2);
     margin: 0;
-    padding: 1rem;
-    font-size: 1.1rem;
-    color: var(--azul);
+    padding: var(--esp-4);
+    font-size: var(--tam-5);
+    font-weight: 700;
+    color: var(--acento);
+  }
+  .menu-lateral .marca .logo {
+    display: flex;
+    flex: none;
+  }
+  .menu-lateral .marca svg {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radio-1);
   }
   .menu-lateral ul {
     list-style: none;
     margin: 0;
-    padding: 0;
+    padding: 0 var(--esp-2);
     flex: 1;
     overflow-y: auto;
   }
   .menu-lateral li button {
-    display: block;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: var(--esp-3);
+    align-items: start;
     width: 100%;
+    min-height: var(--toque);
     text-align: left;
     border: 0;
-    border-left: 4px solid transparent;
+    border-radius: var(--radio-1);
     background: none;
-    padding: 0.7rem 1rem;
+    padding: var(--esp-2) var(--esp-3);
     cursor: pointer;
   }
+  .menu-lateral li button:hover {
+    background: var(--superficie-2);
+  }
+  .menu-lateral .icono {
+    grid-row: span 2;
+    padding-top: 2px;
+    color: var(--texto-suave);
+  }
   .menu-lateral li button.activa {
-    background: var(--azul-claro);
-    border-left-color: var(--azul);
+    background: var(--acento-suave);
+  }
+  .menu-lateral li button.activa .nombre,
+  .menu-lateral li button.activa .icono {
+    color: var(--acento);
   }
   .menu-lateral .nombre {
-    display: block;
-    font-weight: 700;
+    font-weight: 600;
   }
   .menu-lateral .descripcion {
-    display: block;
-    font-size: 0.8rem;
-    color: #52525b;
+    font-size: var(--tam-3);
+    color: var(--texto-suave);
   }
   .pie-menu {
-    padding: 0.75rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: var(--esp-1);
+    padding: var(--esp-3) var(--esp-4);
     border-top: 1px solid var(--borde);
-    font-size: 0.8rem;
-    color: #52525b;
+    font-size: var(--tam-3);
+    color: var(--texto-suave);
   }
   .pie-menu a {
-    color: var(--azul);
+    color: var(--acento);
   }
 }

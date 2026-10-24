@@ -1,0 +1,87 @@
+/*
+ * Sistema visual del Asistente: el único lugar con los colores de la interfaz, la tipografía,
+ * los tamaños y el espaciado. Las Calculadoras usan estas variables y nunca un color suelto.
+ * (El azul del ícono instalado está en iconos.ts; un test lo ata a --acento.)
+ *
+ * Los colores se verifican en tests/paleta.test.ts (WCAG AA en los dos temas). El tema oscuro
+ * sigue al del sistema (docs/adr/0001-modo-oscuro-segun-el-sistema.md): es el :root de abajo,
+ * dentro de @media, y solo redefine colores.
+ */
+:root {
+  color-scheme: light dark;
+
+  /* Paleta, tema claro */
+  --fondo: #f4f6f8;
+  --superficie: #ffffff;
+  --superficie-2: #eef1f5;
+  --texto: #16191d;
+  --texto-suave: #535b67;
+  --borde: #dde1e7;
+  --borde-campo: #858d99;
+  --acento: #1d4ed8;
+  --sobre-acento: #ffffff;
+  --acento-suave: #e6eefc;
+  --dudoso: #b26a00;
+  --dudoso-texto: #7a4000;
+  --dudoso-fondo: #fff1d1;
+  --impracticable: #d02c22;
+  --impracticable-texto: #a1180f;
+  --impracticable-fondo: #fde7e4;
+  --error: var(--impracticable-texto);
+  --sombra: #e3e7ec; /* color de la sombra de las tarjetas */
+
+  /* Tipografía: la del sistema para texto y números; Latin Modern Math para las fórmulas */
+  --fuente-texto: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
+  --fuente-formula: 'Latin Modern Math', 'STIX Two Math', 'Cambria Math', math;
+  /* Latin Modern tiene el ojo más chico que las fuentes del sistema: así las x se igualan */
+  --escala-formula: 1.15;
+
+  /* Escala de tamaños. 16 px de base: un campo con menos hace que iOS agrande la página. */
+  --tam-1: 0.75rem; /* 12 px: nombre de las pestañas */
+  --tam-2: 0.8125rem; /* 13 px: rótulos, eco y esquemas */
+  --tam-3: 0.875rem; /* 14 px: texto secundario, referencias, motivos */
+  --tam-4: 1rem; /* 16 px: texto, campos y botones */
+  --tam-5: 1.125rem; /* 18 px: títulos de tarjeta y encabezado */
+  --tam-6: 1.375rem; /* 22 px: el valor principal de un resultado */
+  --interlineado: 1.45;
+  --interlineado-titulo: 1.25;
+
+  /* Espaciado, en pasos de 4 px */
+  --esp-1: 0.25rem;
+  --esp-2: 0.5rem;
+  --esp-3: 0.75rem;
+  --esp-4: 1rem;
+  --esp-5: 1.5rem;
+  --esp-6: 2rem;
+
+  --radio-1: 6px;
+  --radio-2: 12px;
+  --radio-pildora: 999px;
+
+  /* Objetivo táctil mínimo: todo lo que se toca mide al menos esto de alto y de ancho */
+  --toque: 2.75rem;
+  --alto-pestanas: 3.75rem;
+  --ancho-menu: 17rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fondo: #0f1216;
+    --superficie: #181c22;
+    --superficie-2: #212731;
+    --texto: #e9ecf0;
+    --texto-suave: #a5aebb;
+    --borde: #2c323c;
+    --borde-campo: #6c7685;
+    --acento: #82a8ff;
+    --sobre-acento: #0b1530;
+    --acento-suave: #1b2a49;
+    --dudoso: #eba53a;
+    --dudoso-texto: #ffd58f;
+    --dudoso-fondo: #3a2a0e;
+    --impracticable: #ff6f61;
+    --impracticable-texto: #ffb3aa;
+    --impracticable-fondo: #431814;
+    --sombra: #0b0d10;
+  }
+}

@@ -1,4 +1,5 @@
 import { useRegisterSW } from 'virtual:pwa-register/preact';
+import { FranjaVersion } from './comun/Franjas';
 
 export function FranjaVersionNueva() {
   const {
@@ -6,13 +7,5 @@ export function FranjaVersionNueva() {
     updateServiceWorker,
   } = useRegisterSW();
   if (!hayNueva) return null;
-  return (
-    <div class="franja-version" role="status">
-      <span>Hay una versión nueva</span>
-      <span aria-hidden="true"> · </span>
-      <button type="button" onClick={() => updateServiceWorker(true)}>
-        Recargar
-      </button>
-    </div>
-  );
+  return <FranjaVersion onRecargar={() => updateServiceWorker(true)} />;
 }

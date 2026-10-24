@@ -1,18 +1,25 @@
 import { useState } from 'preact/hooks';
-import { CALCULADORAS, CALCULADORA_INICIAL } from './calculadoras';
+import { CALCULADORAS, CALCULADORA_INICIAL, calculadora } from './calculadoras';
+import { IconoCalculadora } from './comun/Icono';
 import { FranjaVersionNueva } from './FranjaVersionNueva';
+import { svgIconoAsistente } from './iconos';
 import { VERSION } from './version';
+
+const LOGO = svgIconoAsistente({ redondeado: true });
 
 const ES_ARCHIVO = import.meta.env.MODE === 'archivo';
 
 export function App() {
   const [activaId, setActivaId] = useState(CALCULADORA_INICIAL.id);
-  const activa = CALCULADORAS.find((c) => c.id === activaId) ?? CALCULADORA_INICIAL;
+  const activa = calculadora(activaId);
 
   return (
     <div class="armazon">
       <nav class="menu-lateral" aria-label="Calculadoras">
-        <h1 class="marca">Asistente E3</h1>
+        <h1 class="marca">
+          <span class="logo" aria-hidden="true" dangerouslySetInnerHTML={{ __html: LOGO }} />
+          Asistente E3
+        </h1>
         <ul>
           {CALCULADORAS.map((c) => (
             <li key={c.id}>
@@ -22,6 +29,9 @@ export function App() {
                 aria-current={c.id === activaId ? 'page' : undefined}
                 onClick={() => setActivaId(c.id)}
               >
+                <span class="icono">
+                  <IconoCalculadora id={c.id} />
+                </span>
                 <span class="nombre">{c.nombreCorto}</span>
                 <span class="descripcion">{c.descripcion}</span>
               </button>
@@ -45,7 +55,7 @@ export function App() {
         </header>
         <FranjaVersionNueva />
         <main class="calculadora">
-          <p>Esta Calculadora todavía está vacía.</p>
+          <p class="vacia">Esta Calculadora todavía está vacía.</p>
         </main>
       </div>
 
@@ -58,8 +68,8 @@ export function App() {
             aria-current={c.id === activaId ? 'page' : undefined}
             onClick={() => setActivaId(c.id)}
           >
-            <span class="icono" aria-hidden="true">
-              {c.icono}
+            <span class="icono">
+              <IconoCalculadora id={c.id} />
             </span>
             <span class="nombre">{c.nombreCorto}</span>
           </button>

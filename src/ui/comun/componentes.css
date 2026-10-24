@@ -1,0 +1,507 @@
+/* Componentes base de las Calculadoras. Solo usan las variables de tokens.css. */
+
+.solo-lector {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------- Tarjeta de resultado ---------- */
+
+.tarjeta {
+  min-width: 0;
+  margin: 0 0 var(--esp-3);
+  padding: var(--esp-4);
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-2);
+  box-shadow: 0 1px 2px var(--sombra);
+}
+.tarjeta.destacada {
+  border-color: var(--acento);
+  box-shadow: inset 0 0 0 1px var(--acento);
+}
+.tarjeta-titulo {
+  margin: 0 0 var(--esp-2);
+  font-size: var(--tam-5);
+  font-weight: 600;
+}
+.tarjeta > :last-child {
+  margin-bottom: 0;
+}
+
+/* Una tarjeta debajo de otra; en PC, en grilla (spec §4.5). */
+.grilla-tarjetas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  gap: var(--esp-3);
+  align-items: start;
+}
+.grilla-tarjetas > .tarjeta {
+  margin: 0;
+}
+
+.valor-resultado {
+  display: grid;
+  grid-template-columns: minmax(2.5rem, auto) minmax(0, 1fr) auto;
+  column-gap: var(--esp-3);
+  align-items: center;
+  min-height: var(--toque);
+  padding: var(--esp-1) 0;
+  border-top: 1px solid var(--borde);
+}
+.valor-resultado .nombre {
+  font-weight: 600;
+}
+.valor-resultado .valor {
+  font-size: var(--tam-4);
+  font-weight: 600;
+}
+/* Debajo del valor y también debajo del botón: "Valor impracticable" no entra al lado. */
+.valor-resultado .extra {
+  grid-column: 2 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-1) var(--esp-2);
+  font-size: var(--tam-3);
+  color: var(--texto-suave);
+}
+.valor-resultado .accion {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+/* Los números se alinean entre filas y no se cortan antes de la unidad. */
+.valor,
+.valor-principal,
+.numero {
+  font-variant-numeric: tabular-nums lining-nums;
+  white-space: nowrap;
+}
+.valor-principal {
+  display: block;
+  font-size: var(--tam-6);
+  font-weight: 700;
+  line-height: var(--interlineado-titulo);
+}
+
+.formula {
+  overflow-x: auto;
+  margin: var(--esp-2) 0;
+  padding: var(--esp-1) 0;
+}
+.formula math {
+  font-family: var(--fuente-formula);
+  font-size: calc(var(--escala-formula) * 1em);
+}
+.referencia {
+  margin: var(--esp-1) 0 var(--esp-2);
+  font-size: var(--tam-3);
+  color: var(--texto-suave);
+}
+
+.pasos {
+  margin-top: var(--esp-3);
+  border-top: 1px solid var(--borde);
+}
+.pasos > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-2);
+  min-height: var(--toque);
+  list-style: none;
+  color: var(--acento);
+  font-weight: 600;
+  cursor: pointer;
+}
+.pasos > summary::-webkit-details-marker {
+  display: none;
+}
+.pasos > summary::before {
+  content: '';
+  width: 0.5em;
+  height: 0.5em;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.15s;
+}
+.pasos[open] > summary::before {
+  transform: rotate(45deg);
+}
+.pasos-cuerpo {
+  padding: var(--esp-2) var(--esp-3);
+  background: var(--superficie-2);
+  border-radius: var(--radio-1);
+  font-size: var(--tam-3);
+}
+.pasos-cuerpo > :first-child {
+  margin-top: 0;
+}
+.pasos-cuerpo > :last-child {
+  margin-bottom: 0;
+}
+
+.motivos {
+  margin-top: var(--esp-3);
+  padding: var(--esp-2) var(--esp-3);
+  background: var(--superficie-2);
+  border-radius: var(--radio-1);
+  font-size: var(--tam-3);
+}
+.motivos ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.motivos li {
+  display: flex;
+  gap: var(--esp-2);
+  margin-bottom: var(--esp-1);
+}
+.motivos li::before {
+  content: '';
+  flex: none;
+  margin-top: 0.45em;
+}
+.motivos .sugerencia {
+  margin: var(--esp-2) 0;
+}
+
+/* ---------- Rótulos ---------- */
+
+.rotulo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  padding: 0.1em 0.6em;
+  border-radius: var(--radio-pildora);
+  font-size: var(--tam-2);
+  line-height: 1.4;
+  white-space: nowrap;
+  vertical-align: 0.05em;
+}
+.rotulo-dudoso,
+.rotulo-impracticable {
+  font-weight: 600;
+}
+.rotulo-dudoso {
+  background: var(--dudoso-fondo);
+  color: var(--dudoso-texto);
+}
+.rotulo-impracticable {
+  background: var(--impracticable-fondo);
+  color: var(--impracticable-texto);
+}
+.rotulo-estimacion,
+.rotulo-criterio-practico,
+.rotulo-criterio-diseno,
+.rotulo-deduccion-propia {
+  font-style: italic;
+  color: var(--texto-suave);
+  border: 1px solid var(--borde);
+}
+
+/* El nivel se marca con color y con forma: círculo para Valor dudoso, rombo para impracticable. */
+.punto,
+.rotulo-dudoso::before,
+.rotulo-impracticable::before,
+.motivos .motivo-dudoso::before,
+.motivos .motivo-impracticable::before {
+  content: '';
+  display: inline-block;
+  flex: none;
+  width: 0.55rem;
+  height: 0.55rem;
+}
+.punto-dudoso,
+.rotulo-dudoso::before,
+.motivos .motivo-dudoso::before {
+  border-radius: 50%;
+  background: var(--dudoso);
+}
+.punto-impracticable,
+.rotulo-impracticable::before,
+.motivos .motivo-impracticable::before {
+  transform: rotate(45deg) scale(0.9);
+  background: var(--impracticable);
+}
+
+/* ---------- Botón de pase ---------- */
+
+/* También "‹ Volver a …" de la franja de llegada. */
+.pase,
+.franja-llegada .volver {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--esp-2);
+  min-height: var(--toque);
+  padding: 0 var(--esp-3);
+  border: 1px solid var(--acento);
+  border-radius: var(--radio-pildora);
+  background: var(--superficie);
+  color: var(--acento);
+  font-size: var(--tam-3);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.pase:hover,
+.franja-llegada .volver:hover {
+  background: var(--acento-suave);
+}
+
+/* ---------- Botones segmentados ---------- */
+
+.segmentado {
+  min-width: 0;
+  margin: 0 0 var(--esp-4);
+  padding: 0;
+  border: 0;
+}
+.segmentado legend {
+  float: left;
+  width: 100%;
+  margin-bottom: var(--esp-2);
+  padding: 0;
+  font-size: var(--tam-3);
+  font-weight: 600;
+}
+.segmentos {
+  clear: both;
+  display: flex;
+  border: 1px solid var(--borde-campo);
+  border-radius: var(--radio-1);
+  overflow: hidden;
+}
+.segmento {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+}
+.segmento + .segmento {
+  border-left: 1px solid var(--borde-campo);
+}
+.segmento input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+}
+.segmento span {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--toque);
+  padding: var(--esp-1) var(--esp-2);
+  background: var(--superficie);
+  font-size: var(--tam-3);
+  line-height: 1.2;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.segmento input:checked + span {
+  background: var(--acento);
+  color: var(--sobre-acento);
+  font-weight: 600;
+}
+.segmento input:focus-visible + span {
+  outline: 2px solid var(--acento);
+  outline-offset: -4px;
+}
+.segmento input:checked:focus-visible + span {
+  outline-color: var(--sobre-acento);
+}
+
+/* ---------- Campo de valor ---------- */
+
+.campo-valor {
+  display: grid;
+  grid-template-columns: minmax(6rem, 38%) minmax(0, 1fr);
+  column-gap: var(--esp-3);
+  align-items: center;
+  margin-bottom: var(--esp-2);
+}
+.campo-valor label {
+  font-size: var(--tam-3);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.campo-valor .control {
+  display: flex;
+  min-width: 0;
+}
+.campo-valor input,
+.campo-valor select,
+.campo-valor .unidad-fija {
+  min-height: var(--toque);
+  border: 1px solid var(--borde-campo);
+  background: var(--superficie);
+  font-size: var(--tam-4);
+}
+.campo-valor input {
+  flex: 1;
+  min-width: 0;
+  padding: 0 var(--esp-3);
+  border-radius: var(--radio-1);
+  font-variant-numeric: tabular-nums;
+}
+.campo-valor select,
+.campo-valor .unidad-fija {
+  flex: none;
+  margin-left: -1px;
+  padding: 0 var(--esp-2);
+  border-radius: 0 var(--radio-1) var(--radio-1) 0;
+}
+.campo-valor .control > input:not(:last-child) {
+  border-radius: var(--radio-1) 0 0 var(--radio-1);
+}
+.campo-valor .unidad-fija {
+  display: flex;
+  align-items: center;
+  color: var(--texto-suave);
+  background: var(--superficie-2);
+}
+.campo-valor input:focus-visible,
+.campo-valor select:focus-visible {
+  position: relative;
+  outline-offset: -1px;
+}
+.campo-valor .lectura {
+  grid-column: 2;
+  min-height: 1.4em;
+  padding: 2px 0 0 1px;
+  font-size: var(--tam-2);
+  color: var(--texto-suave);
+}
+.campo-valor .lectura-aviso {
+  color: var(--dudoso-texto);
+}
+.campo-valor .lectura-error {
+  color: var(--error);
+}
+.campo-valor.invalido input {
+  border-color: var(--impracticable);
+  box-shadow: inset 0 0 0 1px var(--impracticable);
+}
+
+/* ---------- Franjas y avisos ---------- */
+
+.franja-version {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  column-gap: 0.3em;
+  padding: 0 var(--esp-4);
+  background: var(--acento);
+  color: var(--sobre-acento);
+  font-size: var(--tam-3);
+}
+.franja-version button {
+  min-height: var(--toque);
+  border: 0;
+  background: none;
+  padding: 0 var(--esp-1);
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.franja-llegada {
+  margin-bottom: var(--esp-4);
+  padding: var(--esp-2) var(--esp-3);
+  background: var(--acento-suave);
+  border-left: 4px solid var(--acento);
+  border-radius: var(--radio-1);
+  font-size: var(--tam-3);
+}
+.franja-llegada p {
+  margin: var(--esp-1) 0;
+}
+.franja-llegada .motivo {
+  color: var(--texto);
+}
+.franja-llegada .acciones {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esp-2);
+}
+.franja-llegada .quitar {
+  width: var(--toque);
+  height: var(--toque);
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--texto-suave);
+  font-size: var(--tam-4);
+  cursor: pointer;
+}
+
+.aviso {
+  margin: 0 0 var(--esp-3);
+  padding: var(--esp-2) var(--esp-3);
+  background: var(--dudoso-fondo);
+  border-left: 4px solid var(--dudoso);
+  border-radius: var(--radio-1);
+  font-size: var(--tam-3);
+}
+.aviso.fuerte {
+  background: var(--impracticable-fondo);
+  border-left-color: var(--impracticable);
+}
+
+/* ---------- Esquema ---------- */
+
+.esquema {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--esp-1);
+  margin: var(--esp-2) 0 var(--esp-3);
+  overflow-x: auto;
+  color: var(--texto);
+}
+.esquema svg {
+  flex: none;
+  /* centra cada fila, pero si no entra queda pegada a la izquierda y se puede deslizar */
+  margin-inline: auto;
+  overflow: visible;
+}
+.esquema .trazo {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.esquema .nodo {
+  fill: currentColor;
+}
+.esquema .terminal,
+.esquema .conector circle {
+  fill: var(--superficie);
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+.esquema text {
+  /* el tamaño lo pone Esquema.tsx: es el mismo con el que esquema.ts reparte el ancho */
+  fill: currentColor;
+  font-family: var(--fuente-texto);
+}
+.esquema .conector text {
+  font-weight: 700;
+}
+
+/* ---------- Íconos ---------- */
+
+.icono-calculadora {
+  display: block;
+}

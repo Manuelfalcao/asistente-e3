@@ -87,12 +87,15 @@ Origen: [Formatos de distribución](issues/06-formatos-distribucion.md), [Protot
 | `src/calculo/comun/` | Lo compartido: series E, barrido de frecuencia (ABCD con complejos), búsqueda de Arreglos equivalentes (la usan Arreglos y atenuadores), red L serie-paralelo (la usan redes y resonadores acoplados), criterio de valor impracticable y formateador de números para LaTeX. |
 | `src/entrada/` | Parser puro de la Entrada flexible y formateador de salida. |
 | `src/almacen/` | Inventario, entradas y última Calculadora en `localStorage`, con un JSON que lleva un campo `version` desde el primer día para poder migrar. |
-| `src/ui/` | Componentes, uno por Calculadora, más el armazón (navegación, encabezado, franja de versión). |
+| `src/ui/` | Componentes, uno por Calculadora, más el armazón (navegación, encabezado, franja de versión). Los colores, la tipografía, los tamaños y el espaciado están en `src/ui/tokens.css` ([ADR 1](adr/0001-modo-oscuro-segun-el-sistema.md)). |
+| `src/ui/comun/` | Los componentes base que comparten las Calculadoras: tarjeta de resultado, campos, rótulos, botón de pase, franjas y el esquema en escalera. |
+| `src/muestra/` | La página de muestra del sistema visual, para revisarlo en el celular. No entra en ninguno de los dos productos. |
+| `scripts/` | Pasos de construcción que no hace Vite: los PNG del ícono del Asistente y la copia del HTML único dentro de la PWA. |
 | `tests/` | Vitest. `tests/oraculos/` tiene los oráculos independientes (sección 13.4). |
 
 ### 3.3 Tests
 
-- **Vitest** para `src/calculo/` y `src/entrada/`.
+- **Vitest** para `src/calculo/` y `src/entrada/`, y para las funciones puras de `src/ui/` (el trazado del esquema y el contraste de la paleta).
 - Los Casos de prueba se escriben **como tablas de datos** (entradas, esperado, tolerancia con motivo, referencia). Las mismas tablas corren en Vitest y alimentan el Informe de casos (sección 13).
 - En la primera versión no hay tests de interfaz. Si el pase entre Calculadoras resulta frágil, se suman tests de componentes con `@testing-library/preact`.
 
@@ -125,7 +128,7 @@ Origen: [Stack técnico y estructura del código](issues/15-stack-tecnico.md), [
 - **Qué lleva el pase:**
   - el valor con **precisión completa**, no el texto redondeado. El campo de destino muestra el valor con 4 cifras, y mientras ese texto no se edite se usa el valor completo;
   - en el pase a bobinas, la frecuencia de evaluación del origen precargada como frecuencia de trabajo;
-  - en el pase a Arreglos equivalentes, el tipo de componente (capacitor o resistor) ya elegido;
+  - en el pase a Arreglos equivalentes, el tipo de componente (capacitor o resistencia) ya elegido;
   - el aviso del origen: si el valor era un Valor dudoso o impracticable, la franja de llegada repite el rótulo y su motivo.
 - El botón de pase de un valor con aviso lleva un punto del color del nivel.
 
@@ -258,7 +261,7 @@ Origen: [Prototipo de renderizado de fórmulas en el celular](issues/18-prototip
 | Filtros con R_s ≠ R_L (π, T) | el aviso de pérdida plana | Redes de adaptación | R_s y R_L; f₀ solo si el filtro es pasa banda |
 | Redes de adaptación | cada L | Bobinas | La L y f₀ |
 | Redes de adaptación | cada C | Arreglos equivalentes | La C, con tipo capacitor |
-| Atenuadores | cada resistor | Arreglos equivalentes | La R, con tipo resistor. Nota: en un Arreglo equivalente la potencia se reparte entre los componentes |
+| Atenuadores | cada resistencia | Arreglos equivalentes | La R, con tipo resistencia. Nota: en un Arreglo equivalente la potencia se reparte entre los componentes |
 
 Las Calculadoras de bobinas y de Arreglos equivalentes no pasan valores a otras.
 
@@ -273,7 +276,7 @@ Una función de `src/calculo/comun/` revisa **automáticamente cada L, C y R** d
 | Incertidumbre de L por nodo | ±3 nH | Terminales de 0,4 nH/mm cerca del plano, con unos ±5 a 7 mm de incierto |
 | Incertidumbre de C por nodo | ±0,5 pF | Islas de FR-4 de 3×3 a 5×5 mm, que suman de 0,2 a 0,8 pF a masa (cálculo propio) |
 | ESL de un capacitor | 2,8 nH | Radial de paso 2,54 mm con terminales de 3 mm (`research/valor-impracticable.md` §4.2) |
-| Resistor | axial de película: 4,5 nH en serie y 0,43 pF en paralelo | Brinson, ajuste a medición |
+| Resistencia | axial de película: 4,5 nH en serie y 0,43 pF en paralelo | Brinson, ajuste a medición |
 
 Estos cuatro parámetros están en un solo lugar del código, para poder cambiarlos si la Cátedra mide un montaje.
 
@@ -321,7 +324,7 @@ Estos cuatro parámetros están en un solo lugar del código, para poder cambiar
   - el motivo de cada valor con números, por ejemplo *"C1: suponiendo montaje Manhattan, ±0,5 pF → 25 % de error"*;
   - la sugerencia de la Calculadora, si tiene una (tabla de abajo);
   - el rótulo *criterio práctico*.
-- La cuenta (ΔL/L, f/f_SRF o X/R) va en los pasos intermedios con sus fuentes: KOA y Brinson para los resistores, KYOCERA AVX para la ESL y la NBS Circular 74 para los terminales.
+- La cuenta (ΔL/L, f/f_SRF o X/R) va en los pasos intermedios con sus fuentes: KOA y Brinson para las resistencias, KYOCERA AVX para la ESL y la NBS Circular 74 para los terminales.
 
 | Calculadora | Sugerencia |
 |---|---|
@@ -707,11 +710,11 @@ Busca los Arreglos equivalentes serie-paralelo de hasta 4 componentes de Valor c
 
 | Campo | Opciones o unidad | Notas |
 |---|---|---|
-| Componente | Capacitor · Resistor | Los inductores quedan afuera: para eso está la Calculadora de bobinas |
+| Componente | Capacitor · Resistencia | Los inductores quedan afuera: para eso está la Calculadora de bobinas |
 | Valor buscado | pF o Ω | > 0. Llega precargado desde otras Calculadoras |
 | Serie | E6 · **E12** · E24 | Sin E48 ni E96 |
 | Umbral de error | % | Editable, 1 % por defecto (sección 8.4) |
-| Tolerancia por defecto | % o pF | Editable por tipo: ±5 % para resistores, ±5 % para capacitores de 10 pF o más y ±0,25 pF absolutos para los de menos de 10 pF |
+| Tolerancia por defecto | % o pF | Editable por tipo: ±5 % para resistencias, ±5 % para capacitores de 10 pF o más y ±0,25 pF absolutos para los de menos de 10 pF |
 
 ### 8.2 Bloque de Inventario
 
@@ -724,7 +727,7 @@ y tiene un botón **"Editar Inventario"**.
 
 **Inventario** (uno por tipo de componente, guardado en `localStorage`):
 
-- **Sin Inventario propio**, la búsqueda usa la serie completa en un rango fijo: 1 pF a 10 nF para capacitores y 1 Ω a 10 MΩ para resistores.
+- **Sin Inventario propio**, la búsqueda usa la serie completa en un rango fijo: 1 pF a 10 nF para capacitores y 1 Ω a 10 MΩ para resistencias.
 - **Por inclusión:** la lista de valores que tiene el Alumno. Acepta cualquier valor escrito con la Entrada flexible, sea o no de la serie (0,5 pF, 4,3 pF).
 - **Por exclusión:** la serie E elegida en un rango editable (por defecto, el rango fijo del tipo), menos los **Valores excluidos**, más una lista corta de valores extra fuera de la serie.
   - Los Valores excluidos se marcan tocando una grilla de la serie, una fila por década: tachado al excluir, otro toque lo vuelve a incluir.
@@ -732,12 +735,12 @@ y tiene un botón **"Editar Inventario"**.
 - Al cambiar de modo, la lista del otro modo no se borra.
 - **No guarda cantidades:** un mismo valor se puede repetir dentro de un Arreglo. Cuando se repite, el resultado lo avisa ("usa 3 × 10 pF").
 - **Tolerancia por valor:** en modo inclusión, y en los valores extra del modo exclusión, se puede pisar la tolerancia de un valor puntual. En el resto del modo exclusión vale la tolerancia por defecto.
-- El Inventario de resistores también lo usa la Calculadora de atenuadores (sección 10.4).
+- El Inventario de resistencias también lo usa la Calculadora de atenuadores (sección 10.4).
 
 ### 8.3 Búsqueda
 
 - **Formas de conexión:** 1, 2, 4 y 10 para 1 a 4 componentes (OEIS A000084). Se enumeran sin duplicados como árboles alternantes serie/paralelo (un nodo serie no tiene hijos serie, y al revés) con los hijos ordenados. Las 10 de 4 componentes son `S(a,b,c,d)`, `S(a,b,P(c,d))`, `S(P(a,b),P(c,d))`, `S(a,P(b,c,d))`, `S(a,P(b,S(c,d)))` y sus duales.
-- **Un solo motor con dos operaciones:** suma y suma recíproca. En capacitores, paralelo suma y serie es la inversa de la suma de inversas; en resistores, al revés.
+- **Un solo motor con dos operaciones:** suma y suma recíproca. En capacitores, paralelo suma y serie es la inversa de la suma de inversas; en resistencias, al revés.
 - **Meet-in-the-middle:**
   1. Se precalculan tablas ordenadas de pares en serie y en paralelo.
   2. Cada forma de 4 componentes se escribe como f(componentes externos, Y), con Y un par de la tabla y f creciente en Y.
@@ -873,7 +876,7 @@ Origen: [Redes de adaptación L, π y T: fórmulas y alcance](issues/05-redes-ad
 
 ## 10. Calculadora de atenuadores
 
-Calcula atenuadores resistivos T y π, con impedancias iguales o distintas, la disipación de cada resistor y el efecto de usar Valores comerciales.
+Calcula atenuadores resistivos T y π, con impedancias iguales o distintas, la disipación de cada resistencia y el efecto de usar Valores comerciales.
 
 ### 10.1 Entradas
 
@@ -882,10 +885,10 @@ Calcula atenuadores resistivos T y π, con impedancias iguales o distintas, la d
 | Atenuación A | dB | vacío | > 0. Tope duro: 60 dB |
 | Z1 (fuente) | Ω | 50 | Un botón ⇄ intercambia Z1 y Z2 |
 | Z2 (carga) | Ω | 50 | |
-| Mínima pérdida (botón) | — | — | Aparece con Z1 ≠ Z2: fija la atenuación en A_min y muestra la red L de dos resistores |
+| Mínima pérdida (botón) | — | — | Aparece con Z1 ≠ Z2: fija la atenuación en A_min y muestra la red L de dos resistencias |
 | Potencia de entrada (opcional) | W o dBm | vacío | dBm con el Selector de unidad. Aceptar dBm no es la Calculadora de conversión que quedó afuera |
 | Frecuencia (opcional) | MHz | vacío | Para el criterio de valor impracticable. Vacía: 300 MHz |
-| Redondeo | E6 · **E12** · E24 · Inventario de resistores | | El Inventario se ofrece si hay uno guardado. Sin E96 |
+| Redondeo | E6 · **E12** · E24 · Inventario de resistencias | | El Inventario se ofrece si hay uno guardado. Sin E96 |
 | Tolerancia | % | ±5 % | Editable, como en Arreglos equivalentes |
 | Ventana de atenuación | dB | ±0,1 dB | Editable, para las mejores combinaciones |
 
@@ -906,8 +909,8 @@ T:  R3 = 2K·√(Z1·Z2)/(K² − 1)
 ```
 
 - Con Z1 = Z2 = Z0 se reducen a las formas conocidas: T, `R_serie = Z0·(K−1)/(K+1)` y `R_deriv = 2K·Z0/(K²−1)`; π, `R_deriv = Z0·(K+1)/(K−1)` y `R_serie = Z0·(K²−1)/(2K)`.
-- **Atenuación mínima** con Z1 ≠ Z2: `A_min = 20·log10(√r + √(r − 1))`, con r = Z_mayor/Z_menor (5,72 dB de 50 a 75 Ω; 13,42 dB de 50 a 300 Ω). Por debajo, sale negativo el resistor en serie del lado de la impedancia menor (T) o el de derivación del lado de la impedancia **mayor** (π).
-- **Pad de mínima pérdida** (caso límite, K = K_min): resistor en serie del lado de la impedancia mayor `= Z_mayor·√(1 − Z_menor/Z_mayor)` y en derivación del lado de la menor `= Z_menor/√(1 − Z_menor/Z_mayor)`.
+- **Atenuación mínima** con Z1 ≠ Z2: `A_min = 20·log10(√r + √(r − 1))`, con r = Z_mayor/Z_menor (5,72 dB de 50 a 75 Ω; 13,42 dB de 50 a 300 Ω). Por debajo, sale negativa la resistencia en serie del lado de la impedancia menor (T) o la de derivación del lado de la impedancia **mayor** (π).
+- **Pad de mínima pérdida** (caso límite, K = K_min): resistencia en serie del lado de la impedancia mayor `= Z_mayor·√(1 − Z_menor/Z_mayor)` y en derivación del lado de la menor `= Z_menor/√(1 − Z_menor/Z_mayor)`.
 - **Referencia:** coinciden término a término con el *Reference Data for Radio Engineers*, 4.ª ed. (ITT, 1956), cap. 9, págs. 252-254 (ecuaciones en la pág. 253; mínima pérdida en la Fig. 7, pág. 260), con N = K²; las mismas ecuaciones están en la 1.ª ed. (1943), págs. 65-67. La pág. 253 también sirve para Z1 = Z2. Los pasos intermedios muestran N = K² para cotejar con el libro.
 
 ### 10.3 Potencia (opcional)
@@ -919,20 +922,20 @@ T:  P_R1 = P·R1/Z1        P_R3 = P·(Z1 − R1)²/(Z1·R3)        P_R2 = P·R2/
 π:  P_R1 = P·Z1/R1        P_R3 = P·(√Z1 − √Z2/K)²/R3          P_R2 = P·Z2/(K²·R2)
 ```
 
-- Para cada resistor: la potencia disipada y una **potencia nominal mínima sugerida con margen de 2×**, rotulada como criterio de diseño. No se asume ninguna lista de potencias comerciales.
+- Para cada resistencia: la potencia disipada y una **potencia nominal mínima sugerida con margen de 2×**, rotulada como criterio de diseño. No se asume ninguna lista de potencias comerciales.
 - Nota fija: el cálculo es para potencia continua; con señales moduladas hay que mirar la potencia de pico.
 
 ### 10.4 Valores comerciales
 
-- Se muestran el **redondeo al más cercano** (en escala logarítmica) y las **3 mejores combinaciones entre vecinos**: los 7 valores más cercanos de cada resistor, sin forzar la simetría (7³ = 343 evaluaciones).
+- Se muestran el **redondeo al más cercano** (en escala logarítmica) y las **3 mejores combinaciones entre vecinos**: los 7 valores más cercanos de cada resistencia, sin forzar la simetría (7³ = 343 evaluaciones).
   - Se ordenan por PR dentro de la ventana de atenuación (±0,1 dB por defecto).
   - Si ninguna entra en la ventana, se muestran las 3 de menor error de atenuación, con un aviso.
 - Cada opción muestra, calculado con el barrido de la sección 5.7:
   - la atenuación real;
   - la PR de entrada y de salida en dB con la ROE equivalente ("30,5 dB (ROE 1,06)");
   - el **peor caso por tolerancia**: la atenuación [mín, máx] y la PR mínima, con las 8 combinaciones de extremos.
-- El pad de mínima pérdida lleva el mismo tratamiento con 2 resistores. Si el redondeo lo deja apenas debajo de A_min, la desadaptación se ve en las PR, sin aviso aparte.
-- **Cada resistor calculado** tiene un botón de pase a Arreglos equivalentes (tipo resistor), con la nota de que la potencia se reparte entre los componentes.
+- El pad de mínima pérdida lleva el mismo tratamiento con 2 resistencias. Si el redondeo lo deja apenas debajo de A_min, la desadaptación se ve en las PR, sin aviso aparte.
+- **Cada resistencia calculada** tiene un botón de pase a Arreglos equivalentes (tipo resistencia), con la nota de que la potencia se reparte entre los componentes.
 
 ### 10.5 Límites y avisos
 
@@ -941,15 +944,15 @@ T:  P_R1 = P·R1/Z1        P_R3 = P·(Z1 − R1)²/(Z1·R3)        P_R2 = P·R2/
 | A ≤ 0 dB | Entrada inválida |
 | A > 60 dB | Corte: no se calcula |
 | A < A_min con Z1 ≠ Z2 | No se muestran valores negativos: se informa A_min y se ofrece el pad de mínima pérdida |
-| A < 0,5 dB | Aviso: los resistores en serie quedan del orden de la resistencia de los terminales |
+| A < 0,5 dB | Aviso: las resistencias en serie quedan del orden de la resistencia de los terminales |
 | A > 40 dB | Aviso: en VHF una sola sección no llega a esa atenuación real; conviene armar secciones de 10 a 20 dB en cascada. La cascada no se calcula: el Alumno puede usar la Calculadora dos veces |
-| Frecuencia vacía | Los resistores se revisan a 300 MHz, y el aviso lo dice |
-| Cada resistor ideal y redondeado | Valor dudoso o impracticable por el rango de R a esa frecuencia (sección 5.6). Con estos umbrales, el T de 20 dB (10 Ω en derivación) es dudoso a 150 MHz e impracticable a 300 MHz, y el resistor de 1 Ω del T de 40 dB es impracticable en toda la banda |
-| Siempre | Nota para VHF: resistores de película o SMD, no de alambre, y terminales cortos |
+| Frecuencia vacía | Las resistencias se revisan a 300 MHz, y el aviso lo dice |
+| Cada resistencia ideal y redondeada | Valor dudoso o impracticable por el rango de R a esa frecuencia (sección 5.6). Con estos umbrales, el T de 20 dB (10 Ω en derivación) es dudoso a 150 MHz e impracticable a 300 MHz, y la resistencia de 1 Ω del T de 40 dB es impracticable en toda la banda |
+| Siempre | Nota para VHF: resistencias de película o SMD, no de alambre, y terminales cortos |
 
 ### 10.6 Pasos intermedios
 
-K = 10^(A/20) y N = K², la fórmula de cada resistor con sus valores, A_min cuando Z1 ≠ Z2, y la verificación: la impedancia de entrada con la carga conectada y la atenuación recalculada.
+K = 10^(A/20) y N = K², la fórmula de cada resistencia con sus valores, A_min cuando Z1 ≠ Z2, y la verificación: la impedancia de entrada con la carga conectada y la atenuación recalculada.
 
 Origen: [Fórmulas de atenuadores resistivos π y T](issues/12-formulas-atenuadores.md), [Alcance de la Calculadora de atenuadores](issues/13-alcance-atenuadores.md), [Contraste de las fórmulas de atenuadores con impedancias distintas](issues/23-contraste-atenuadores.md), [`research/formulas-atenuadores.md`](research/formulas-atenuadores.md), [`research/contraste-atenuadores.md`](research/contraste-atenuadores.md).
 
@@ -1053,7 +1056,7 @@ Los valores numéricos de cada caso están en las investigaciones de [`research/
 **Arreglos equivalentes** (`research/busqueda-arreglos-equivalentes.md`)
 
 - *Referencia:* E6, E12 y E24 completas contra IEC 60063 (Vishay 31001), con las 8 excepciones de E24 a la vista; la cantidad de formas de conexión (OEIS A000084: 1, 2, 4, 10).
-- *Verificación:* en 37,3 pF E12, 47 pF y dos búsquedas de resistores, el top-10 del meet-in-the-middle es igual al de la fuerza bruta. La Tolerancia del arreglo de 47 pF = 39 pF J ∥ 8,2 pF C (±4,7 %) va calculada a mano en el informe.
+- *Verificación:* en 37,3 pF E12, 47 pF y dos búsquedas de resistencias, el top-10 del meet-in-the-middle es igual al de la fuerza bruta. La Tolerancia del arreglo de 47 pF = 39 pF J ∥ 8,2 pF C (±4,7 %) va calculada a mano en el informe.
 - *Comportamiento:* Inventario por exclusión con Valores excluidos y valores extra; valores repetidos; umbral del 1 %; ±0,25 pF debajo de 10 pF; C mínima.
 
 **Redes de adaptación** (`research/redes-adaptacion.md`)
@@ -1140,5 +1143,5 @@ Origen: [Casos de prueba e informe para la aprobación de la Cátedra](issues/24
 | H. A. Wheeler, *Proc. IRE* 16(10), 1928 | Bobinas (pasos intermedios) |
 | R. G. Medhurst, *Wireless Engineer*, 1947 | Bobinas (SRF) |
 | IEC 60063:2015 (Vishay Dale, doc. 31001) | Series E |
-| KEMET C1003_C0G; KYOCERA AVX; KOA; Brinson | Tolerancias de capacitores, ESL, parásitas de resistores |
+| KEMET C1003_C0G; KYOCERA AVX; KOA; Brinson | Tolerancias de capacitores, ESL, parásitas de resistencias |
 | Temml 0.14.0; Latin Modern Math (GUST) | Fórmulas en pantalla |

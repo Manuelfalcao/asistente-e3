@@ -1,0 +1,201 @@
+/* Solo para la página de muestra. En el Asistente la fuente de las fórmulas llega con Temml. */
+@font-face {
+  font-family: 'Latin Modern Math';
+  src: url('./fuentes/latinmodern-math-recorte.woff2') format('woff2');
+  font-display: swap;
+}
+
+.m-pagina {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: var(--esp-4) var(--esp-4) var(--esp-6);
+}
+.m-cabecera h1 {
+  margin: 0 0 var(--esp-2);
+  font-size: var(--tam-6);
+}
+.m-seccion {
+  margin-top: var(--esp-6);
+}
+.m-seccion h2 {
+  margin: 0 0 var(--esp-3);
+  padding-bottom: var(--esp-2);
+  border-bottom: 1px solid var(--borde);
+  font-size: var(--tam-5);
+}
+.m-seccion h3:not(.tarjeta-titulo) {
+  margin: var(--esp-5) 0 var(--esp-2);
+  font-size: var(--tam-4);
+}
+.m-seccion p {
+  margin: 0 0 var(--esp-3);
+}
+.m-nota,
+.m-seccion .m-nota {
+  font-size: var(--tam-3);
+  color: var(--texto-suave);
+}
+.m-cabecera .segmentado {
+  max-width: 24rem;
+  margin-bottom: var(--esp-2);
+}
+
+.m-colores {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+  gap: var(--esp-2);
+  margin-bottom: var(--esp-4);
+}
+.m-color {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--esp-2);
+  font-size: var(--tam-3);
+}
+.m-pastilla {
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--borde-campo);
+  border-radius: var(--radio-1);
+}
+.m-hex {
+  font-family: ui-monospace, monospace;
+  color: var(--texto-suave);
+}
+.m-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--tam-3);
+}
+.m-tabla th {
+  text-align: left;
+  color: var(--texto-suave);
+  font-weight: 600;
+}
+.m-tabla th,
+.m-tabla td {
+  padding: var(--esp-2) var(--esp-1);
+  border-bottom: 1px solid var(--borde);
+  vertical-align: middle;
+}
+.m-tabla code {
+  font-size: var(--tam-1);
+  color: var(--texto-suave);
+  overflow-wrap: anywhere;
+}
+.m-par {
+  display: inline-block;
+  min-width: 5.5rem;
+  padding: var(--esp-1) var(--esp-2);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-1);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.m-escala {
+  margin-bottom: var(--esp-4);
+}
+.m-tam {
+  display: flex;
+  flex-direction: column;
+  padding: var(--esp-2) 0;
+  border-bottom: 1px solid var(--borde);
+}
+.m-tam small {
+  font-size: var(--tam-2);
+  color: var(--texto-suave);
+}
+
+.m-espacios {
+  margin-bottom: var(--esp-4);
+}
+.m-espacio {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-3);
+  font-size: var(--tam-3);
+}
+.m-espacio span {
+  height: 0.75rem;
+  background: var(--acento);
+}
+.m-toque,
+.m-fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-3);
+}
+.m-cuadro-toque {
+  display: grid;
+  place-items: center;
+  width: var(--toque);
+  height: var(--toque);
+  border: 1px dashed var(--borde-campo);
+  font-size: var(--tam-1);
+  color: var(--texto-suave);
+}
+
+.pestanas.m-estatica {
+  position: static;
+  height: var(--alto-pestanas);
+  padding-bottom: 0;
+  margin-bottom: var(--esp-4);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-2);
+  overflow: hidden;
+}
+.m-iconos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-4);
+  margin-bottom: var(--esp-4);
+}
+.m-iconos figure {
+  margin: 0;
+  text-align: center;
+  font-size: var(--tam-2);
+  color: var(--texto-suave);
+}
+.m-iconos svg {
+  margin: 0 auto var(--esp-1);
+  color: var(--texto);
+}
+.m-iconos-app {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-5);
+}
+.m-iconos-app figure {
+  margin: 0;
+  text-align: center;
+  font-size: var(--tam-2);
+  color: var(--texto-suave);
+}
+.m-iconos-app span {
+  display: block;
+  width: 96px;
+  height: 96px;
+  margin-bottom: var(--esp-1);
+  overflow: hidden;
+}
+.m-iconos-app svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.m-iconos-app .m-circulo {
+  border-radius: 50%;
+}
+.m-iconos-app .m-ios {
+  border-radius: 22%;
+}
+
+.m-entradas {
+  max-width: 30rem;
+}
+.m-franja-version {
+  margin: 0 calc(-1 * var(--esp-4));
+}
