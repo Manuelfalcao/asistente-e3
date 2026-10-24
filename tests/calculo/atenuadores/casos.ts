@@ -3,6 +3,7 @@ import type {
   CodigoCorte,
   EntradaAtenuador,
 } from '../../../src/calculo/atenuadores/atenuadores';
+import type { Nivel } from '../../../src/calculo/comun/valor-impracticable';
 import {
   type ClaseCaso,
   type DiferenciaEsperada,
@@ -107,7 +108,7 @@ export const CASOS_COMPORTAMIENTO: readonly CasoComportamiento[] = [
   comportamiento(
     '60 dB se calcula, con el aviso de más de 40 dB',
     { atenuacion: 60, z1: 50, z2: 50 },
-    { avisos: ['mas-de-40'] },
+    { avisos: ['mas-de-40', 'frecuencia-por-defecto'] },
   ),
   comportamiento(
     'Debajo de A_min de 50 a 75 Ω',
@@ -122,14 +123,79 @@ export const CASOS_COMPORTAMIENTO: readonly CasoComportamiento[] = [
   comportamiento(
     'Apenas arriba de A_min de 50 a 75 Ω se calcula',
     { atenuacion: 5.72, z1: 50, z2: 75 },
-    { avisos: [] },
+    { avisos: ['frecuencia-por-defecto'] },
   ),
   comportamiento(
     'Menos de 0,5 dB',
     { atenuacion: 0.3, z1: 50, z2: 50 },
-    { avisos: ['menos-de-medio-db'] },
+    { avisos: ['menos-de-medio-db', 'frecuencia-por-defecto'] },
   ),
-  comportamiento('0,5 dB no avisa', { atenuacion: 0.5, z1: 50, z2: 50 }, { avisos: [] }),
-  comportamiento('Más de 40 dB', { atenuacion: 45, z1: 50, z2: 75 }, { avisos: ['mas-de-40'] }),
-  comportamiento('40 dB no avisa', { atenuacion: 40, z1: 50, z2: 50 }, { avisos: [] }),
+  comportamiento(
+    '0,5 dB no avisa',
+    { atenuacion: 0.5, z1: 50, z2: 50 },
+    { avisos: ['frecuencia-por-defecto'] },
+  ),
+  comportamiento(
+    'Más de 40 dB',
+    { atenuacion: 45, z1: 50, z2: 75 },
+    { avisos: ['mas-de-40', 'frecuencia-por-defecto'] },
+  ),
+  comportamiento(
+    '40 dB no avisa',
+    { atenuacion: 40, z1: 50, z2: 50 },
+    { avisos: ['frecuencia-por-defecto'] },
+  ),
+];
+
+// El criterio común de valor impracticable sobre las resistencias (spec §5.6 y §10.5). Con la
+// frecuencia vacía se revisa a 300 MHz.
+export interface CasoValor extends CasoBase {
+  clase: 'comportamiento';
+  // El nivel de cada resistencia marcada de cada red; las que no están, sin marca.
+  esperado: { t: Partial<Record<NombreR, Nivel>>; pi: Partial<Record<NombreR, Nivel>> };
+}
+
+type NombreR = 'R1' | 'R2' | 'R3';
+
+const SPEC_VALOR = 'spec §5.6 y §10.5';
+
+const valor = (
+  id: string,
+  entradas: EntradaAtenuador,
+  esperado: CasoValor['esperado'],
+  referencia = SPEC_VALOR,
+): CasoValor => ({ clase: 'comportamiento', id, entradas, esperado, referencia });
+
+export const CASOS_VALOR: readonly CasoValor[] = [
+  // En el T de 20 dB, R3 = 10,1 Ω da ω·Ls/R = 0,42 a 150 MHz y 0,84 a 300 MHz, y las serie de
+  // 40,9 Ω llegan a 0,21 a 300 MHz. En el π, la serie de 247,5 Ω da ω·Cp·R = 0,2006 a 300 MHz.
+  valor(
+    'T de 20 dB a 150 MHz: R3 (10 Ω) es Valor dudoso',
+    { atenuacion: 20, z1: 50, z2: 50, frecuencia: 150e6 },
+    { t: { R3: 'dudoso' }, pi: {} },
+  ),
+  valor(
+    'T de 20 dB a 300 MHz: R3 (10 Ω) es Valor impracticable',
+    { atenuacion: 20, z1: 50, z2: 50, frecuencia: 300e6 },
+    { t: { R1: 'dudoso', R2: 'dudoso', R3: 'impracticable' }, pi: { R3: 'dudoso' } },
+  ),
+  valor(
+    'T de 20 dB sin frecuencia: se revisa a 300 MHz',
+    { atenuacion: 20, z1: 50, z2: 50 },
+    { t: { R1: 'dudoso', R2: 'dudoso', R3: 'impracticable' }, pi: { R3: 'dudoso' } },
+  ),
+  // El π de 40 dB tampoco se salva: su serie de 2,5 kΩ da ω·Cp·R = 0,20 a 30 MHz y 0,68 a 100 MHz.
+  ...[30e6, 100e6, 150e6, 300e6].map((f) =>
+    valor(
+      `T de 40 dB a ${f / 1e6} MHz: R3 (1 Ω) es Valor impracticable (V13)`,
+      { atenuacion: 40, z1: 50, z2: 50, frecuencia: f },
+      { t: { R3: 'impracticable' }, pi: { R3: f === 30e6 ? 'dudoso' : 'impracticable' } },
+      `${SPEC_VALOR}; research/valor-impracticable.md, §8 (V13)`,
+    ),
+  ),
+  valor(
+    'T de 10 dB a 30 MHz: nada marcado',
+    { atenuacion: 10, z1: 50, z2: 50, frecuencia: 30e6 },
+    { t: {}, pi: {} },
+  ),
 ];

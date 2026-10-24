@@ -167,6 +167,11 @@
 .lista-pasos .formula {
   margin: 0;
 }
+.paso-fuente {
+  display: block;
+  font-size: var(--tam-3);
+  color: var(--texto-suave);
+}
 
 .motivos {
   margin-top: var(--esp-3);

@@ -49,7 +49,8 @@ export function Cita({ referencias }: { referencias: readonly Referencia[] }) {
   );
 }
 
-// El contenido del desplegable de pasos intermedios: qué se calcula y la fórmula sustituida.
+// El contenido del desplegable de pasos intermedios: qué se calcula, la fórmula sustituida y, si
+// hay, de dónde salen sus números.
 export function Pasos({ pasos }: { pasos: readonly Paso[] }) {
   return (
     <ol class="lista-pasos">
@@ -57,6 +58,7 @@ export function Pasos({ pasos }: { pasos: readonly Paso[] }) {
         <li key={i}>
           <span class="paso-texto">{p.texto}</span>
           <Formula latex={p.latex} />
+          {p.fuente && <span class="paso-fuente">{p.fuente}</span>}
         </li>
       ))}
     </ol>

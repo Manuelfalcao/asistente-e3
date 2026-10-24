@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import temml from 'temml';
 import { describe, expect, it } from 'vitest';
 import { calcularAtenuadores } from '../../src/calculo/atenuadores/atenuadores';
+import { revisarValores } from '../../src/calculo/comun/valor-impracticable';
 import { caracteresDeLaFuente } from './woff2';
 
 // Si una fórmula usa un carácter que la fuente recortada no tiene, el navegador lo dibuja con otra
@@ -28,6 +29,19 @@ function formulasDeAtenuadores(): string[] {
     }
   }
   return formulas;
+}
+
+// Las cuentas del criterio de valor impracticable, con un valor por cada rama.
+function formulasDelCriterio(): string[] {
+  const resultado = {
+    l: { componente: 'L', nombre: 'L1', valor: 5e-9 },
+    c: { componente: 'C', nombre: 'C1', valor: 2e-12 },
+    cSrf: { componente: 'C', nombre: 'C2', valor: 100e-12 },
+    cInductiva: { componente: 'C', nombre: 'C3', valor: 1e-9 },
+    rChica: { componente: 'R', nombre: 'R1', valor: 1 },
+    rGrande: { componente: 'R', nombre: 'R2', valor: 10e3 },
+  };
+  return revisarValores(resultado, 300e6).pasos.map((p) => p.latex);
 }
 
 // Un <mi> de una sola letra sin mathvariant sale en itálica: el navegador lo pasa a las letras
@@ -84,6 +98,18 @@ describe('fuente recortada de las fórmulas', () => {
   it('tiene cada carácter de las fórmulas de atenuadores', () => {
     const faltan = new Set<string>();
     for (const latex of formulasDeAtenuadores()) {
+      for (const c of caracteresDelMathml(temml.renderToString(latex, { wrap: 'tex' }))) {
+        if (!enLaFuente.has(c)) faltan.add(`U+${c.toString(16).toUpperCase().padStart(4, '0')}`);
+      }
+    }
+    expect([...faltan]).toEqual([]);
+  });
+
+  it('tiene cada carácter de las cuentas del criterio de valor impracticable', () => {
+    const faltan = new Set<string>();
+    const formulas = formulasDelCriterio();
+    expect(formulas.length).toBeGreaterThanOrEqual(6);
+    for (const latex of formulas) {
       for (const c of caracteresDelMathml(temml.renderToString(latex, { wrap: 'tex' }))) {
         if (!enLaFuente.has(c)) faltan.add(`U+${c.toString(16).toUpperCase().padStart(4, '0')}`);
       }

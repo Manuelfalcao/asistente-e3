@@ -1,5 +1,7 @@
+import type { Nivel } from '../../calculo/comun/valor-impracticable';
+
 // Nivel de aviso de un valor (spec §5.6): ámbar para Valor dudoso, rojo para Valor impracticable.
-export type Nivel = 'dudoso' | 'impracticable';
+export type { Nivel };
 
 export type TipoRotulo =
   Nivel | 'estimacion' | 'criterio-practico' | 'criterio-diseno' | 'deduccion-propia';

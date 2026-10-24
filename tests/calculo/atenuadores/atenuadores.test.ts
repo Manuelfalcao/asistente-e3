@@ -6,7 +6,7 @@ import {
   calcularAtenuadores,
 } from '../../../src/calculo/atenuadores/atenuadores';
 import { dentroDeTolerancia, margen } from '../../casos';
-import { CASOS_COMPORTAMIENTO, CASOS_REFERENCIA } from './casos';
+import { CASOS_COMPORTAMIENTO, CASOS_REFERENCIA, CASOS_VALOR } from './casos';
 
 function calculado(atenuacion: number, z1: number, z2: number) {
   const r = calcularAtenuadores({ atenuacion, z1, z2 });
@@ -83,6 +83,46 @@ describe('casos de comportamiento (spec §10.5)', () => {
   it('la nota fija de VHF va siempre', () => {
     const r = calculado(10, 50, 50);
     expect(r.notas.join(' ')).toMatch(/película o SMD.*no de alambre.*terminales cortos/);
+  });
+});
+
+describe('valor impracticable en las resistencias (spec §5.6 y §10.5)', () => {
+  for (const caso of CASOS_VALOR) {
+    it(caso.id, () => {
+      const r = calcularAtenuadores(caso.entradas);
+      if (r.estado !== 'calculado') throw new Error(`no calculó: ${r.codigo}`);
+      const niveles = (a: Atenuador) =>
+        Object.fromEntries(a.revision.marcados.map((m) => [m.nombre, m.nivel]));
+      expect(niveles(r.t)).toEqual(caso.esperado.t);
+      expect(niveles(r.pi)).toEqual(caso.esperado.pi);
+    });
+  }
+
+  it('con la frecuencia vacía se revisa a 300 MHz y el aviso lo dice', () => {
+    const r = calculado(20, 50, 50);
+    const aviso = r.avisos.find((a) => a.codigo === 'frecuencia-por-defecto');
+    expect(aviso?.texto).toContain('300 MHz');
+    expect(r.t.revision.marcados.find((m) => m.nombre === 'R3')?.motivo).toBe(
+      'R3: suponiendo resistencia axial de película, 4,5 nH en serie → 84 % de error a 300 MHz',
+    );
+  });
+
+  it('con frecuencia no hay aviso de la frecuencia', () => {
+    const r = calcularAtenuadores({ atenuacion: 20, z1: 50, z2: 50, frecuencia: 145e6 });
+    expect(r.estado === 'calculado' && r.avisos.map((a) => a.codigo)).toEqual([]);
+  });
+
+  it('la sugerencia es mirar la otra Topología', () => {
+    const { t } = calculado(40, 50, 50);
+    expect(t.revision.sugerencia).toBe(
+      'Mirá la otra Topología (el π de 40 dB aguanta mucho mejor que el T).',
+    );
+  });
+
+  it('la cuenta va al final de los pasos de cada red', () => {
+    const { t } = calculado(40, 50, 50);
+    expect(t.pasos.at(-1)?.texto).toBe('R3: reactancia parásita sobre R a 300 MHz');
+    expect(t.pasos.at(-1)?.fuente).toMatch(/KOA.*Brinson/);
   });
 });
 

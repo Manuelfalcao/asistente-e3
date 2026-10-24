@@ -1,6 +1,7 @@
 import { formatearValor } from '../../entrada/formato';
 import { numeroLatex as numero, valorLatex } from '../comun/latex';
 import type { Aviso, Paso, Referencia } from '../comun/resultado';
+import { type Revision, revisarValores } from '../comun/valor-impracticable';
 
 // Atenuadores resistivos T y π entre Z1 (fuente) y Z2 (carga), iguales o distintas (spec §10.2).
 // Puro: recibe dB y ohms, y devuelve los valores con sus fórmulas, sus pasos y su referencia.
@@ -10,12 +11,17 @@ export interface EntradaAtenuador {
   atenuacion: number;
   z1: number;
   z2: number;
+  // En Hz, para el criterio de valor impracticable. Vacía: 300 MHz.
+  frecuencia?: number | null;
 }
 
 export type CodigoCorte = 'no-positiva' | 'mas-de-60' | 'debajo-de-a-min';
-export type CodigoAviso = 'menos-de-medio-db' | 'mas-de-40';
+export type CodigoAviso = 'menos-de-medio-db' | 'mas-de-40' | 'frecuencia-por-defecto';
 
 export interface Resistencia {
+  componente: 'R';
+  // "R1"
+  nombre: string;
   valor: number;
   posicion: 'serie' | 'derivacion';
   // De qué lado está; null la del medio.
@@ -32,6 +38,8 @@ export interface Atenuador {
   pasos: readonly Paso[];
   // Con Z2 conectada: la impedancia que ve la fuente y la atenuación que resulta.
   verificacion: { zEntrada: number; atenuacion: number };
+  // Valor dudoso o impracticable de cada resistencia (spec §5.6). Su cuenta está al final de pasos.
+  revision: Revision;
 }
 
 export type ResultadoAtenuadores =
@@ -79,12 +87,19 @@ export const NOTAS_ATENUADORES: readonly string[] = [
 
 const TOPE = 60;
 
+// El peor caso de la banda, para revisar las resistencias sin frecuencia.
+export const FRECUENCIA_POR_DEFECTO = 300e6;
+
+export const SUGERENCIA_ATENUADORES =
+  'Mirá la otra Topología (el π de 40 dB aguanta mucho mejor que el T).';
+
 const ohmsLatex = (r: number) => valorLatex(r, 'resistencia');
 
 export function calcularAtenuadores({
   atenuacion: a,
   z1,
   z2,
+  frecuencia = null,
 }: EntradaAtenuador): ResultadoAtenuadores {
   if (!(a > 0)) {
     return {
@@ -149,14 +164,30 @@ export function calcularAtenuadores({
     });
   }
 
+  if (frecuencia === null) {
+    avisos.push({
+      codigo: 'frecuencia-por-defecto',
+      texto:
+        `Sin frecuencia, las resistencias se revisan a ` +
+        `${formatearValor(FRECUENCIA_POR_DEFECTO, 'frecuencia')}, el peor caso de la banda. ` +
+        'Escribí la tuya en Frecuencia para revisarlas ahí.',
+    });
+  }
+
   const comunes = [...pasosDeK(a, k, n), ...(minima?.pasos ?? [])];
+  const conRevision = (red: Omit<Atenuador, 'revision'>): Atenuador => {
+    const revision = revisarValores(red, frecuencia ?? FRECUENCIA_POR_DEFECTO, {
+      sugerencia: SUGERENCIA_ATENUADORES,
+    });
+    return { ...red, pasos: [...comunes, ...red.pasos, ...revision.pasos], revision };
+  };
   return {
     estado: 'calculado',
     k,
     n,
     aMin: minima?.aMin ?? null,
-    t: { ...t, pasos: [...comunes, ...t.pasos] },
-    pi: { ...pi, pasos: [...comunes, ...pi.pasos] },
+    t: conRevision(t),
+    pi: conRevision(pi),
     avisos,
     referencias: REFERENCIAS_ATENUADORES,
     notas: NOTAS_ATENUADORES,
@@ -218,7 +249,14 @@ function pasoAtenuacion(zEntrada: number, z2: number, v2SobreV1: number, atenuac
 }
 
 // T: R1 en serie del lado de Z1, R3 en derivación y R2 en serie del lado de Z2.
-function atenuadorT(k: number, n: number, z1: number, z2: number): Atenuador {
+const resistencia = (
+  nombre: string,
+  valor: number,
+  posicion: Resistencia['posicion'],
+  lado: Resistencia['lado'],
+): Resistencia => ({ componente: 'R', nombre, valor, posicion, lado });
+
+function atenuadorT(k: number, n: number, z1: number, z2: number): Omit<Atenuador, 'revision'> {
   const r3 = (2 * k * Math.sqrt(z1 * z2)) / (n - 1);
   const r1 = (z1 * (n + 1)) / (n - 1) - r3;
   const r2 = (z2 * (n + 1)) / (n - 1) - r3;
@@ -288,9 +326,9 @@ function atenuadorT(k: number, n: number, z1: number, z2: number): Atenuador {
 
   return {
     topologia: 'T',
-    r1: { valor: r1, posicion: 'serie', lado: 'Z1' },
-    r2: { valor: r2, posicion: 'serie', lado: 'Z2' },
-    r3: { valor: r3, posicion: 'derivacion', lado: null },
+    r1: resistencia('R1', r1, 'serie', 'Z1'),
+    r2: resistencia('R2', r2, 'serie', 'Z2'),
+    r3: resistencia('R3', r3, 'derivacion', null),
     formulas: ['K = 10^{A/20}', ...formulas],
     pasos,
     verificacion: { zEntrada, atenuacion },
@@ -298,7 +336,7 @@ function atenuadorT(k: number, n: number, z1: number, z2: number): Atenuador {
 }
 
 // π: R1 en derivación del lado de Z1, R3 en serie y R2 en derivación del lado de Z2.
-function atenuadorPi(k: number, n: number, z1: number, z2: number): Atenuador {
+function atenuadorPi(k: number, n: number, z1: number, z2: number): Omit<Atenuador, 'revision'> {
   const r3 = ((n - 1) * Math.sqrt(z1 * z2)) / (2 * k);
   const r1 = ((n - 1) * z1) / (n + 1 - 2 * k * Math.sqrt(z1 / z2));
   const r2 = ((n - 1) * z2) / (n + 1 - 2 * k * Math.sqrt(z2 / z1));
@@ -374,9 +412,9 @@ function atenuadorPi(k: number, n: number, z1: number, z2: number): Atenuador {
 
   return {
     topologia: 'π',
-    r1: { valor: r1, posicion: 'derivacion', lado: 'Z1' },
-    r2: { valor: r2, posicion: 'derivacion', lado: 'Z2' },
-    r3: { valor: r3, posicion: 'serie', lado: null },
+    r1: resistencia('R1', r1, 'derivacion', 'Z1'),
+    r2: resistencia('R2', r2, 'derivacion', 'Z2'),
+    r3: resistencia('R3', r3, 'serie', null),
     formulas: ['K = 10^{A/20}', ...formulas],
     pasos,
     verificacion: { zEntrada, atenuacion },

@@ -6,6 +6,8 @@ export interface Paso {
   // Qué se calcula, en una línea: "Relación de tensiones".
   texto: string;
   latex: string;
+  // De dónde salen los números que no son del Alumno: "Brinson, ajuste a medición".
+  fuente?: string;
 }
 
 // Una obra de la bibliografía. Si hay varias ediciones, una entrada por edición.

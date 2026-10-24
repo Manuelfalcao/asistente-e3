@@ -13,6 +13,7 @@ import { Esquema } from '../comun/Esquema';
 import { Formula } from '../comun/Formula';
 import { Aviso } from '../comun/Franjas';
 import { Cita, FormaResultado, Pasos } from '../comun/Resultado';
+import { Rotulo } from '../comun/Rotulo';
 import { TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
 import { ATENUACION, FRECUENCIA, POTENCIA, Z1, Z2, Z_POR_DEFECTO } from './campos';
 
@@ -39,7 +40,12 @@ export function Atenuadores() {
     a.estado.estado === 'valido' &&
     z1.estado.estado === 'valido' &&
     z2.estado.estado === 'valido'
-      ? { atenuacion: a.estado.valor, z1: z1.estado.valor, z2: z2.estado.valor }
+      ? {
+          atenuacion: a.estado.valor,
+          z1: z1.estado.valor,
+          z2: z2.estado.valor,
+          frecuencia: frecuencia.estado.estado === 'valido' ? frecuencia.estado.valor : null,
+        }
       : null;
 
   return (
@@ -140,7 +146,7 @@ function escalera(red: Atenuador): Escalera {
   const elementos = (['r1', 'r3', 'r2'] as const).map((clave) => ({
     tipo: 'R' as const,
     posicion: red[clave].posicion,
-    nombre: clave.toUpperCase(),
+    nombre: red[clave].nombre,
   }));
   return { fuente: 'Z_1', carga: 'Z_2', elementos };
 }
@@ -160,17 +166,30 @@ function TarjetaAtenuador({
   titulo: string;
   resultado: Extract<ResultadoAtenuadores, { estado: 'calculado' }>;
 }) {
+  const { revision } = red;
+  const nivel = (clave: 'r1' | 'r2' | 'r3') =>
+    revision.marcados.find((m) => m.nombre === red[clave].nombre)?.nivel;
   return (
-    <TarjetaResultado titulo={titulo} destacada pasos={<Pasos pasos={red.pasos} />}>
+    <TarjetaResultado
+      titulo={titulo}
+      destacada
+      pasos={<Pasos pasos={red.pasos} />}
+      motivos={revision.marcados.map((m) => ({ nivel: m.nivel, texto: m.motivo }))}
+      sugerencia={revision.sugerencia ?? undefined}
+    >
       <Esquema escalera={escalera(red)} />
-      {(['r1', 'r2', 'r3'] as const).map((clave) => (
-        <ValorResultado
-          key={clave}
-          nombre={clave.toUpperCase()}
-          valor={ohms(red[clave].valor)}
-          detalle={donde(red, clave)}
-        />
-      ))}
+      {(['r1', 'r2', 'r3'] as const).map((clave) => {
+        const marca = nivel(clave);
+        return (
+          <ValorResultado
+            key={clave}
+            nombre={red[clave].nombre}
+            valor={ohms(red[clave].valor)}
+            rotulos={marca && <Rotulo tipo={marca} />}
+            detalle={donde(red, clave)}
+          />
+        );
+      })}
       <div class="formulas">
         {red.formulas.map((f) => (
           <Formula key={f} latex={f} />
