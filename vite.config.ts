@@ -45,7 +45,15 @@ export default defineConfig(({ mode }) => {
     plugins: [
       preact(),
       ...(archivo
-        ? [viteSingleFile()]
+        ? [
+            viteSingleFile(),
+            {
+              // Sin public/ el HTML único no tiene el PNG: el link apuntaría a un archivo que no existe.
+              name: 'sin-apple-touch-icon',
+              transformIndexHtml: (html: string) =>
+                html.replace(/\s*<link rel="apple-touch-icon"[^>]*>/, ''),
+            },
+          ]
         : [
             VitePWA({
               registerType: 'prompt',
