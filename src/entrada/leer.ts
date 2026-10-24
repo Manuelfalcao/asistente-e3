@@ -11,17 +11,17 @@ import {
 } from './campos';
 import { formatearDbm, formatearValor, vatiosADbm } from './formato';
 
-// Parser puro de la Entrada flexible (spec §5.1). Solo lee: los rangos válidos de cada campo los
+// Lector puro de la Entrada flexible (spec §5.1). Solo lee: los rangos válidos de cada campo los
 // fija su Calculadora (campo.ts).
 
-export type Lectura =
+export type ResultadoLectura =
   | { tipo: 'vacio' }
   // `valor` está en SI (H, F, Ω, Hz, W, m) o en la unidad del campo (dB, %, número). Una potencia
   // escrita en dBm lleva además los `dbm` que se escribieron.
   | { tipo: 'valor'; valor: number; dbm?: number; aviso?: string }
   | { tipo: 'error'; mensaje: string };
 
-const error = (mensaje: string): Lectura => ({ tipo: 'error', mensaje });
+const error = (mensaje: string): ResultadoLectura => ({ tipo: 'error', mensaje });
 const MENSAJE_MENOS = 'El signo menos solo vale en dBm';
 
 // Los prefijos que existen, en la variante que se escribió. Solo m/M y p/P se distinguen.
@@ -113,7 +113,7 @@ function prefijoFueraDelJuego(
   campo: Campo,
   cola: Cola,
   reescribir: (prefijo: string) => string,
-): Lectura {
+): ResultadoLectura {
   const def = DEFINICIONES[campo.magnitud];
   const escrito = `${cola.token}${cola.unidad ?? ''}`;
   const { prefijos } = def;
@@ -154,8 +154,15 @@ function unidadAceptada(campo: Campo, unidad: Unidad): boolean {
 
 const MANTISA = /^(\d+[.,]?\d*|[.,]\d+)/;
 const RKM = /^(\d+)(meg|[A-Za-zµμ])(\d+)\s*(.*)$/i;
-const R_COMO_COMA = /^(\d*)[rR](\d+)$/;
-const R_FINAL = /^(\d+)[rR]$/;
+// Con la unidad opcional detrás, como en "4k7 ohm": la última captura es lo que sigue a la R.
+const R_COMO_COMA = /^(\d*)[rR](\d+)\s*(.*)$/;
+const R_FINAL = /^(\d+)[rR]\s*(.*)$/;
+
+// Detrás de una R que hace de coma solo puede ir la unidad, sin prefijo.
+function esSoloOhmios(cola: string): boolean {
+  const leida = leerCola(cola.trim());
+  return leida !== null && leida.prefijo === undefined && (leida.unidad ?? OHMIO) === OHMIO;
+}
 
 function aDecimal(mantisa: string): string {
   let texto = mantisa.replace(',', '.');
@@ -164,7 +171,7 @@ function aDecimal(mantisa: string): string {
 }
 
 // Lee lo que el Alumno escribió en un campo de valor. No juzga el rango: eso es del campo.
-export function leerEntrada(texto: string, campo: Campo): Lectura {
+export function leerEntrada(texto: string, campo: Campo): ResultadoLectura {
   const original = texto.trim();
   if (original === '') return { tipo: 'vacio' };
   const def = DEFINICIONES[campo.magnitud];
@@ -195,9 +202,12 @@ export function leerEntrada(texto: string, campo: Campo): Lectura {
   // La R como coma o como final vale solo en resistencia ("R47", "47R", "4R7").
   if (campo.magnitud === 'resistencia') {
     const coma = R_COMO_COMA.exec(cuerpo);
-    if (coma) return { tipo: 'valor', valor: Number(`${coma[1] || '0'}.${coma[2]}`) };
     const final = R_FINAL.exec(cuerpo);
-    if (final) return { tipo: 'valor', valor: Number(final[1]) };
+    const forma = coma ?? final;
+    if (forma && esSoloOhmios(forma[forma.length - 1])) {
+      const texto = coma ? `${coma[1] || '0'}.${coma[2]}` : final![1];
+      return { tipo: 'valor', valor: Number(texto) };
+    }
   }
 
   let mantisa: string;
@@ -247,10 +257,17 @@ export function leerEntrada(texto: string, campo: Campo): Lectura {
 
   const esDbm = cola.unidad === 'dBm' || (!cola.prefijo && !cola.unidad && campo.unidad === 'dBm');
   if (negativo && !esDbm) return error(MENSAJE_MENOS);
+  const desborda = error(`«${original}» es demasiado grande`);
   if (esDbm) {
     const dbm = Number(`${negativo ? '-' : ''}${mantisa}e${exponenteCientifico}`);
     const valor = 10 ** (dbm / 10) / 1000;
-    return { tipo: 'valor', valor, dbm, ...avisoDeMiles(cuerpo, campo, cola, esRkm, valor) };
+    if (!Number.isFinite(valor) || !Number.isFinite(dbm)) return desborda;
+    return {
+      tipo: 'valor',
+      valor,
+      dbm,
+      ...avisoDeMiles(cuerpo, campo, cola, esRkm, negativo, valor),
+    };
   }
 
   const exponente = cola.prefijo
@@ -259,39 +276,37 @@ export function leerEntrada(texto: string, campo: Campo): Lectura {
       ? def.exponenteBase
       : exponenteDelSelector(campo);
   const valor = Number(`${mantisa}e${exponenteCientifico + exponente}`);
-  return { tipo: 'valor', valor, ...avisoDeMiles(cuerpo, campo, cola, esRkm, valor) };
+  if (!Number.isFinite(valor)) return desborda;
+  return { tipo: 'valor', valor, ...avisoDeMiles(cuerpo, campo, cola, esRkm, false, valor) };
 }
 
 // Aviso suave: un separador seguido de exactamente 3 dígitos, con parte entera distinta de cero
 // ("1.000", "4,700"), casi siempre es un separador de miles que acá no existe. El valor se acepta.
+// Solo avisa con un número pelado: si el Alumno escribió prefijo o unidad ("1,234 kΩ", que es lo
+// que muestra el Asistente en los pasos intermedios), sabe lo que escribe.
 function avisoDeMiles(
   cuerpo: string,
   campo: Campo,
   cola: Cola,
   esRkm: boolean,
+  negativo: boolean,
   valor: number,
 ): { aviso?: string } {
-  const miles = /^(\d*[1-9]\d*)[.,](\d{3})(?=\D|$)/.exec(cuerpo);
-  if (!miles || esRkm || /^[\d.,]+[eE]/.test(cuerpo)) return {};
+  if (esRkm || cola.prefijo || cola.unidad) return {};
+  const miles = /^(\d*[1-9]\d*)[.,](\d{3})$/.exec(cuerpo);
+  if (!miles) return {};
   const [, entera, decimales] = miles;
-  const mil = `${entera}${decimales}`;
+  const mil = `${negativo ? '-' : ''}${entera}${decimales}`;
   const leido =
-    campo.magnitud === 'potencia' &&
-    campo.dbm &&
-    (cola.unidad === 'dBm' || (!cola.prefijo && !cola.unidad))
+    campo.magnitud === 'potencia' && campo.unidad === 'dBm'
       ? formatearDbm(vatiosADbm(valor))
-      : formatearValor(valor, campo.magnitud);
-  const sufijo = cuerpo.slice(miles[0].length);
-  const cuanto = mil === '1000' ? 'mil' : mil;
-  const alternativas = [`${mil}${sufijo}`];
+      : formatearValor(valor, campo.magnitud, 'paso');
+  const alternativas = [mil];
   // "1k" solo es lo mismo que "1000" si el selector está en la unidad base.
-  if (
-    sufijo === '' &&
-    DEFINICIONES[campo.magnitud].prefijos.includes('k') &&
-    exponenteDelSelector(campo) === 0
-  ) {
+  if (DEFINICIONES[campo.magnitud].prefijos.includes('k') && exponenteDelSelector(campo) === 0) {
     const fraccion = decimales.replace(/0+$/, '');
     alternativas.push(`${entera}${fraccion ? `,${fraccion}` : ''}k`);
   }
+  const cuanto = mil === '1000' ? 'mil' : mil;
   return { aviso: `Se leyó ${leido}. Para ${cuanto}, escribí ${alternativas.join(' o ')}.` };
 }

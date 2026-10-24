@@ -1,26 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { leerCampo, mensajeDeResultados, type EspecCampo } from '../../src/entrada/campo';
-
-const ATENUACION: EspecCampo = {
-  nombre: 'Atenuación A',
-  magnitud: 'decibeles',
-  obligatorio: true,
-  rango: { min: 0, minIncluido: false, max: 60 },
-};
-const Z1: EspecCampo = {
-  nombre: 'Z1',
-  magnitud: 'resistencia',
-  unidad: 'Ω',
-  obligatorio: true,
-  rango: { min: 0, minIncluido: false },
-};
-const POTENCIA: EspecCampo = {
-  nombre: 'Potencia de entrada',
-  magnitud: 'potencia',
-  unidad: 'W',
-  dbm: true,
-  rango: { min: 0, minIncluido: false },
-};
+// Los campos de la Calculadora de atenuadores, tal como los usa (spec §10.1).
+import { ATENUACION, POTENCIA, Z1 } from '../../src/ui/atenuadores/campos';
 
 describe('leerCampo', () => {
   it('un valor válido lleva su eco en el formato de salida', () => {

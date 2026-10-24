@@ -1,8 +1,7 @@
-import type { EspecCampo } from '../../entrada/campo';
+import type { EspecSinSelector } from '../../entrada/campo';
 
 // Los campos de la Calculadora de atenuadores y su rango válido (spec §10.1). El tope de 60 dB es
 // duro; el resto de los avisos y cortes (§10.5) los pone el cálculo.
-type EspecSinSelector = Omit<EspecCampo, 'unidad'>;
 
 export const ATENUACION: EspecSinSelector = {
   nombre: 'Atenuación A',
@@ -28,7 +27,7 @@ export const POTENCIA: EspecSinSelector = {
   rango: { min: 0, minIncluido: false },
 };
 
-// Para el criterio de valor impracticable. Vacía: 300 MHz.
+// Para el criterio de Valor impracticable. Vacía: 300 MHz.
 export const FRECUENCIA: EspecSinSelector = {
   nombre: 'Frecuencia',
   magnitud: 'frecuencia',

@@ -1,6 +1,11 @@
 import { useMemo, useState } from 'preact/hooks';
 import { opcionesDelSelector } from '../../entrada/campos';
-import { leerCampo, type EspecCampo, type EstadoCampo } from '../../entrada/campo';
+import {
+  leerCampo,
+  type EspecCampo,
+  type EspecSinSelector,
+  type EstadoCampo,
+} from '../../entrada/campo';
 import { CampoValor, type Lectura } from './CampoValor';
 
 // El texto de un campo de valor y su Selector de unidad, leídos con la Entrada flexible. La
@@ -14,7 +19,7 @@ export interface CampoEntrada {
   estado: EstadoCampo;
 }
 
-export function useCampoEntrada(spec: Omit<EspecCampo, 'unidad'>, textoInicial = ''): CampoEntrada {
+export function useCampoEntrada(spec: EspecSinSelector, textoInicial = ''): CampoEntrada {
   // El Selector de unidad arranca en la primera opción de la magnitud (spec §5.1).
   const [unidad, setUnidad] = useState<string | undefined>(
     opcionesDelSelector(spec.magnitud, spec.dbm)[0],

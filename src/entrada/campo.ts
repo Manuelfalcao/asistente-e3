@@ -2,8 +2,8 @@ import type { Campo } from './campos';
 import { formatearDbm, formatearValor } from './formato';
 import { leerEntrada } from './leer';
 
-// Un campo de valor tal como lo ve una Calculadora: lo que dice el parser más el rango válido que
-// fija ella (spec §5.1: el parser solo lee).
+// Un campo de valor tal como lo ve una Calculadora: lo que dice el lector de la Entrada flexible más el rango válido que
+// fija ella (spec §5.1: el lector solo lee).
 
 export interface Rango {
   // En la unidad del valor leído (SI, o dB / % / número).
@@ -19,6 +19,9 @@ export interface EspecCampo extends Campo {
   obligatorio?: boolean;
   rango?: Rango;
 }
+
+// La especificación de un campo antes de saber qué marca su Selector de unidad.
+export type EspecSinSelector = Omit<EspecCampo, 'unidad'>;
 
 export type EstadoCampo =
   | { estado: 'vacio' }

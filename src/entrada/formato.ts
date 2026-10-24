@@ -29,6 +29,11 @@ function escribirDecimal(x: number, decimales: number): string {
   return (x < 0 && !esCero ? MENOS : '') + texto.replace('.', ',');
 }
 
+// dB y dBm: 2 decimales, sin ceros de relleno.
+function dosDecimales(x: number): string {
+  return escribirDecimal(Number(x.toFixed(2)), 2);
+}
+
 export function formatearNumero(x: number, cifras: number): string {
   const r = redondearCifras(x, cifras);
   if (r === 0) return '0';
@@ -47,7 +52,7 @@ export function formatearValor(valor: number, magnitud: Magnitud, nivel: Nivel =
   const def = DEFINICIONES[magnitud];
   switch (magnitud) {
     case 'decibeles':
-      return `${escribirDecimal(Number(valor.toFixed(2)), 2)} dB`;
+      return `${dosDecimales(valor)} dB`;
     case 'porcentaje':
       return `${formatearNumero(valor, 2)} %`;
     case 'numero':
@@ -77,9 +82,11 @@ export function vatiosADbm(vatios: number): number {
 }
 
 export function formatearDbm(dbm: number): string {
-  return `${escribirDecimal(Number(dbm.toFixed(2)), 2)} dBm`;
+  return `${dosDecimales(dbm)} dBm`;
 }
 
+// Fuera de la ida y vuelta: un error relativo es un resultado con signo, no un valor que se escriba
+// en un campo (el menos solo vale en dBm, spec §5.1).
 // Un error relativo, con signo y con el menos tipográfico: "+4,7 %", "−1,2 %". Recibe el
 // porcentaje, no la fracción.
 export function formatearErrorRelativo(porcentaje: number): string {

@@ -75,7 +75,10 @@ describe('ida y vuelta del formato de salida', () => {
           const texto = formatearValor(valor, magnitud, nivel);
           const lectura = leerEntrada(texto, campoDe(magnitud));
           expect(lectura.tipo, `«${texto}» de ${valor}`).toBe('valor');
-          if (lectura.tipo === 'valor') cercanos(lectura.valor, redondearCifras(valor, cifras));
+          if (lectura.tipo === 'valor') {
+            cercanos(lectura.valor, redondearCifras(valor, cifras));
+            expect(lectura.aviso, `«${texto}»`).toBeUndefined();
+          }
         }
       });
     }

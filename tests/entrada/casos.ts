@@ -191,6 +191,46 @@ export const CASOS_ENTRADA: readonly CasoEntrada[] = [
     respalda: '§5.1 aviso suave, sin la alternativa con k donde L no la tiene',
   },
   {
+    texto: '1,234 kΩ',
+    campo: R,
+    esperado: { valor: 1234 },
+    respalda: '§5.2 el texto de los pasos intermedios (4 cifras) no dispara el aviso de miles',
+  },
+  {
+    texto: '4R7 ohm',
+    campo: R,
+    esperado: { valor: 4.7 },
+    respalda: '§5.1 R como coma, con unidad',
+  },
+  {
+    texto: '47R ohm',
+    campo: R,
+    esperado: { valor: 47 },
+    respalda: '§5.1 R como final, con unidad',
+  },
+  {
+    texto: '4R7 kohm',
+    campo: R,
+    esperado: { error: 'No entiendo «4R7 kohm»' },
+    respalda: '§5.1 la R como coma no se combina con un prefijo',
+  },
+  {
+    texto: '1e999',
+    campo: R,
+    esperado: { error: 'demasiado grande' },
+    respalda: '§5.1 un número que no cabe no se lee',
+  },
+  {
+    texto: '-1.000',
+    campo: P_DBM,
+    esperado: {
+      valor: 10 ** -0.1 / 1000,
+      dbm: -1,
+      aviso: 'Se leyó −1 dBm. Para -1000, escribí -1000.',
+    },
+    respalda: '§5.1 aviso de miles, sin perder el signo',
+  },
+  {
     texto: '0,500',
     campo: R,
     esperado: { valor: 0.5 },
