@@ -1,0 +1,39 @@
+import type { EspecCampo } from '../../entrada/campo';
+
+// Los campos de la Calculadora de atenuadores y su rango válido (spec §10.1). El tope de 60 dB es
+// duro; el resto de los avisos y cortes (§10.5) los pone el cálculo.
+type EspecSinSelector = Omit<EspecCampo, 'unidad'>;
+
+export const ATENUACION: EspecSinSelector = {
+  nombre: 'Atenuación A',
+  magnitud: 'decibeles',
+  obligatorio: true,
+  rango: { min: 0, minIncluido: false, max: 60 },
+};
+
+export const Z1: EspecSinSelector = {
+  nombre: 'Z1',
+  magnitud: 'resistencia',
+  obligatorio: true,
+  rango: { min: 0, minIncluido: false },
+};
+
+export const Z2: EspecSinSelector = { ...Z1, nombre: 'Z2' };
+
+// Potencia que entra al atenuador: W o mW con el Selector de unidad, o dBm.
+export const POTENCIA: EspecSinSelector = {
+  nombre: 'Potencia de entrada',
+  magnitud: 'potencia',
+  dbm: true,
+  rango: { min: 0, minIncluido: false },
+};
+
+// Para el criterio de valor impracticable. Vacía: 300 MHz.
+export const FRECUENCIA: EspecSinSelector = {
+  nombre: 'Frecuencia',
+  magnitud: 'frecuencia',
+  rango: { min: 0, minIncluido: false },
+};
+
+// Z1 y Z2 vienen en 50 Ω.
+export const Z_POR_DEFECTO = '50';

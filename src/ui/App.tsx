@@ -1,4 +1,5 @@
 import { useState } from 'preact/hooks';
+import { Atenuadores } from './atenuadores/Atenuadores';
 import { CALCULADORAS, CALCULADORA_INICIAL, calculadora } from './calculadoras';
 import { IconoCalculadora } from './comun/Icono';
 import { FranjaVersionNueva } from './FranjaVersionNueva';
@@ -55,7 +56,11 @@ export function App() {
         </header>
         <FranjaVersionNueva />
         <main class="calculadora">
-          <p class="vacia">Esta Calculadora todavía está vacía.</p>
+          {activa.id === 'atenuadores' ? (
+            <Atenuadores />
+          ) : (
+            <p class="vacia">Esta Calculadora todavía está vacía.</p>
+          )}
         </main>
       </div>
 

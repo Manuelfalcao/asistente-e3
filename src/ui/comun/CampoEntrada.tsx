@@ -1,0 +1,71 @@
+import { useMemo, useState } from 'preact/hooks';
+import { opcionesDelSelector } from '../../entrada/campos';
+import { leerCampo, type EspecCampo, type EstadoCampo } from '../../entrada/campo';
+import { CampoValor, type Lectura } from './CampoValor';
+
+// El texto de un campo de valor y su Selector de unidad, leídos con la Entrada flexible. La
+// Calculadora usa `estado` para calcular y para decidir qué muestra el área de resultados.
+export interface CampoEntrada {
+  spec: EspecCampo;
+  texto: string;
+  setTexto: (texto: string) => void;
+  unidad: string | undefined;
+  setUnidad: (unidad: string) => void;
+  estado: EstadoCampo;
+}
+
+export function useCampoEntrada(spec: Omit<EspecCampo, 'unidad'>, textoInicial = ''): CampoEntrada {
+  // El Selector de unidad arranca en la primera opción de la magnitud (spec §5.1).
+  const [unidad, setUnidad] = useState<string | undefined>(
+    opcionesDelSelector(spec.magnitud, spec.dbm)[0],
+  );
+  const [texto, setTexto] = useState(textoInicial);
+  const completa: EspecCampo = useMemo(() => ({ ...spec, unidad }), [spec, unidad]);
+  const estado = useMemo(() => leerCampo(texto, completa), [texto, completa]);
+  return { spec: completa, texto, setTexto, unidad, setUnidad, estado };
+}
+
+function lecturaDe(estado: EstadoCampo): Lectura | undefined {
+  switch (estado.estado) {
+    case 'invalido':
+      return { tipo: 'error', texto: estado.motivo };
+    case 'valido':
+      return estado.aviso
+        ? { tipo: 'aviso', texto: estado.aviso }
+        : { tipo: 'eco', texto: estado.eco };
+    default:
+      return undefined;
+  }
+}
+
+// Campo de valor con la Entrada flexible: el eco en vivo debajo, o el motivo en rojo si no se lee.
+export function CampoEntradaValor({
+  id,
+  etiqueta,
+  campo,
+  unidadFija,
+}: {
+  id: string;
+  etiqueta: string;
+  campo: CampoEntrada;
+  // Para los campos sin Selector de unidad, como los dB o los largos en mm.
+  unidadFija?: string;
+}) {
+  const { spec, unidad } = campo;
+  const opciones = opcionesDelSelector(spec.magnitud, spec.dbm);
+  return (
+    <CampoValor
+      id={id}
+      etiqueta={etiqueta}
+      texto={campo.texto}
+      onTexto={campo.setTexto}
+      selector={
+        opciones.length > 0 && unidad !== undefined
+          ? { unidades: opciones, unidad, onUnidad: campo.setUnidad }
+          : undefined
+      }
+      unidadFija={opciones.length === 0 ? unidadFija : undefined}
+      lectura={lecturaDe(campo.estado)}
+    />
+  );
+}

@@ -73,6 +73,29 @@ h3 {
   color: var(--texto-suave);
 }
 
+/* Una Calculadora: las entradas arriba y los resultados abajo; desde el corte de PC, lado a lado. */
+.cuerpo-calculadora {
+  display: grid;
+  gap: var(--esp-5);
+}
+.cuerpo-calculadora .entradas {
+  max-width: 30rem;
+}
+.cuerpo-calculadora .sin-resultado {
+  margin: 0;
+  padding: var(--esp-3) var(--esp-4);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-2);
+  background: var(--superficie);
+  color: var(--texto-suave);
+}
+.cuerpo-calculadora .sin-resultado.corregir {
+  border-color: var(--impracticable);
+  background: var(--impracticable-fondo);
+  color: var(--impracticable-texto);
+  font-weight: 600;
+}
+
 .menu-lateral {
   display: none;
 }
@@ -136,6 +159,10 @@ h3 {
   }
   .calculadora {
     padding: var(--esp-5);
+  }
+  .cuerpo-calculadora {
+    grid-template-columns: 24rem minmax(0, 1fr);
+    align-items: start;
   }
   .menu-lateral {
     display: flex;
