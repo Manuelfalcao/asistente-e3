@@ -81,6 +81,25 @@ h3 {
 .cuerpo-calculadora .entradas {
   max-width: 30rem;
 }
+/* El ⇄ entre Z1 y Z2, alineado con los campos. */
+.fila-intercambio {
+  display: grid;
+  grid-template-columns: minmax(6rem, 38%) minmax(0, 1fr);
+  column-gap: var(--esp-3);
+  margin: calc(-1 * var(--esp-2)) 0 var(--esp-1);
+}
+.intercambiar {
+  grid-column: 2;
+  justify-self: start;
+  min-width: var(--toque);
+  min-height: var(--toque);
+  border: 1px solid var(--borde-campo);
+  border-radius: var(--radio-1);
+  background: var(--superficie);
+  color: var(--acento);
+  font-size: var(--tam-5);
+  cursor: pointer;
+}
 .cuerpo-calculadora .sin-resultado {
   margin: 0;
   padding: var(--esp-3) var(--esp-4);

@@ -1,0 +1,7 @@
+/* Latin Modern Math recortada (scripts/recortar-fuente.py). En el HTML único va embebida; en la PWA
+   es un archivo aparte que queda en la caché. */
+@font-face {
+  font-family: 'Latin Modern Math';
+  src: url('../fuentes/latinmodern-math-recorte.woff2') format('woff2');
+  font-display: swap;
+}

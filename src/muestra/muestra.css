@@ -1,9 +1,4 @@
-/* Solo para la página de muestra. En el Asistente la fuente de las fórmulas llega con Temml. */
-@font-face {
-  font-family: 'Latin Modern Math';
-  src: url('./fuentes/latinmodern-math-recorte.woff2') format('woff2');
-  font-display: swap;
-}
+/* Solo para la página de muestra. La fuente de las fórmulas llega con Formula.tsx. */
 
 .m-pagina {
   max-width: 72rem;

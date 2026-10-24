@@ -9,6 +9,7 @@ Calculadoras para dimensionar los componentes de circuitos de VHF. La especifica
 | `npm run build:archivo` | HTML único autocontenido en `dist-archivo/index.html`               |
 | `npm run build:muestra` | Página de muestra del sistema visual en `dist-muestra/muestra.html` |
 | `npm run iconos`        | Arma los PNG del ícono del Asistente en `public/`                   |
+| `npm run fuente`        | Recorta Latin Modern Math para las fórmulas (Python con fontTools)  |
 | `npm run typecheck`     | `tsc --noEmit`                                                      |
 | `npm test`              | Vitest                                                              |
 
@@ -17,5 +18,10 @@ Node 24 (ver `.nvmrc`). La Versión sale de `package.json` más el hash corto de
 ## Sistema visual
 
 - Colores, tipografía, tamaños y espaciado: `src/ui/tokens.css`. Las Calculadoras usan esas variables y nunca un color suelto; `tests/paleta.test.ts` verifica el contraste en el tema claro y en el oscuro ([ADR 1](docs/adr/0001-modo-oscuro-segun-el-sistema.md)).
-- Componentes base (tarjeta de resultado, campos, rótulos, botón de pase, franjas, esquema en escalera): `src/ui/comun/`.
+- Componentes base (tarjeta de resultado, forma del resultado, fórmula, cita, pasos intermedios, campos, rótulos, botón de pase, franjas, esquema en escalera): `src/ui/comun/`.
 - La página de muestra los presenta todos. No llega al Asistente: con `npm run dev` está en `/muestra.html`, y `npm run build:muestra` la arma como un HTML suelto para mirarla en el celular.
+
+## Fórmulas
+
+- El cálculo (`src/calculo/`) escribe las fórmulas como cadenas LaTeX con los números ya sustituidos; `src/ui/comun/Formula.tsx` las dibuja con Temml.
+- La fuente es Latin Modern Math (licencia GUST) recortada a los caracteres de `scripts/fuentes/rangos.txt`. Si una fórmula nueva usa un carácter que no está, `tests/fuente/fuente.test.ts` falla: hay que sumarlo a la lista y correr `npm run fuente` (`pip install fonttools brotli`).

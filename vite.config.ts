@@ -124,7 +124,7 @@ export default defineConfig(({ mode }) => {
                   },
                 ],
               },
-              workbox: { globPatterns: ['**/*.{js,css,html,png,svg,webmanifest}'] },
+              workbox: { globPatterns: ['**/*.{js,css,html,png,svg,woff2,webmanifest}'] },
             }),
           ]),
     ],

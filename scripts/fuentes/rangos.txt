@@ -1,0 +1,30 @@
+# Caracteres de Latin Modern Math que quedan en la fuente recortada de las fórmulas.
+# Lo lee scripts/recortar-fuente.py; tests/fuente/fuente.test.ts verifica que cada carácter que generan
+# las fórmulas esté en la fuente recortada. Un rango o un carácter por línea, en hexadecimal.
+
+0020-007E    # ASCII imprimible: cifras, letras rectas, signos y paréntesis
+00A0         # espacio sin corte
+00B0-00B1    # ° ±
+00B5         # µ (signo micro)
+00B7         # ·
+00D7         # ×
+0391-03A1    # griegas mayúsculas
+03A3-03A9
+03B1-03C9    # griegas minúsculas
+2026         # …
+2032         # ′
+2061-2063    # operadores invisibles de MathML
+210E         # h itálica (el bloque de itálicas de 1D434 no la tiene)
+2113         # ℓ
+2192         # →
+21D2         # ⇒
+2211-2212    # ∑ −
+221A         # √
+221E         # ∞
+2248         # ≈
+2260         # ≠
+2264-2265    # ≤ ≥
+22C5         # ⋅
+1D434-1D454  # latinas itálicas de matemática: las letras sueltas de las fórmulas
+1D456-1D467
+1D6E2-1D71B  # griegas itálicas de matemática

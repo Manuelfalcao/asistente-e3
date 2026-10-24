@@ -36,7 +36,7 @@
 /* Una tarjeta debajo de otra; en PC, en grilla (spec §4.5). */
 .grilla-tarjetas {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
   gap: var(--esp-3);
   align-items: start;
 }
@@ -104,6 +104,13 @@
   color: var(--texto-suave);
 }
 
+.formulas {
+  margin: var(--esp-3) 0 0;
+}
+.formulas .formula {
+  margin: 0;
+}
+
 .pasos {
   margin-top: var(--esp-3);
   border-top: 1px solid var(--borde);
@@ -144,6 +151,21 @@
 }
 .pasos-cuerpo > :last-child {
   margin-bottom: 0;
+}
+
+.lista-pasos {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lista-pasos li + li {
+  margin-top: var(--esp-2);
+}
+.paso-texto {
+  color: var(--texto-suave);
+}
+.lista-pasos .formula {
+  margin: 0;
 }
 
 .motivos {
@@ -456,6 +478,31 @@
 .aviso.fuerte {
   background: var(--impracticable-fondo);
   border-left-color: var(--impracticable);
+}
+
+.aviso p {
+  margin: 0;
+}
+.aviso .formula {
+  margin-bottom: 0;
+}
+
+/* ---------- Forma del resultado ---------- */
+
+.notas-fijas {
+  margin-top: var(--esp-4);
+  font-size: var(--tam-3);
+  color: var(--texto-suave);
+}
+.notas-fijas h3 {
+  margin: 0 0 var(--esp-1);
+  font-size: var(--tam-3);
+  font-weight: 600;
+  color: var(--texto);
+}
+.notas-fijas ul {
+  margin: 0;
+  padding-left: 1.2em;
 }
 
 /* ---------- Esquema ---------- */

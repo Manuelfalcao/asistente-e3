@@ -5,6 +5,7 @@ import { BotonesSegmentados } from '../ui/comun/BotonesSegmentados';
 import { BotonPase } from '../ui/comun/BotonPase';
 import { CampoValor } from '../ui/comun/CampoValor';
 import { Esquema } from '../ui/comun/Esquema';
+import { Formula } from '../ui/comun/Formula';
 import { Aviso, FranjaLlegada, FranjaVersion } from '../ui/comun/Franjas';
 import { IconoCalculadora } from '../ui/comun/Icono';
 import { Rotulo, type TipoRotulo } from '../ui/comun/Rotulo';
@@ -168,13 +169,13 @@ export function Muestra() {
           destacada
           pasos={
             <>
-              <Formula mathml={MATHML_K} />
+              <Formula latex={LATEX_K} />
               <p>Con los valores sustituidos y 4 cifras, como en los pasos intermedios.</p>
             </>
           }
         >
           <span class="valor-principal">R3 = 35,1 Ω</span>
-          <Formula mathml={MATHML_R3} />
+          <Formula latex={LATEX_R3} />
           <p class="referencia">
             <em>Reference Data for Radio Engineers</em>, 4.ª ed. (ITT, 1956), cap. 9, pág. 253.
           </p>
@@ -389,10 +390,6 @@ function Seccion({ titulo, children }: { titulo: string; children: ComponentChil
   );
 }
 
-function Formula({ mathml }: { mathml: string }) {
-  return <div class="formula" dangerouslySetInnerHTML={{ __html: mathml }} />;
-}
-
 function Segmentados() {
   const [tipo, setTipo] = useState('pasa-banda');
   const [aprox, setAprox] = useState('chebyshev');
@@ -484,19 +481,6 @@ function Campos() {
   );
 }
 
-// MathML escrito a mano para la muestra: las fórmulas del Asistente las arma Temml (ticket 28).
-const sub = (base: string, i: string) => `<msub><mi>${base}</mi><mn>${i}</mn></msub>`;
-const MATHML_R3 =
-  '<math><mrow>' +
-  sub('R', '3') +
-  '<mo>=</mo><mfrac><mrow><mn>2</mn><mi>K</mi><msqrt>' +
-  sub('Z', '1') +
-  sub('Z', '2') +
-  '</msqrt></mrow><mrow><msup><mi>K</mi><mn>2</mn></msup><mo>−</mo><mn>1</mn></mrow></mfrac>' +
-  '<mo>=</mo><mfrac><mrow><mn>2</mn><mo>·</mo><mn>3,162</mn><mo>·</mo><mn>50</mn></mrow>' +
-  '<mrow><mn>10,00</mn><mo>−</mo><mn>1</mn></mrow></mfrac><mo>=</mo><mn>35,14</mn>' +
-  '<mspace width="0.17em"/><mi mathvariant="normal">Ω</mi></mrow></math>';
-const MATHML_K =
-  '<math><mrow><mi>K</mi><mo>=</mo><msup><mn>10</mn><mrow><mi>A</mi><mo>/</mo><mn>20</mn></mrow></msup>' +
-  '<mo>=</mo><msup><mn>10</mn><mrow><mn>10</mn><mo>/</mo><mn>20</mn></mrow></msup><mo>=</mo>' +
-  '<mn>3,162</mn></mrow></math>';
+// Las mismas cadenas LaTeX que arma el cálculo, dibujadas con Temml.
+const LATEX_R3 = String.raw`R_3 = \dfrac{2 K Z_0}{K^2 - 1} = \dfrac{2 \cdot 3{,}162 \cdot 50}{10 - 1} = 35{,}14\,\mathrm{\Omega}`;
+const LATEX_K = 'K = 10^{A/20} = 10^{10/20} = 3{,}162';
