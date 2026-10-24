@@ -10,8 +10,9 @@ import {
   type Tolerancia,
 } from '../../casos';
 
-// Casos de prueba de la Calculadora de atenuadores (spec §13.3). Los valores salen de
-// research/contraste-atenuadores.md, sección 4.2.
+// Casos de prueba de la Calculadora de atenuadores (spec §13.3). Los de referencia están
+// transcriptos de la pág. 262 del libro; research/contraste-atenuadores.md, sección 4.2, los
+// contrasta.
 
 const FIG_8 = 'Reference Data for Radio Engineers, 4.ª ed. (ITT, 1956), cap. 9, Fig. 8, pág. 262';
 const SPEC_LIMITES = 'spec §10.5';
@@ -57,14 +58,22 @@ const fig8 = (
 });
 
 // Pads T entre impedancias distintas: R1 en serie del lado de Z1, R2 del lado de Z2, R3 en
-// derivación. Faltan 7 de las 13 filas: la investigación transcribió solo esta selección.
+// derivación. Las 13 filas, en el orden del libro y con las cifras impresas (el libro separa los
+// miles con coma: "3,889" es 3889).
 export const CASOS_REFERENCIA: readonly CasoReferenciaT[] = [
   fig8(5000, 2000, 10, '3889', '222', '2222'),
+  fig8(5000, 2000, 15, '4165', '969', '1161'),
+  fig8(5000, 2000, 20, '4462', '1402', '639'),
   fig8(5000, 500, 20, '4782', '190,7', '319,4'),
+  fig8(2000, 500, 15, '1763', '165,4', '367,3'),
+  fig8(2000, 500, 20, '1838', '308,1', '202,0'),
   fig8(2000, 200, 20, '1913', '76,3', '127,8'),
+  fig8(500, 200, 10, '388,9', '22,2', '222,2'),
   fig8(500, 200, 15, '416,5', '96,9', '116,1'),
+  fig8(500, 200, 20, '446,2', '140,2', '63,9'),
   fig8(500, 50, 20, '478,2', '19,07', '31,94'),
   fig8(200, 50, 15, '176,3', '16,54', '36,73'),
+  fig8(200, 50, 20, '183,8', '30,81', '20,20'),
 ];
 
 const comportamiento = (
