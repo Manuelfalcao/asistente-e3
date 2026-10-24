@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { leerEntrada } from '../../src/entrada/leer';
-import { CASOS_ENTRADA, TOLERANCIA_RELATIVA } from './casos';
+import { CASOS_ENTRADA, TOLERANCIA_RELATIVA, nombreDeCasoEntrada } from './casos';
 
 describe('Entrada flexible: casos de comportamiento', () => {
   for (const caso of CASOS_ENTRADA) {
-    const nombre = `«${caso.texto}» en ${caso.campo.magnitud} (${caso.campo.unidad ?? 'sin selector'})`;
-    it(nombre, () => {
+    it(nombreDeCasoEntrada(caso), () => {
       const lectura = leerEntrada(caso.texto, caso.campo);
       const esperado = caso.esperado;
       if ('vacio' in esperado) {

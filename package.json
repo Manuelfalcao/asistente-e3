@@ -10,6 +10,7 @@
     "build:muestra": "vite build --mode muestra",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "informe": "node scripts/informe.mjs",
     "format": "prettier --write .",
     "iconos": "node scripts/iconos.mjs",
     "fuente": "python scripts/recortar-fuente.py"

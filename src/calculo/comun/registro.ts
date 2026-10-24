@@ -1,3 +1,4 @@
+import type { Paso } from './resultado';
 import { CRITERIO_UMBRALES } from './valor-impracticable';
 
 // Registro común de Criterios prácticos y Deducciones propias (spec §13.5). Lo lee el Informe de
@@ -14,6 +15,9 @@ export interface EntradaRegistro {
   adaptacion: string;
   // Lo que lo respalda: fuentes, casos o simulaciones.
   respaldo: string;
+  // Solo en una Deducción propia: cómo se llega a la fórmula, paso a paso, en LaTeX. La comparación
+  // contra el plan B y contra casos límite son los Casos de prueba con `bandera` de esta entrada.
+  deduccion?: readonly Paso[];
   // Qué hace el Asistente si la Cátedra no lo aprueba.
   planB: string;
   // La bandera de src/calculo/ que activa el plan B. Null si el plan B es ajustar números.

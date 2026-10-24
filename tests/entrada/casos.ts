@@ -21,6 +21,11 @@ export interface CasoEntrada {
   respalda: string;
 }
 
+// El nombre del caso: el título de su test en Vitest y su id en el Informe de casos.
+export function nombreDeCasoEntrada(caso: CasoEntrada): string {
+  return `«${caso.texto}» en ${caso.campo.magnitud} (${caso.campo.unidad ?? 'sin selector'})`;
+}
+
 const L: Campo = { magnitud: 'inductancia', unidad: 'nH' };
 const C: Campo = { magnitud: 'capacidad', unidad: 'pF' };
 const R: Campo = { magnitud: 'resistencia', unidad: 'Ω' };

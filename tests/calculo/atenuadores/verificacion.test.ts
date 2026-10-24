@@ -5,14 +5,9 @@ import {
   calcularMinimaPerdida,
 } from '../../../src/calculo/atenuadores/atenuadores';
 import { MEDIA_UNIDAD, dentroDeTolerancia, margen } from '../../casos';
-import {
-  CASOS_POTENCIA,
-  CASOS_VERIFICACION,
-  GRILLA_ATENUACIONES,
-  GRILLA_IMPEDANCIAS,
-  TOLERANCIA_ORACULO,
-} from './casos-pad';
+import { CASOS_POTENCIA, CASOS_VERIFICACION, TOLERANCIA_ORACULO } from './casos-pad';
 import { escaleraDeAtenuador, escaleraDePad, medir, potencias } from './elementos';
+import { recorrerGrilla, recorrerGrillaPad } from './grilla';
 
 // Casos de verificación (spec §13.3): las resistencias que calcula el Asistente, armadas en el
 // oráculo ABCD de tests/oraculos/, dan Z1 a la entrada, Z2 a la salida y la atenuación pedida.
@@ -66,52 +61,26 @@ describe('A1 a A15: las resistencias, contra la investigación y contra el orác
 });
 
 describe('el T y el π, en una grilla de Z1, Z2 y dB', () => {
-  // La menor atenuación del par, con la fórmula del Reference Data: la grilla queda arriba.
-  const aMin = (z1: number, z2: number) => {
-    const r = Math.max(z1, z2) / Math.min(z1, z2);
-    return r === 1 ? 0 : 20 * Math.log10(Math.sqrt(r) + Math.sqrt(r - 1));
-  };
-
-  it('cubre la grilla entera', () => {
-    let casos = 0;
-    for (const z1 of GRILLA_IMPEDANCIAS) {
-      for (const z2 of GRILLA_IMPEDANCIAS) {
-        for (const a of GRILLA_ATENUACIONES) {
-          if (a <= aMin(z1, z2)) {
-            const r = calcularAtenuadores({ atenuacion: a, z1, z2 });
-            // debajo de A_min es un corte, y no queda ningún valor negativo que verificar
-            expect(r.estado, `${z1} → ${z2}, ${a} dB`).toBe('corte');
-            continue;
-          }
-          const r = redes(a, z1, z2);
-          verificar(r.t, a, z1, z2, `T ${z1} → ${z2}, ${a} dB`);
-          verificar(r.pi, a, z1, z2, `π ${z1} → ${z2}, ${a} dB`);
-          casos++;
-        }
-      }
-    }
-    // 8 × 8 pares con 10 atenuaciones son 640; quedan 328 una vez sacadas las de debajo de A_min
-    expect(casos).toBe(328);
+  it('Grilla de Z1, Z2 y dB: T y π dan Z1, Z2 y la atenuación pedida con el oráculo', () => {
+    const g = recorrerGrilla();
+    // Debajo de A_min es un corte, y no queda ningún valor negativo que verificar.
+    expect(g.fueraDeLugar).toEqual([]);
+    // 8 × 8 pares con 10 atenuaciones son 640; quedan 328 una vez sacadas las de debajo de A_min,
+    // y cada una arma un T y un π.
+    expect(g.redes).toBe(656);
+    expect(g.zEntrada.valor, `Zin: ${g.zEntrada.donde}`).toBeLessThan(impedancia.valor);
+    expect(g.zSalida.valor, `Zout: ${g.zSalida.donde}`).toBeLessThan(impedancia.valor);
+    expect(g.atenuacion.valor, `A: ${g.atenuacion.donde}`).toBeLessThan(tolA.valor);
   });
 });
 
 describe('el pad de mínima pérdida, en una grilla de Z1 y Z2', () => {
-  it('da Z1, Z2 y A_min con el oráculo, con la serie del lado de la impedancia mayor', () => {
-    let casos = 0;
-    for (const z1 of GRILLA_IMPEDANCIAS) {
-      for (const z2 of GRILLA_IMPEDANCIAS) {
-        if (z1 === z2) continue;
-        const r = calcularMinimaPerdida({ z1, z2 });
-        if (r.estado !== 'calculado') throw new Error(`no calculó: ${r.codigo}`);
-        const m = medir(escaleraDePad(r.pad), z1, z2);
-        const donde = `${z1} → ${z2}`;
-        expect(errorRelativo(m.zEntrada, z1), `${donde}: Zin`).toBeLessThan(impedancia.valor);
-        expect(errorRelativo(m.zSalida, z2), `${donde}: Zout`).toBeLessThan(impedancia.valor);
-        expect(Math.abs(m.atenuacion - r.aMin), `${donde}: A`).toBeLessThan(tolA.valor);
-        casos++;
-      }
-    }
-    expect(casos).toBe(56);
+  it('Grilla del pad: da Z1, Z2 y A_min con el oráculo, con la serie del lado de la mayor', () => {
+    const g = recorrerGrillaPad();
+    expect(g.redes).toBe(56);
+    expect(g.zEntrada.valor, `Zin: ${g.zEntrada.donde}`).toBeLessThan(impedancia.valor);
+    expect(g.zSalida.valor, `Zout: ${g.zSalida.donde}`).toBeLessThan(impedancia.valor);
+    expect(g.atenuacion.valor, `A: ${g.atenuacion.donde}`).toBeLessThan(tolA.valor);
   });
 
   it('A_min es el piso: con un poco menos de atenuación el T se vuelve negativo', () => {

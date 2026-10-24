@@ -90,7 +90,7 @@ Origen: [Formatos de distribución](issues/06-formatos-distribucion.md), [Protot
 | `src/ui/` | Componentes, uno por Calculadora, más el armazón (navegación, encabezado, franja de versión). Los colores, la tipografía, los tamaños y el espaciado están en `src/ui/tokens.css` ([ADR 1](adr/0001-modo-oscuro-segun-el-sistema.md)). |
 | `src/ui/comun/` | Los componentes base que comparten las Calculadoras: tarjeta de resultado, forma del resultado (avisos, resultado principal, tarjetas y notas fijas), fórmula en Temml, cita de la referencia, pasos intermedios, campos, rótulos, botón de pase, franjas y el esquema en escalera. |
 | `src/muestra/` | La página de muestra del sistema visual, para revisarlo en el celular. No entra en ninguno de los dos productos. |
-| `scripts/` | Pasos de construcción que no hace Vite: los PNG del ícono del Asistente, el recorte de Latin Modern Math y la copia del HTML único dentro de la PWA. |
+| `scripts/` | Pasos de construcción que no hace Vite: los PNG del ícono del Asistente, el recorte de Latin Modern Math y la copia del HTML único dentro de la PWA. `scripts/informe/` arma el Informe de casos (sección 13.6) con las tablas de `tests/`; no entra en el Asistente. |
 | `tests/` | Vitest. `tests/oraculos/` tiene los oráculos independientes (sección 13.4). |
 
 ### 3.3 Tests

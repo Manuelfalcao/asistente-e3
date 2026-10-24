@@ -1,0 +1,432 @@
+/* Estilos del Informe de casos. Es un documento para leer y para imprimir, no parte del Asistente:
+   no usa tokens.css. Los colores de estado se distinguen también por el texto, no solo por el color. */
+
+:root {
+  --fondo: #ffffff;
+  --texto: #1b1f24;
+  --suave: #57606a;
+  --linea: #d0d7de;
+  --linea-fuerte: #8c959f;
+  --banda: #f6f8fa;
+  --ok: #1a7f37;
+  --ok-fondo: #dafbe1;
+  --rojo: #cf222e;
+  --rojo-fondo: #ffebe9;
+  --ambar: #9a6700;
+  --ambar-fondo: #fff8c5;
+  --enlace: #0969da;
+  --fuente-formula: 'Latin Modern Math', 'Cambria Math', math;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fondo: #0d1117;
+    --texto: #e6edf3;
+    --suave: #8b949e;
+    --linea: #30363d;
+    --linea-fuerte: #6e7681;
+    --banda: #161b22;
+    --ok: #3fb950;
+    --ok-fondo: #12261e;
+    --rojo: #ff7b72;
+    --rojo-fondo: #2d1517;
+    --ambar: #d29922;
+    --ambar-fondo: #2a2108;
+    --enlace: #58a6ff;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0 auto;
+  max-width: 1400px;
+  padding: 1.5rem;
+  background: var(--fondo);
+  color: var(--texto);
+  font:
+    15px/1.5 system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+}
+
+a {
+  color: var(--enlace);
+}
+
+code {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 0.92em;
+}
+
+h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.9rem;
+}
+
+h2 {
+  margin: 2.5rem 0 0.75rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 2px solid var(--linea-fuerte);
+  font-size: 1.4rem;
+}
+
+h3 {
+  margin: 1.75rem 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+h4 {
+  margin: 1.25rem 0 0.4rem;
+  font-size: 1rem;
+}
+
+h5 {
+  margin: 1rem 0 0.3rem;
+  font-size: 0.95rem;
+  color: var(--suave);
+}
+
+.cuenta {
+  font-weight: normal;
+  color: var(--suave);
+}
+
+.nota,
+.version {
+  color: var(--suave);
+}
+
+/* Portada */
+
+.portada {
+  padding-bottom: 0.75rem;
+}
+
+.resumen {
+  display: inline-block;
+  margin: 0.5rem 0 0;
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.resumen-ok {
+  background: var(--ok-fondo);
+  color: var(--ok);
+}
+
+.resumen-rojo {
+  background: var(--rojo-fondo);
+  color: var(--rojo);
+}
+
+.indice ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.5rem;
+  margin: 0;
+  padding: 0.5rem 0 0 1.25rem;
+}
+
+/* Tablas de casos */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+th,
+td {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--linea);
+  text-align: left;
+  vertical-align: top;
+}
+
+thead th {
+  background: var(--banda);
+  font-weight: 600;
+}
+
+tbody.caso {
+  break-inside: avoid;
+}
+
+tbody.caso + tbody.caso {
+  border-top: 2px solid var(--linea-fuerte);
+}
+
+.caso-id {
+  min-width: 12rem;
+  background: var(--banda);
+}
+
+.caso-id .id {
+  display: block;
+  font-weight: 600;
+}
+
+.caso-id .entradas,
+.caso-id .oraculo {
+  display: block;
+  margin-top: 0.2rem;
+  font-weight: normal;
+  color: var(--suave);
+  font-size: 0.85em;
+}
+
+.num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.fuera {
+  background: var(--rojo-fondo);
+  color: var(--rojo);
+  font-weight: 600;
+}
+
+.tol {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.motivo,
+.referencia,
+.dif {
+  color: var(--suave);
+  font-size: 0.9em;
+}
+
+.dif {
+  display: block;
+  margin-top: 0.25rem;
+}
+
+.dif strong {
+  color: var(--ambar);
+}
+
+.compacta th[scope='row'] {
+  font-weight: 500;
+}
+
+/* Estado */
+
+.estado {
+  display: inline-block;
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.85em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.estado-ok {
+  background: var(--ok-fondo);
+  color: var(--ok);
+}
+
+.estado-falla {
+  background: var(--rojo-fondo);
+  color: var(--rojo);
+}
+
+.estado-sin-test {
+  background: var(--ambar-fondo);
+  color: var(--ambar);
+}
+
+/* Pasos intermedios, los mismos que ve el Alumno */
+
+.fila-pasos > td {
+  padding: 0;
+  border-top: 0;
+}
+
+details.pasos > summary {
+  padding: 0.35rem 0.5rem;
+  cursor: pointer;
+  color: var(--enlace);
+  font-size: 0.9em;
+}
+
+.grupo-pasos {
+  padding: 0 0.75rem 0.5rem;
+}
+
+.lista-pasos {
+  margin: 0;
+  padding-left: 1.5rem;
+}
+
+.lista-pasos li + li {
+  margin-top: 0.6rem;
+}
+
+.paso-texto {
+  display: block;
+  font-weight: 600;
+  font-size: 0.9em;
+}
+
+.paso-fuente {
+  display: block;
+  color: var(--suave);
+  font-size: 0.82em;
+  font-style: italic;
+}
+
+.formula {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 0.1rem 0;
+}
+
+.formula math {
+  font-family: var(--fuente-formula);
+  font-size: 1.15em;
+}
+
+/* Ítems a aprobar */
+
+.item {
+  margin: 1.25rem 0;
+  padding: 0.75rem 1rem 1rem;
+  border: 1px solid var(--linea-fuerte);
+  border-radius: 8px;
+}
+
+.item h3 {
+  margin-top: 0.25rem;
+}
+
+.item dl {
+  display: grid;
+  grid-template-columns: 14rem 1fr;
+  gap: 0.35rem 1rem;
+  margin: 0.5rem 0;
+}
+
+.item dt {
+  font-weight: 600;
+}
+
+.item dd {
+  margin: 0;
+}
+
+.aprobacion {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 1rem;
+  padding: 0.6rem 0.75rem;
+  border: 2px solid var(--linea-fuerte);
+  border-radius: 6px;
+  background: var(--banda);
+}
+
+.aprobacion input {
+  width: 1.4rem;
+  height: 1.4rem;
+  flex: none;
+}
+
+section[data-vacia] {
+  opacity: 0.85;
+}
+
+/* Impresión: hoja horizontal, sin fondos de color que no salgan y sin cortar un caso a la mitad. */
+
+@page {
+  size: A4 landscape;
+  margin: 12mm;
+}
+
+@media print {
+  :root {
+    --fondo: #ffffff;
+    --texto: #000000;
+    --suave: #333333;
+    --linea: #999999;
+    --linea-fuerte: #555555;
+    --banda: #eeeeee;
+    --ok: #0a5c25;
+    --ok-fondo: #ffffff;
+    --rojo: #a40e1a;
+    --rojo-fondo: #ffffff;
+    --ambar: #6b4700;
+    --ambar-fondo: #ffffff;
+    --enlace: #000000;
+  }
+
+  body {
+    max-width: none;
+    padding: 0;
+    font-size: 10pt;
+  }
+
+  table {
+    font-size: 8.5pt;
+  }
+
+  th,
+  td {
+    padding: 0.2rem 0.35rem;
+  }
+
+  h2 {
+    break-after: avoid;
+    break-before: page;
+  }
+
+  #cambios {
+    break-before: auto;
+  }
+
+  h3,
+  h4,
+  h5 {
+    break-after: avoid;
+  }
+
+  .grupo-pasos {
+    break-inside: avoid;
+  }
+
+  .estado {
+    border: 1px solid currentColor;
+  }
+
+  .fuera {
+    border: 2px solid var(--rojo);
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  details.pasos > summary {
+    list-style: none;
+  }
+
+  details.pasos > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .indice {
+    display: none;
+  }
+
+  a {
+    text-decoration: none;
+  }
+}
