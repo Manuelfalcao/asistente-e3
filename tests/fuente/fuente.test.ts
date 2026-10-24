@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
 import temml from 'temml';
 import { describe, expect, it } from 'vitest';
-import { calcularAtenuadores } from '../../src/calculo/atenuadores/atenuadores';
+import {
+  calcularAtenuadores,
+  calcularMinimaPerdida,
+} from '../../src/calculo/atenuadores/atenuadores';
 import { revisarValores } from '../../src/calculo/comun/valor-impracticable';
 import { caracteresDeLaFuente } from './woff2';
 
@@ -21,11 +24,22 @@ function formulasDeAtenuadores(): string[] {
     [20, 300, 50],
     [5, 50, 75],
   ]) {
-    const r = calcularAtenuadores({ atenuacion, z1, z2 });
+    // Con potencia, para que entren las fórmulas de la disipación y de la nominal mínima.
+    const r = calcularAtenuadores({ atenuacion, z1, z2, potencia: 0.75 });
     if (r.estado === 'corte') formulas.push(...r.pasos.map((p) => p.latex));
     else {
       for (const red of [r.t, r.pi])
         formulas.push(...red.formulas, ...red.pasos.map((p) => p.latex));
+    }
+  }
+  // El pad de mínima pérdida, con la serie de cada lado.
+  for (const [z1, z2] of [
+    [50, 75],
+    [300, 50],
+  ]) {
+    const r = calcularMinimaPerdida({ z1, z2, potencia: 0.75 });
+    if (r.estado === 'calculado') {
+      formulas.push(...r.pad.formulas, ...r.pad.pasos.map((p) => p.latex));
     }
   }
   return formulas;

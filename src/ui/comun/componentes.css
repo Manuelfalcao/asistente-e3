@@ -557,3 +557,38 @@
 .icono-calculadora {
   display: block;
 }
+
+/* ---------- Mínima pérdida y potencia (atenuadores) ---------- */
+
+.boton-minima {
+  grid-column: 2;
+  justify-self: start;
+  min-height: var(--toque);
+  padding: 0 var(--esp-3);
+  border: 1px solid var(--acento);
+  border-radius: var(--radio-pildora);
+  background: var(--superficie);
+  color: var(--acento);
+  font-size: var(--tam-3);
+  font-weight: 600;
+  cursor: pointer;
+}
+.boton-minima:hover {
+  background: var(--acento-suave);
+}
+.boton-minima[aria-pressed='true'] {
+  background: var(--acento);
+  color: var(--sobre-acento);
+}
+.boton-minima.en-aviso {
+  margin-top: var(--esp-2);
+}
+
+.potencia {
+  margin-top: var(--esp-3);
+}
+.potencia-titulo {
+  margin: 0 0 var(--esp-1);
+  font-size: var(--tam-3);
+  font-weight: 600;
+}

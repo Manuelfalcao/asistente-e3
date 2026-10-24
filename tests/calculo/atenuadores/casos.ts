@@ -120,6 +120,14 @@ export const CASOS_COMPORTAMIENTO: readonly CasoComportamiento[] = [
     { atenuacion: 10, z1: 300, z2: 50 },
     { corte: 'debajo-de-a-min' },
   ),
+  {
+    ...comportamiento(
+      'A12: de 50 a 300 Ω, 10 dB, debajo de A_min (13,42 dB)',
+      { atenuacion: 10, z1: 50, z2: 300 },
+      { corte: 'debajo-de-a-min' },
+    ),
+    referencia: 'research/formulas-atenuadores.md, §7 (A12); spec §10.5',
+  },
   comportamiento(
     'Apenas arriba de A_min de 50 a 75 Ω se calcula',
     { atenuacion: 5.72, z1: 50, z2: 75 },

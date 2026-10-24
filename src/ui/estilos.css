@@ -270,3 +270,11 @@ h3 {
     color: var(--acento);
   }
 }
+
+/* El botón "Mínima pérdida", alineado con los campos como el ⇄. */
+.fila-minima {
+  display: grid;
+  grid-template-columns: minmax(6rem, 38%) minmax(0, 1fr);
+  column-gap: var(--esp-3);
+  margin: 0 0 var(--esp-3);
+}

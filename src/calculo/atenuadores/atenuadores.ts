@@ -13,7 +13,12 @@ export interface EntradaAtenuador {
   z2: number;
   // En Hz, para el criterio de valor impracticable. Vacía: 300 MHz.
   frecuencia?: number | null;
+  // En W, la que entra al atenuador. Vacía: no se calcula la disipación.
+  potencia?: number | null;
 }
+
+// El pad de mínima pérdida: la atenuación se fija en A_min, así que no hay atenuación que ingresar.
+export type EntradaMinimaPerdida = Omit<EntradaAtenuador, 'atenuacion'>;
 
 export type CodigoCorte = 'no-positiva' | 'mas-de-60' | 'debajo-de-a-min';
 export type CodigoAviso = 'menos-de-medio-db' | 'mas-de-40' | 'frecuencia-por-defecto';
@@ -28,11 +33,24 @@ export interface Resistencia {
   lado: 'Z1' | 'Z2' | null;
 }
 
-export interface Atenuador {
-  topologia: 'T' | 'π';
-  r1: Resistencia;
-  r2: Resistencia;
-  r3: Resistencia;
+// La potencia que disipa una resistencia y la nominal mínima que conviene (spec §10.3).
+export interface PotenciaResistencia {
+  nombre: string;
+  // En W.
+  disipada: number;
+  // En W: el margen de 2× sobre la disipada. Es un criterio de diseño, no un valor comercial.
+  nominalMinima: number;
+}
+
+export interface PotenciaRed {
+  // En W, la que entra al atenuador.
+  entrada: number;
+  margen: number;
+  resistencias: readonly PotenciaResistencia[];
+}
+
+// Lo que tienen en común el T, el π y el pad de mínima pérdida.
+interface RedResistiva {
   // Las fórmulas que se usaron, sin números: van a la vista en la tarjeta.
   formulas: readonly string[];
   pasos: readonly Paso[];
@@ -40,6 +58,23 @@ export interface Atenuador {
   verificacion: { zEntrada: number; atenuacion: number };
   // Valor dudoso o impracticable de cada resistencia (spec §5.6). Su cuenta está al final de pasos.
   revision: Revision;
+  // Solo con potencia de entrada.
+  potencia: PotenciaRed | null;
+}
+
+export interface Atenuador extends RedResistiva {
+  topologia: 'T' | 'π';
+  r1: Resistencia;
+  r2: Resistencia;
+  r3: Resistencia;
+}
+
+// La red L de dos resistencias: R1 en serie del lado de la impedancia mayor y R3 en derivación del
+// lado de la menor, con los nombres de la Fig. 7 del libro.
+export interface PadMinimaPerdida extends RedResistiva {
+  topologia: 'L';
+  serie: Resistencia;
+  derivacion: Resistencia;
 }
 
 export type ResultadoAtenuadores =
@@ -81,9 +116,31 @@ export const REFERENCIAS_ATENUADORES: readonly Referencia[] = [
   },
 ];
 
+// El pad de mínima pérdida está en la Fig. 7 (pág. 260); sus ecuaciones, en la pág. 253.
+export const REFERENCIAS_MINIMA_PERDIDA: readonly Referencia[] = [
+  {
+    obra: 'Reference Data for Radio Engineers',
+    edicion: '4.ª',
+    editor: 'ITT',
+    anio: 1956,
+    ubicacion: 'cap. 9, pág. 253 (ecuaciones) y Fig. 7, pág. 260',
+  },
+  {
+    obra: 'Reference Data for Radio Engineers',
+    edicion: '1.ª',
+    anio: 1943,
+    ubicacion: 'págs. 65-67',
+  },
+];
+
 export const NOTAS_ATENUADORES: readonly string[] = [
   'En VHF usá resistencias de película o SMD, no de alambre, y dejá los terminales cortos.',
+  'El cálculo de potencia es para potencia continua: con señales moduladas hay que mirar la ' +
+    'potencia de pico.',
 ];
+
+// El margen sobre la potencia disipada, en veces: una práctica habitual (criterio de diseño).
+export const MARGEN_DE_POTENCIA = 2;
 
 const TOPE = 60;
 
@@ -100,6 +157,7 @@ export function calcularAtenuadores({
   z1,
   z2,
   frecuencia = null,
+  potencia = null,
 }: EntradaAtenuador): ResultadoAtenuadores {
   if (!(a > 0)) {
     return {
@@ -145,6 +203,40 @@ export function calcularAtenuadores({
     };
   }
 
+  const avisos = avisosDe(a, frecuencia);
+  const entrada = potenciaValida(potencia);
+  const comunes = [...pasosDeK(a, k, n), ...(minima?.pasos ?? [])];
+  const completar = (
+    red: Omit<Atenuador, 'revision' | 'potencia'>,
+    calcularPotencia: (p: number) => ResultadoPotencia,
+  ): Atenuador => {
+    const conPotencia = entrada === null ? null : calcularPotencia(entrada);
+    const revision = revisarValores(red, frecuencia ?? FRECUENCIA_POR_DEFECTO, {
+      sugerencia: SUGERENCIA_ATENUADORES,
+    });
+    return {
+      ...red,
+      formulas: [...red.formulas, ...(conPotencia?.formulas ?? [])],
+      pasos: [...comunes, ...red.pasos, ...(conPotencia?.pasos ?? []), ...revision.pasos],
+      revision,
+      potencia: conPotencia?.potencia ?? null,
+    };
+  };
+  return {
+    estado: 'calculado',
+    k,
+    n,
+    aMin: minima?.aMin ?? null,
+    t: completar(t, (p) => potenciaDeT(t, n, z1, z2, p)),
+    pi: completar(pi, (p) => potenciaDePi(pi, k, n, z1, z2, p)),
+    avisos,
+    referencias: REFERENCIAS_ATENUADORES,
+    notas: NOTAS_ATENUADORES,
+  };
+}
+
+// Los avisos de la atenuación y de la frecuencia (spec §10.5), los mismos para el T, el π y el pad.
+function avisosDe(a: number, frecuencia: number | null): Aviso<CodigoAviso>[] {
   const avisos: Aviso<CodigoAviso>[] = [];
   if (a < 0.5) {
     avisos.push({
@@ -173,26 +265,12 @@ export function calcularAtenuadores({
         'Escribí la tuya en Frecuencia para revisarlas ahí.',
     });
   }
-
-  const comunes = [...pasosDeK(a, k, n), ...(minima?.pasos ?? [])];
-  const conRevision = (red: Omit<Atenuador, 'revision'>): Atenuador => {
-    const revision = revisarValores(red, frecuencia ?? FRECUENCIA_POR_DEFECTO, {
-      sugerencia: SUGERENCIA_ATENUADORES,
-    });
-    return { ...red, pasos: [...comunes, ...red.pasos, ...revision.pasos], revision };
-  };
-  return {
-    estado: 'calculado',
-    k,
-    n,
-    aMin: minima?.aMin ?? null,
-    t: conRevision(t),
-    pi: conRevision(pi),
-    avisos,
-    referencias: REFERENCIAS_ATENUADORES,
-    notas: NOTAS_ATENUADORES,
-  };
+  return avisos;
 }
+
+// La potencia de entrada, si hay una que tenga sentido.
+const potenciaValida = (p: number | null | undefined): number | null =>
+  p !== null && p !== undefined && p > 0 && Number.isFinite(p) ? p : null;
 
 function pasosDeK(a: number, k: number, n: number): Paso[] {
   return [
@@ -208,13 +286,19 @@ function pasosDeK(a: number, k: number, n: number): Paso[] {
 }
 
 // Con Z1 ≠ Z2, la atenuación debajo de la cual alguna resistencia sale negativa.
-function atenuacionMinima(z1: number, z2: number): { aMin: number; pasos: Paso[] } {
+// K_min es la relación de tensiones que le corresponde (el Reference Data: cosh θ = √r).
+export function atenuacionMinima(
+  z1: number,
+  z2: number,
+): { aMin: number; kMin: number; pasos: Paso[] } {
   const mayor = Math.max(z1, z2);
   const menor = Math.min(z1, z2);
   const r = mayor / menor;
-  const aMin = 20 * Math.log10(Math.sqrt(r) + Math.sqrt(r - 1));
+  const kMin = Math.sqrt(r) + Math.sqrt(r - 1);
+  const aMin = 20 * Math.log10(kMin);
   return {
     aMin,
+    kMin,
     pasos: [
       {
         texto: 'Relación de impedancias',
@@ -256,7 +340,9 @@ const resistencia = (
   lado: Resistencia['lado'],
 ): Resistencia => ({ componente: 'R', nombre, valor, posicion, lado });
 
-function atenuadorT(k: number, n: number, z1: number, z2: number): Omit<Atenuador, 'revision'> {
+type SinCompletar = Omit<Atenuador, 'revision' | 'potencia'>;
+
+function atenuadorT(k: number, n: number, z1: number, z2: number): SinCompletar {
   const r3 = (2 * k * Math.sqrt(z1 * z2)) / (n - 1);
   const r1 = (z1 * (n + 1)) / (n - 1) - r3;
   const r2 = (z2 * (n + 1)) / (n - 1) - r3;
@@ -336,7 +422,7 @@ function atenuadorT(k: number, n: number, z1: number, z2: number): Omit<Atenuado
 }
 
 // π: R1 en derivación del lado de Z1, R3 en serie y R2 en derivación del lado de Z2.
-function atenuadorPi(k: number, n: number, z1: number, z2: number): Omit<Atenuador, 'revision'> {
+function atenuadorPi(k: number, n: number, z1: number, z2: number): SinCompletar {
   const r3 = ((n - 1) * Math.sqrt(z1 * z2)) / (2 * k);
   const r1 = ((n - 1) * z1) / (n + 1 - 2 * k * Math.sqrt(z1 / z2));
   const r2 = ((n - 1) * z2) / (n + 1 - 2 * k * Math.sqrt(z2 / z1));
@@ -419,4 +505,303 @@ function atenuadorPi(k: number, n: number, z1: number, z2: number): Omit<Atenuad
     pasos,
     verificacion: { zEntrada, atenuacion },
   };
+}
+
+// --- Potencia (spec §10.3) -------------------------------------------------------------------------
+
+const FUENTE_MARGEN =
+  'Criterio de diseño: margen de 2×. No se asume ninguna lista de potencias comerciales.';
+
+interface ResultadoPotencia {
+  potencia: PotenciaRed;
+  // Las fórmulas de la tarjeta, sin números.
+  formulas: string[];
+  pasos: Paso[];
+}
+
+interface TramoPotencia {
+  nombre: string;
+  // "P_{R_1} = P \dfrac{R_1}{Z_1}"
+  formula: string;
+  // El segundo miembro con los números, después de "P = ": "\dfrac{R_1}{Z_1}" sustituido.
+  sustituida: string;
+  disipada: number;
+}
+
+const pLatex = (p: number) => valorLatex(p, 'potencia');
+
+// Una potencia por resistencia: la disipada y la nominal mínima sugerida, con sus pasos.
+function armarPotencia(entrada: number, tramos: TramoPotencia[]): ResultadoPotencia {
+  const margen = numero(MARGEN_DE_POTENCIA);
+  const pasos: Paso[] = [];
+  const resistencias: PotenciaResistencia[] = [];
+  for (const t of tramos) {
+    const nominalMinima = MARGEN_DE_POTENCIA * t.disipada;
+    resistencias.push({ nombre: t.nombre, disipada: t.disipada, nominalMinima });
+    pasos.push(
+      {
+        texto: `${t.nombre}: potencia disipada con ${formatearValor(entrada, 'potencia')} de entrada`,
+        latex: `${t.formula} = ${t.sustituida} = ${pLatex(t.disipada)}`,
+      },
+      {
+        texto: `${t.nombre}: potencia nominal mínima sugerida`,
+        latex:
+          `P_{\\mathrm{nom}} = ${margen} \\cdot P_{${t.nombre.replace('R', 'R_')}} = ` +
+          `${margen} \\cdot ${pLatex(t.disipada)} = ${pLatex(nominalMinima)}`,
+        fuente: FUENTE_MARGEN,
+      },
+    );
+  }
+  return {
+    potencia: { entrada, margen: MARGEN_DE_POTENCIA, resistencias },
+    formulas: [...tramos.map((t) => t.formula), `P_{\\mathrm{nom}} = ${margen} \\cdot P_R`],
+    pasos,
+  };
+}
+
+function potenciaDeT(
+  red: SinCompletar,
+  n: number,
+  z1: number,
+  z2: number,
+  p: number,
+): ResultadoPotencia {
+  const [r1, r2, r3] = [red.r1.valor, red.r2.valor, red.r3.valor];
+  const P = pLatex(p);
+  const [Z1, Z2, R1, R2, R3] = [z1, z2, r1, r2, r3].map(ohmsLatex);
+  return armarPotencia(p, [
+    {
+      nombre: 'R1',
+      formula: 'P_{R_1} = P \\dfrac{R_1}{Z_1}',
+      sustituida: `${P} \\cdot \\dfrac{${R1}}{${Z1}}`,
+      disipada: (p * r1) / z1,
+    },
+    {
+      nombre: 'R2',
+      formula: 'P_{R_2} = P \\dfrac{R_2}{K^2 Z_2}',
+      sustituida: `${P} \\cdot \\dfrac{${R2}}{${numero(n)} \\cdot ${Z2}}`,
+      disipada: (p * r2) / (n * z2),
+    },
+    {
+      nombre: 'R3',
+      formula: 'P_{R_3} = P \\dfrac{(Z_1 - R_1)^2}{Z_1 R_3}',
+      sustituida: `${P} \\cdot \\dfrac{(${Z1} - ${R1})^2}{${Z1} \\cdot ${R3}}`,
+      disipada: (p * (z1 - r1) ** 2) / (z1 * r3),
+    },
+  ]);
+}
+
+function potenciaDePi(
+  red: SinCompletar,
+  k: number,
+  n: number,
+  z1: number,
+  z2: number,
+  p: number,
+): ResultadoPotencia {
+  const [r1, r2, r3] = [red.r1.valor, red.r2.valor, red.r3.valor];
+  const P = pLatex(p);
+  const [Z1, Z2, R1, R2, R3] = [z1, z2, r1, r2, r3].map(ohmsLatex);
+  return armarPotencia(p, [
+    {
+      nombre: 'R1',
+      formula: 'P_{R_1} = P \\dfrac{Z_1}{R_1}',
+      sustituida: `${P} \\cdot \\dfrac{${Z1}}{${R1}}`,
+      disipada: (p * z1) / r1,
+    },
+    {
+      nombre: 'R2',
+      formula: 'P_{R_2} = P \\dfrac{Z_2}{K^2 R_2}',
+      sustituida: `${P} \\cdot \\dfrac{${Z2}}{${numero(n)} \\cdot ${R2}}`,
+      disipada: (p * z2) / (n * r2),
+    },
+    {
+      nombre: 'R3',
+      formula: 'P_{R_3} = P \\dfrac{\\left(\\sqrt{Z_1} - \\sqrt{Z_2}/K\\right)^2}{R_3}',
+      sustituida: `${P} \\cdot \\dfrac{\\left(\\sqrt{${Z1}} - \\sqrt{${Z2}}/${numero(k)}\\right)^2}{${R3}}`,
+      disipada: (p * (Math.sqrt(z1) - Math.sqrt(z2) / k) ** 2) / r3,
+    },
+  ]);
+}
+
+// --- Pad de mínima pérdida (spec §10.2) ----------------------------------------------------------
+
+export type CodigoCorteMinima = 'impedancias-iguales';
+
+export type ResultadoMinimaPerdida =
+  | { estado: 'corte'; codigo: CodigoCorteMinima; texto: string }
+  | {
+      estado: 'calculado';
+      // K_min, la relación de tensiones del pad.
+      k: number;
+      aMin: number;
+      pad: PadMinimaPerdida;
+      avisos: readonly Aviso<CodigoAviso>[];
+      referencias: readonly Referencia[];
+      notas: readonly string[];
+    };
+
+// La red L de dos resistencias con la atenuación mínima que permite Z1 ≠ Z2: la serie del lado de
+// la impedancia mayor y la de derivación del lado de la menor.
+export function calcularMinimaPerdida({
+  z1,
+  z2,
+  frecuencia = null,
+  potencia = null,
+}: EntradaMinimaPerdida): ResultadoMinimaPerdida {
+  if (z1 === z2) {
+    return {
+      estado: 'corte',
+      codigo: 'impedancias-iguales',
+      texto: 'Con Z1 = Z2 no hay pad de mínima pérdida: la atenuación mínima es 0 dB.',
+    };
+  }
+  const { aMin, kMin: k, pasos: pasosDeA } = atenuacionMinima(z1, z2);
+  const mayor = Math.max(z1, z2);
+  const menor = Math.min(z1, z2);
+  const raiz = Math.sqrt(1 - menor / mayor);
+  const rSerie = mayor * raiz;
+  const rDerivacion = menor / raiz;
+  // La serie va del lado de la impedancia mayor; si es Z1, la fuente ve primero la serie.
+  const serieEnZ1 = z1 > z2;
+  const serie = resistencia('R1', rSerie, 'serie', serieEnZ1 ? 'Z1' : 'Z2');
+  const derivacion = resistencia('R3', rDerivacion, 'derivacion', serieEnZ1 ? 'Z2' : 'Z1');
+
+  const formulas = [
+    'A_{\\mathrm{min}} = 20 \\log_{10}\\left(\\sqrt{r} + \\sqrt{r - 1}\\right)',
+    'R_1 = Z_{\\mathrm{mayor}} \\sqrt{1 - \\dfrac{Z_{\\mathrm{menor}}}{Z_{\\mathrm{mayor}}}}',
+    'R_3 = \\dfrac{Z_{\\mathrm{menor}}}{\\sqrt{1 - \\dfrac{Z_{\\mathrm{menor}}}{Z_{\\mathrm{mayor}}}}}',
+  ];
+  const raizLatex = `\\sqrt{1 - \\dfrac{${numero(menor)}}{${numero(mayor)}}}`;
+  const pasos: Paso[] = [
+    ...pasosDeA,
+    {
+      texto: 'Relación de tensiones del pad de mínima pérdida',
+      latex:
+        `K_{\\mathrm{min}} = \\sqrt{r} + \\sqrt{r - 1} = 10^{A_{\\mathrm{min}}/20} = ` +
+        `10^{${numero(aMin)}/20} = ${numero(k)}`,
+    },
+    {
+      texto: `R1, en serie del lado de ${serie.lado} (la impedancia mayor)`,
+      latex: `${formulas[1]} = ${numero(mayor)} \\cdot ${raizLatex} = ${ohmsLatex(rSerie)}`,
+    },
+    {
+      texto: `R3, en derivación del lado de ${derivacion.lado} (la impedancia menor)`,
+      latex: `${formulas[2]} = \\dfrac{${numero(menor)}}{${raizLatex}} = ${ohmsLatex(rDerivacion)}`,
+    },
+  ];
+
+  // Con Z2 conectada: si la serie está del lado de Z1 la fuente la ve primero; si no, ve primero
+  // la derivación y la serie queda entre ella y la carga.
+  let zEntrada: number;
+  let v2SobreV1: number;
+  if (serieEnZ1) {
+    zEntrada = rSerie + (rDerivacion * z2) / (rDerivacion + z2);
+    v2SobreV1 = (zEntrada - rSerie) / zEntrada;
+    pasos.push(
+      {
+        texto: 'Impedancia de entrada con Z2 conectada',
+        latex:
+          `Z_{\\mathrm{ent}} = R_1 + \\dfrac{R_3 Z_2}{R_3 + Z_2} = ` +
+          `${numero(rSerie)} + \\dfrac{${numero(rDerivacion)} \\cdot ${numero(z2)}}` +
+          `{${numero(rDerivacion)} + ${numero(z2)}} = ${ohmsLatex(zEntrada)}`,
+      },
+      {
+        texto: 'Tensión en la carga sobre tensión de entrada',
+        latex:
+          `\\dfrac{V_2}{V_1} = \\dfrac{Z_{\\mathrm{ent}} - R_1}{Z_{\\mathrm{ent}}} = ` +
+          `\\dfrac{${numero(zEntrada)} - ${numero(rSerie)}}{${numero(zEntrada)}} = ${numero(v2SobreV1)}`,
+      },
+    );
+  } else {
+    const hacia = rSerie + z2;
+    zEntrada = (rDerivacion * hacia) / (rDerivacion + hacia);
+    v2SobreV1 = z2 / hacia;
+    pasos.push(
+      {
+        texto: 'Impedancia de entrada con Z2 conectada',
+        latex:
+          `Z_{\\mathrm{ent}} = \\dfrac{R_3 (R_1 + Z_2)}{R_3 + R_1 + Z_2} = ` +
+          `\\dfrac{${numero(rDerivacion)} \\cdot (${numero(rSerie)} + ${numero(z2)})}` +
+          `{${numero(rDerivacion)} + ${numero(rSerie)} + ${numero(z2)}} = ${ohmsLatex(zEntrada)}`,
+      },
+      {
+        texto: 'Tensión en la carga sobre tensión de entrada',
+        latex:
+          `\\dfrac{V_2}{V_1} = \\dfrac{Z_2}{R_1 + Z_2} = ` +
+          `\\dfrac{${numero(z2)}}{${numero(rSerie)} + ${numero(z2)}} = ${numero(v2SobreV1)}`,
+      },
+    );
+  }
+  const atenuacion = atenuacionDe(zEntrada, z2, v2SobreV1);
+  pasos.push(pasoAtenuacion(zEntrada, z2, v2SobreV1, atenuacion));
+
+  const entrada = potenciaValida(potencia);
+  const conPotencia =
+    entrada === null ? null : potenciaDePad(serie, derivacion, serieEnZ1, k, z1, z2, entrada);
+  const revision = revisarValores({ serie, derivacion }, frecuencia ?? FRECUENCIA_POR_DEFECTO);
+
+  return {
+    estado: 'calculado',
+    k,
+    aMin,
+    pad: {
+      topologia: 'L',
+      serie,
+      derivacion,
+      formulas: [...formulas, ...(conPotencia?.formulas ?? [])],
+      pasos: [...pasos, ...(conPotencia?.pasos ?? []), ...revision.pasos],
+      verificacion: { zEntrada, atenuacion },
+      revision,
+      potencia: conPotencia?.potencia ?? null,
+    },
+    avisos: avisosDe(aMin, frecuencia),
+    referencias: REFERENCIAS_MINIMA_PERDIDA,
+    notas: NOTAS_ATENUADORES,
+  };
+}
+
+// Con la serie del lado de Z1 el pad es un T con R2 = 0 y valen las de R1 y R3 del T; con la
+// derivación del lado de Z1, es un π con Rb abierta y valen las de Ra y Rs del π.
+function potenciaDePad(
+  serie: Resistencia,
+  derivacion: Resistencia,
+  serieEnZ1: boolean,
+  k: number,
+  z1: number,
+  z2: number,
+  p: number,
+): ResultadoPotencia {
+  const P = pLatex(p);
+  const [Z1, Z2, R1, R3] = [z1, z2, serie.valor, derivacion.valor].map(ohmsLatex);
+  if (serieEnZ1) {
+    return armarPotencia(p, [
+      {
+        nombre: 'R1',
+        formula: 'P_{R_1} = P \\dfrac{R_1}{Z_1}',
+        sustituida: `${P} \\cdot \\dfrac{${R1}}{${Z1}}`,
+        disipada: (p * serie.valor) / z1,
+      },
+      {
+        nombre: 'R3',
+        formula: 'P_{R_3} = P \\dfrac{(Z_1 - R_1)^2}{Z_1 R_3}',
+        sustituida: `${P} \\cdot \\dfrac{(${Z1} - ${R1})^2}{${Z1} \\cdot ${R3}}`,
+        disipada: (p * (z1 - serie.valor) ** 2) / (z1 * derivacion.valor),
+      },
+    ]);
+  }
+  return armarPotencia(p, [
+    {
+      nombre: 'R1',
+      formula: 'P_{R_1} = P \\dfrac{\\left(\\sqrt{Z_1} - \\sqrt{Z_2}/K\\right)^2}{R_1}',
+      sustituida: `${P} \\cdot \\dfrac{\\left(\\sqrt{${Z1}} - \\sqrt{${Z2}}/${numero(k)}\\right)^2}{${R1}}`,
+      disipada: (p * (Math.sqrt(z1) - Math.sqrt(z2) / k) ** 2) / serie.valor,
+    },
+    {
+      nombre: 'R3',
+      formula: 'P_{R_3} = P \\dfrac{Z_1}{R_3}',
+      sustituida: `${P} \\cdot \\dfrac{${Z1}}{${R3}}`,
+      disipada: (p * z1) / derivacion.valor,
+    },
+  ]);
 }
