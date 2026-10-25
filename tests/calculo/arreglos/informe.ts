@@ -5,8 +5,13 @@ import {
   MAGNITUD,
   type MagnitudArreglo,
   calcularArreglos,
-  valoresSinInventario,
+  valoresDeBusqueda,
 } from '../../../src/calculo/arreglos/arreglos';
+import {
+  type ValorCargado,
+  describirInventario,
+  escribirTolerancia,
+} from '../../../src/calculo/arreglos/inventario';
 import { formasDeConexion } from '../../../src/calculo/comun/arreglos';
 import { formatearValor } from '../../../src/entrada/formato';
 import {
@@ -34,10 +39,38 @@ import {
 // El adaptador de los Casos de prueba de Arreglos equivalentes para el Informe de casos (spec
 // §13.6): corre el cálculo con las entradas de cada caso y deja el obtenido y los pasos como texto.
 
+// Los valores del Inventario con la tolerancia que el Alumno les escribió: "10 pF ± 0,1 pF".
+function cargados(e: EntradaArreglos, valores: readonly ValorCargado[]): string {
+  const magnitud = MAGNITUD[e.componente];
+  return valores
+    .map(({ valor, tolerancia }) => {
+      const base = formatearValor(valor, magnitud);
+      return tolerancia ? `${base} ± ${escribirTolerancia(tolerancia, e.componente)}` : base;
+    })
+    .join(', ');
+}
+
+function inventarioTexto(e: EntradaArreglos): string {
+  const { inventario } = e;
+  if (!inventario || inventario.modo === 'ninguno') return `serie ${e.serie} completa`;
+  const descripcion = describirInventario(e.componente, e.serie, inventario).texto;
+  if (inventario.modo === 'inclusion')
+    return `${descripcion}: ${cargados(e, inventario.inclusion)}`;
+  const { excluidos, extras } = inventario.exclusion;
+  const magnitud = MAGNITUD[e.componente];
+  return [
+    descripcion,
+    excluidos.length > 0 && `sin ${excluidos.map((x) => formatearValor(x, magnitud)).join(', ')}`,
+    extras.length > 0 && `más ${cargados(e, extras)}`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
 function entradasTexto(e: EntradaArreglos): string {
   const partes = [
     `${e.componente === 'capacitor' ? 'Capacitor' : 'Resistencia'} de ${formatearValor(e.buscado, MAGNITUD[e.componente])}`,
-    `serie ${e.serie} completa`,
+    inventarioTexto(e),
     `umbral ${formatearValor(e.umbral * 100, 'porcentaje')}`,
   ];
   return partes.join(' · ');
@@ -124,7 +157,7 @@ const top10 = (): CasoInforme[] =>
     enCaso(caso, () => {
       const { entrada } = caso;
       const r = calcularArreglos(entrada);
-      const valores = valoresSinInventario(entrada.componente, entrada.serie);
+      const valores = valoresDeBusqueda(entrada);
       const esperado = mejoresArreglos(valores, entrada.buscado, entrada.umbral);
       const magnitud = MAGNITUD[entrada.componente];
       const medidas = esperado.flatMap((e, i): Medida[] => {

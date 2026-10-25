@@ -1,4 +1,4 @@
-// Entradas, última Calculadora y (más adelante) Inventario en `localStorage` (spec §4.4). El JSON
+// Entradas, última Calculadora e Inventario en `localStorage` (spec §4.4). El JSON
 // lleva `version` desde el primer día, y `migrar` lleva cualquier versión anterior a la actual.
 // Todas las escrituras van en try/catch: si no se puede guardar, el Asistente sigue andando.
 
@@ -16,7 +16,8 @@ export interface Datos {
   ultima?: string;
   // Calculadora → campo → texto y Selector de unidad.
   entradas: Record<string, Record<string, EntradaGuardada>>;
-  // Lo escribe el ticket 36; acá solo se conserva.
+  // Tipo de componente → Inventario (spec §8.2). Se guarda como llega y se valida al leerlo; un
+  // Inventario de otra forma se descarta al guardar uno nuevo.
   inventario?: unknown;
 }
 
@@ -96,6 +97,18 @@ export class Almacen {
 
   guardarEntrada(calculadora: string, campo: string, entrada: EntradaGuardada): boolean {
     (this.datos.entradas[calculadora] ??= {})[campo] = entrada;
+    return this.escribir();
+  }
+
+  // El Inventario de un tipo de componente ('capacitor', 'resistencia'), tal como se guardó: quien
+  // lo usa lo valida (calculo/arreglos/inventario.ts).
+  inventario(tipo: string): unknown {
+    return esObjeto(this.datos.inventario) ? this.datos.inventario[tipo] : undefined;
+  }
+
+  guardarInventario(tipo: string, inventario: unknown): boolean {
+    if (!esObjeto(this.datos.inventario)) this.datos.inventario = {};
+    (this.datos.inventario as Record<string, unknown>)[tipo] = inventario;
     return this.escribir();
   }
 

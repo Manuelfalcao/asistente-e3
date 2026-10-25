@@ -1,4 +1,4 @@
-import { POR_DEFECTO } from '../../calculo/arreglos/arreglos';
+import { MAGNITUD, POR_DEFECTO, type TipoComponente } from '../../calculo/arreglos/arreglos';
 import type { EspecSinSelector } from '../../entrada/campo';
 import { formatearNumero } from '../../entrada/formato';
 
@@ -43,6 +43,16 @@ export const TOLERANCIA_CHICOS: EspecSinSelector = {
   obligatorio: true,
   rango: { min: 0 },
 };
+
+// Los campos del Inventario (spec §8.2): un valor a cargar y los extremos del rango de la serie.
+const porTipo = (nombre: string): Record<TipoComponente, EspecSinSelector> => ({
+  capacitor: { nombre, magnitud: MAGNITUD.capacitor, obligatorio: true, rango: MAYOR_QUE_CERO },
+  resistencia: { nombre, magnitud: MAGNITUD.resistencia, obligatorio: true, rango: MAYOR_QUE_CERO },
+});
+
+export const VALOR_DEL_INVENTARIO = porTipo('Valor');
+export const RANGO_DESDE = porTipo('Desde');
+export const RANGO_HASTA = porTipo('Hasta');
 
 // Los valores por defecto de §8.1, como se escriben en los campos: "1", "5" y "0,25" (en pF).
 const porcentaje = (fraccion: number) => formatearNumero(fraccion * 100, 3);

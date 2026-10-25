@@ -644,6 +644,144 @@
   color: var(--texto-suave);
 }
 
+.boton-inventario {
+  min-height: var(--toque);
+  margin-top: var(--esp-2);
+  padding: 0 var(--esp-3);
+  border: 1px solid var(--acento);
+  border-radius: var(--radio-pildora);
+  background: var(--superficie);
+  color: var(--acento);
+  font-size: var(--tam-3);
+  font-weight: 600;
+  cursor: pointer;
+}
+.boton-inventario:hover:not(:disabled) {
+  background: var(--acento-suave);
+}
+.boton-inventario:disabled {
+  border-color: var(--borde-campo);
+  color: var(--texto-suave);
+  cursor: default;
+}
+
+/* El editor del Inventario (spec §8.2) */
+.editor-inventario {
+  margin-top: var(--esp-4);
+  padding-top: var(--esp-4);
+  border-top: 1px solid var(--borde);
+}
+.editor-inventario h4 {
+  margin: var(--esp-4) 0 var(--esp-1);
+  font-size: var(--tam-3);
+  font-weight: 600;
+}
+.ayuda-inventario {
+  margin: 0 0 var(--esp-2);
+  font-size: var(--tam-3);
+  color: var(--texto-suave);
+}
+.error-inventario {
+  margin: var(--esp-1) 0;
+  font-size: var(--tam-2);
+  color: var(--error);
+}
+.rango-serie {
+  min-width: 0;
+  margin: 0 0 var(--esp-3);
+  padding: 0;
+  border: 0;
+}
+.rango-serie legend {
+  margin-bottom: var(--esp-2);
+  padding: 0;
+  font-size: var(--tam-3);
+  font-weight: 600;
+}
+
+/* La grilla de la serie: una fila por década, que se desliza si no entra en el ancho */
+.grilla-serie .decadas {
+  overflow-x: auto;
+  padding-bottom: var(--esp-1);
+}
+.decada {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-1);
+  width: max-content;
+  margin-bottom: var(--esp-1);
+}
+.decada-etiqueta {
+  flex: none;
+  position: sticky;
+  left: 0;
+  width: 3.5rem;
+  background: var(--superficie-2);
+  font-size: var(--tam-2);
+  color: var(--texto-suave);
+}
+.celda-serie {
+  flex: none;
+  min-width: var(--toque);
+  min-height: var(--toque);
+  padding: 0 var(--esp-2);
+  border: 1px solid var(--borde-campo);
+  border-radius: var(--radio-1);
+  background: var(--superficie);
+  color: var(--texto);
+  font-size: var(--tam-3);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.celda-serie[aria-pressed='true'] {
+  border-style: dashed;
+  background: var(--superficie-2);
+  color: var(--texto-suave);
+  text-decoration: line-through;
+}
+.celda-serie:focus-visible,
+.valor-cargado input:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 1px;
+}
+
+/* La lista de valores cargados, cada uno con su tolerancia propia opcional */
+.valores-cargados {
+  margin: var(--esp-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.valor-cargado {
+  display: grid;
+  grid-template-columns: 5rem minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--esp-2);
+  margin-bottom: var(--esp-2);
+}
+.valor-cargado .valor-texto {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.valor-cargado input {
+  min-width: 0;
+  min-height: var(--toque);
+  padding: 0 var(--esp-3);
+  border: 1px solid var(--borde-campo);
+  border-radius: var(--radio-1);
+  background: var(--superficie);
+  font-size: var(--tam-3);
+}
+.valor-cargado.invalido input {
+  border-color: var(--impracticable);
+  box-shadow: inset 0 0 0 1px var(--impracticable);
+}
+.valor-cargado .boton-inventario {
+  margin-top: 0;
+}
+.valor-cargado .error-inventario {
+  grid-column: 2 / -1;
+}
+
 .calculando {
   margin: var(--esp-2) 0;
   font-size: var(--tam-3);

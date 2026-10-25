@@ -75,6 +75,38 @@ describe('almacén', () => {
     expect(JSON.parse(s.datos[CLAVE]).inventario).toEqual([1]);
   });
 
+  it('guarda un Inventario por tipo de componente y vuelve al reabrir', () => {
+    const s = memoria();
+    const a = new Almacen(s);
+    const capacitores = { modo: 'inclusion', inclusion: [{ valor: 4.3e-12 }] };
+    expect(a.inventario('capacitor')).toBeUndefined();
+    expect(a.guardarInventario('capacitor', capacitores)).toBe(true);
+    expect(a.guardarInventario('resistencia', { modo: 'exclusion' })).toBe(true);
+    a.guardarEntrada('arreglos', 'serie', { texto: 'E24' });
+
+    const b = new Almacen(s); // al reabrir
+    expect(b.inventario('capacitor')).toEqual(capacitores);
+    expect(b.inventario('resistencia')).toEqual({ modo: 'exclusion' });
+    expect(b.entrada('arreglos', 'serie')).toEqual({ texto: 'E24' });
+  });
+
+  it('el Inventario sobrevive a una Versión nueva: migrar lo conserva', () => {
+    const s = memoria();
+    new Almacen(s).guardarInventario('capacitor', { modo: 'inclusion', inclusion: [] });
+    const guardado = JSON.parse(s.datos[CLAVE]);
+    expect(migrar(guardado).inventario).toEqual({
+      capacitor: { modo: 'inclusion', inclusion: [] },
+    });
+  });
+
+  it('un Inventario guardado con otra forma no rompe: se reemplaza al guardar', () => {
+    const s = memoria({ [CLAVE]: JSON.stringify({ version: 1, entradas: {}, inventario: [1] }) });
+    const a = new Almacen(s);
+    expect(a.inventario('capacitor')).toBeUndefined();
+    expect(a.guardarInventario('capacitor', { modo: 'ninguno' })).toBe(true);
+    expect(new Almacen(s).inventario('capacitor')).toEqual({ modo: 'ninguno' });
+  });
+
   it('si la escritura falla, no tira error y sigue andando en memoria', () => {
     const a = new Almacen(roto);
     expect(a.guardarEntrada('atenuadores', 'z1', { texto: '75' })).toBe(false);

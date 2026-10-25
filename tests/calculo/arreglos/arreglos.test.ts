@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   RANGO_SIN_INVENTARIO,
   calcularArreglos,
-  valoresSinInventario,
+  valoresDeBusqueda,
 } from '../../../src/calculo/arreglos/arreglos';
 import { formasDeConexion } from '../../../src/calculo/comun/arreglos';
 import { leerEntrada } from '../../../src/entrada/leer';
@@ -23,7 +23,7 @@ describe('Arreglos equivalentes: el top-10 es el de la fuerza bruta', () => {
   for (const caso of CASOS_TOP10) {
     it(caso.id, { timeout: 30000 }, () => {
       const r = calcularArreglos(caso.entrada);
-      const valores = valoresSinInventario(caso.entrada.componente, caso.entrada.serie);
+      const valores = valoresDeBusqueda(caso.entrada);
       const esperado = mejoresArreglos(valores, caso.entrada.buscado, caso.entrada.umbral);
       expect(r.filas).toHaveLength(10);
       expect(r.filas.map((f) => f.componentes)).toEqual(esperado.map((a) => a.componentes));
@@ -67,7 +67,7 @@ describe('Arreglos equivalentes: comportamiento', () => {
 describe('Arreglos equivalentes: salidas', () => {
   it('sin Inventario usa la serie completa en el rango fijo del tipo', () => {
     const c = calcularArreglos({ ...CASO_TOLERANCIA_47.entrada });
-    expect(c.inventario).toEqual({
+    expect(c.inventario).toMatchObject({
       texto: 'Serie E12 completa, sin Inventario',
       rango: '1 pF – 10 nF',
       cantidad: 49,

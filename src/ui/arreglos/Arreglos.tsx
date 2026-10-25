@@ -8,7 +8,9 @@ import {
   MAGNITUD,
   POR_DEFECTO,
   describirInventario,
+  type DescripcionInventario,
 } from '../../calculo/arreglos/arreglos';
+import { type Inventario, TIPOS } from '../../calculo/arreglos/inventario';
 import { ARREGLOS_A_MOSTRAR } from '../../calculo/comun/arreglos';
 import type { SerieE } from '../../calculo/comun/series-e';
 import { mensajeDeResultados } from '../../entrada/campo';
@@ -25,6 +27,8 @@ import { Cita, FormaResultado, Pasos } from '../comun/Resultado';
 import { Rotulo } from '../comun/Rotulo';
 import { TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
 import { useBusquedaArreglos } from './buscador';
+import { EditorInventario } from './EditorInventario';
+import { useInventario } from './inventario';
 import {
   CAPACIDAD_BUSCADA,
   RESISTENCIA_BUSCADA,
@@ -74,19 +78,27 @@ export function Arreglos() {
     guardado('tolerancia-chicos'),
   );
 
+  const [inventario, setInventario] = useInventario(componente);
+  const descripcion = describirInventario(componente, serie, inventario);
+  const conInventario = inventario.modo !== 'ninguno';
+
   const esCapacitor = componente === 'capacitor';
   const buscado = esCapacitor ? capacidad : resistencia;
   const tolerancia = esCapacitor ? toleranciaC : toleranciaR;
   const campos = esCapacitor
     ? [buscado, umbral, tolerancia, toleranciaChicos]
     : [buscado, umbral, tolerancia];
-  const mensaje = mensajeDeResultados(
-    campos.map((c) => ({
-      nombre: c.spec.nombre,
-      obligatorio: !!c.spec.obligatorio,
-      estado: c.estado,
-    })),
-  );
+  const mensaje =
+    mensajeDeResultados(
+      campos.map((c) => ({
+        nombre: c.spec.nombre,
+        obligatorio: !!c.spec.obligatorio,
+        estado: c.estado,
+      })),
+    ) ??
+    (conInventario && descripcion.cantidad === 0
+      ? `El Inventario de ${TIPOS[componente]} no tiene valores: cargalos en «Editar Inventario»`
+      : null);
   const valor = (c: CampoEntrada) => (c.estado.estado === 'valido' ? c.estado.valor : null);
   const valorBuscado = valor(buscado);
   const umbralPorcentaje = valor(umbral);
@@ -102,6 +114,7 @@ export function Arreglos() {
           componente,
           buscado: valorBuscado,
           serie,
+          ...(conInventario && { inventario }),
           umbral: umbralPorcentaje / 100,
           tolerancia: toleranciaPorcentaje / 100,
           toleranciaChicos: absolutaChicos,
@@ -125,13 +138,15 @@ export function Arreglos() {
             etiqueta="Valor buscado"
             campo={buscado}
           />
-          <BotonesSegmentados
-            etiqueta="Serie"
-            nombre="serie"
-            opciones={SERIES}
-            valor={serie}
-            onCambio={setSerie}
-          />
+          {inventario.modo !== 'inclusion' && (
+            <BotonesSegmentados
+              etiqueta="Serie"
+              nombre="serie"
+              opciones={SERIES}
+              valor={serie}
+              onCambio={setSerie}
+            />
+          )}
           <CampoEntradaValor id="umbral" etiqueta="Umbral de error" campo={umbral} unidadFija="%" />
           {esCapacitor ? (
             <>
@@ -156,7 +171,14 @@ export function Arreglos() {
             />
           )}
         </section>
-        <BloqueInventario componente={componente} serie={serie} />
+        <BloqueInventario
+          key={componente}
+          componente={componente}
+          serie={serie}
+          inventario={inventario}
+          descripcion={descripcion}
+          onCambio={setInventario}
+        />
       </div>
       <section class="resultados" aria-label="Resultados" aria-live="polite" aria-busy={calculando}>
         {mensaje !== null ? (
@@ -171,17 +193,44 @@ export function Arreglos() {
   );
 }
 
-// Qué se usa para buscar, en un bloque propio separado de las entradas (spec §8.2). El botón
-// "Editar Inventario" llega con el Inventario.
-function BloqueInventario({ componente, serie }: { componente: TipoComponente; serie: SerieE }) {
-  const inventario = describirInventario(componente, serie);
+// Qué se usa para buscar, en un bloque propio separado de las entradas, y el botón "Editar
+// Inventario" (spec §8.2).
+function BloqueInventario({
+  componente,
+  serie,
+  inventario,
+  descripcion,
+  onCambio,
+}: {
+  componente: TipoComponente;
+  serie: SerieE;
+  inventario: Inventario;
+  descripcion: DescripcionInventario;
+  onCambio: (cambio: (previo: Inventario) => Inventario) => void;
+}) {
+  const [editando, setEditando] = useState(false);
   return (
     <section class="bloque-inventario" aria-label="Inventario">
       <h3>Inventario</h3>
-      <p>{inventario.texto}</p>
-      <p class="detalle">
-        {inventario.rango} · {inventario.cantidad} valores
-      </p>
+      <p>{descripcion.texto}</p>
+      {descripcion.detalle && <p class="detalle">{descripcion.detalle}</p>}
+      <button
+        type="button"
+        class="boton-inventario"
+        aria-expanded={editando}
+        aria-controls={`editor-inventario-${componente}`}
+        onClick={() => setEditando(!editando)}
+      >
+        {editando ? 'Cerrar' : 'Editar Inventario'}
+      </button>
+      {editando && (
+        <EditorInventario
+          componente={componente}
+          serie={serie}
+          inventario={inventario}
+          onCambio={onCambio}
+        />
+      )}
     </section>
   );
 }

@@ -11,27 +11,43 @@ import {
 } from '../comun/arreglos';
 import { enteroLatex, errorLatex, porcentajeLatex, valorLatex } from '../comun/latex';
 import type { Paso, Referencia } from '../comun/resultado';
-import { type SerieE, valoresDeSerie } from '../comun/series-e';
+import type { SerieE } from '../comun/series-e';
 import { type Componente, type Revision, revisarValores } from '../comun/valor-impracticable';
+import {
+  type DescripcionInventario,
+  type Inventario,
+  type MagnitudArreglo,
+  type TipoComponente,
+  type ToleranciaValor,
+  MAGNITUD,
+  describirInventario,
+  valoresCargados,
+} from './inventario';
 
 // La Calculadora de Arreglos equivalentes (spec §8): los 10 mejores Arreglos serie-paralelo de hasta
-// 4 componentes de Valor comercial para un capacitor o una resistencia buscada. Todavía sin
-// Inventario: busca en la serie E completa, en el rango fijo del tipo.
+// 4 componentes de Valor comercial para un capacitor o una resistencia buscada. Busca con el
+// Inventario del tipo (inventario.ts) o, sin él, en la serie E completa en el rango fijo del tipo.
 
-export type TipoComponente = 'capacitor' | 'resistencia';
-
-export type MagnitudArreglo = 'capacidad' | 'resistencia';
-
-export const MAGNITUD: Record<TipoComponente, MagnitudArreglo> = {
-  capacitor: 'capacidad',
-  resistencia: 'resistencia',
-};
+export {
+  type DescripcionInventario,
+  type MagnitudArreglo,
+  type TipoComponente,
+  type ToleranciaValor,
+  MAGNITUD,
+  RANGO_SIN_INVENTARIO,
+  describirInventario,
+  valoresSinInventario,
+} from './inventario';
 
 export interface EntradaArreglos {
   componente: TipoComponente;
   // En F u Ω.
   buscado: number;
+  // Con Inventario por exclusión es la serie de la que se descuentan los Valores excluidos; con
+  // Inventario por inclusión no se usa.
   serie: SerieE;
+  // El Inventario del tipo. Sin él (o con modo 'ninguno') busca en la serie completa.
+  inventario?: Inventario;
   // Fracción: 0,01 es 1 %.
   umbral: number;
   // Fracción: la de las resistencias y la de los capacitores de 10 pF o más.
@@ -51,25 +67,26 @@ export const POR_DEFECTO = {
 // Debajo de este valor un capacitor C0G se especifica con tolerancia absoluta (KEMET, tabla 1A).
 export const LIMITE_CHICOS = 10e-12;
 
-// Sin Inventario propio, la serie completa en un rango fijo (spec §8.2).
-export const RANGO_SIN_INVENTARIO: Record<TipoComponente, { min: number; max: number }> = {
-  capacitor: { min: 1e-12, max: 10e-9 },
-  resistencia: { min: 1, max: 10e6 },
-};
-
-export function valoresSinInventario(componente: TipoComponente, serie: SerieE): number[] {
-  const { min, max } = RANGO_SIN_INVENTARIO[componente];
-  return valoresDeSerie(serie, min, max);
-}
-
-// La tolerancia de un valor del Inventario: relativa (fracción) o absoluta (F u Ω).
-export type ToleranciaValor =
-  { tipo: 'relativa'; fraccion: number } | { tipo: 'absoluta'; valor: number };
-
 export interface ValorInventario {
   valor: number;
   tolerancia: ToleranciaValor;
+  // Si la tolerancia la escribió el Alumno en el Inventario y no es la de por defecto.
+  propia?: boolean;
 }
+
+// Los valores con que busca la entrada, de menor a mayor, cada uno con su tolerancia: la propia del
+// Inventario si la tiene y, si no, la de por defecto del tipo.
+export function inventarioDeBusqueda(entrada: EntradaArreglos): ValorInventario[] {
+  return valoresCargados(entrada.componente, entrada.serie, entrada.inventario).map(
+    ({ valor, tolerancia }): ValorInventario =>
+      tolerancia
+        ? { valor, tolerancia, propia: true }
+        : { valor, tolerancia: toleranciaPorDefecto(entrada, valor) },
+  );
+}
+
+export const valoresDeBusqueda = (entrada: EntradaArreglos): number[] =>
+  inventarioDeBusqueda(entrada).map((v) => v.valor);
 
 export interface FilaArreglo {
   // "(27 pF serie 68 pF) ∥ 15 pF"
@@ -86,26 +103,6 @@ export interface FilaArreglo {
   nota: string | null;
   // El Error del arreglo y la cuenta de la Tolerancia del arreglo.
   pasos: readonly Paso[];
-}
-
-// Qué se usa para buscar: "Serie E12 completa, sin Inventario", "1 pF – 10 nF", 49 valores.
-export interface DescripcionInventario {
-  texto: string;
-  rango: string;
-  cantidad: number;
-}
-
-export function describirInventario(
-  componente: TipoComponente,
-  serie: SerieE,
-): DescripcionInventario {
-  const { min, max } = RANGO_SIN_INVENTARIO[componente];
-  const { magnitud } = CONVENCIONES[componente];
-  return {
-    texto: `Serie ${serie} completa, sin Inventario`,
-    rango: `${formatearValor(min, magnitud)} – ${formatearValor(max, magnitud)}`,
-    cantidad: valoresSinInventario(componente, serie).length,
-  };
 }
 
 export interface ResultadoArreglos {
@@ -160,11 +157,8 @@ const CONVENCIONES: Record<TipoComponente, Convencion> = {
 export function calcularArreglos(entrada: EntradaArreglos): ResultadoArreglos {
   const { componente, buscado, serie, umbral } = entrada;
   const convencion = CONVENCIONES[componente];
-  const valores = valoresSinInventario(componente, serie);
-  const inventario = valores.map((valor) => ({
-    valor,
-    tolerancia: toleranciaPorDefecto(entrada, valor),
-  }));
+  const inventario = inventarioDeBusqueda(entrada);
+  const valores = inventario.map((v) => v.valor);
   const busqueda = buscarArreglos(valores, buscado, { umbral });
 
   const filas = busqueda.arreglos.map((a): FilaArreglo => {
@@ -199,7 +193,7 @@ export function calcularArreglos(entrada: EntradaArreglos): ResultadoArreglos {
   return {
     componente,
     buscado: buscadoComo,
-    inventario: describirInventario(componente, serie),
+    inventario: describirInventario(componente, serie, entrada.inventario),
     filas,
     formulas,
     pasos: [
@@ -367,7 +361,9 @@ function pasosDeFila(
     {
       texto: `Tolerancia del arreglo: mínimo, con todos al mínimo (${conTolerancia})`,
       latex: `${sub('min')} = ${enExtremo(-1)} = ${v(tolerancia.minimo)}`,
-      fuente: FUENTE_TOLERANCIAS,
+      fuente: distintos.some((h) => inventario[h].propia)
+        ? `${FUENTE_TOLERANCIAS} Los valores del Inventario con tolerancia propia usan la que se escribió.`
+        : FUENTE_TOLERANCIAS,
     },
     {
       texto: 'Tolerancia del arreglo: máximo, con todos al máximo',
