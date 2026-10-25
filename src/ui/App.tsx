@@ -13,6 +13,7 @@ import {
 import { Aviso } from './comun/Franjas';
 import { IconoCalculadora } from './comun/Icono';
 import { FranjaVersionNueva } from './FranjaVersionNueva';
+import { Redes } from './redes/Redes';
 import { svgIconoAsistente } from './iconos';
 import { VERSION } from './version';
 
@@ -96,6 +97,8 @@ export function App() {
             <Bobinas />
           ) : activa.id === 'arreglos' ? (
             <Arreglos />
+          ) : activa.id === 'redes' ? (
+            <Redes />
           ) : activa.id === 'atenuadores' ? (
             <Atenuadores />
           ) : (

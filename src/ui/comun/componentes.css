@@ -588,6 +588,34 @@
   margin-top: var(--esp-3);
 }
 
+/* ---------- Redes de adaptación ---------- */
+
+/* Las etiquetas de Bowick de cada variante: "deja pasar la continua", "atenúa armónicas". */
+.etiquetas-bowick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-1);
+  margin: var(--esp-2) 0;
+  padding: 0;
+  list-style: none;
+}
+.etiquetas-bowick li {
+  padding: 0.1em 0.6em;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-pildora);
+  font-size: var(--tam-2);
+  color: var(--texto-suave);
+}
+
+.barrido {
+  margin-top: var(--esp-3);
+}
+.barrido-titulo {
+  margin: 0 0 var(--esp-1);
+  font-size: var(--tam-3);
+  font-weight: 600;
+}
+
 /* ---------- Vecinos en pasos de media vuelta (bobinas) ---------- */
 
 .vecinos {

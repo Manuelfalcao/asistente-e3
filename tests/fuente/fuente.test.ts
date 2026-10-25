@@ -13,6 +13,7 @@ import {
   rosaGrover91ConPasos,
 } from '../../src/calculo/bobinas/dos-capas';
 import { revisarValores } from '../../src/calculo/comun/valor-impracticable';
+import { calcularRedL } from '../../src/calculo/redes/redes';
 import { caracteresDeLaFuente } from './woff2';
 
 // Si una fórmula usa un carácter que la fuente recortada no tiene, el navegador lo dibuja con otra
@@ -110,6 +111,23 @@ function formulasDeArreglos(): string[] {
   return formulas;
 }
 
+// Redes de adaptación: la red L con R_s menor y mayor que R_L (las dos fórmulas de Zin), con y sin
+// borde inferior y con valores marcados.
+function formulasDeRedes(): string[] {
+  const formulas: string[] = [];
+  for (const [rs, rl, f0] of [
+    [100, 1000, 100e6],
+    [200, 50, 145e6],
+    [5, 50, 300e6],
+  ]) {
+    const r = calcularRedL({ f0, rs, rl, qBobina: 100 });
+    if (r.estado !== 'calculado') continue;
+    formulas.push(r.formula, ...r.pasos.map((p) => p.latex));
+    for (const v of r.variantes) formulas.push(...v.formulas, ...v.pasos.map((p) => p.latex));
+  }
+  return formulas;
+}
+
 // Las cuentas del criterio de valor impracticable, con un valor por cada rama.
 function formulasDelCriterio(): string[] {
   const resultado = {
@@ -191,6 +209,12 @@ describe('fuente recortada de las fórmulas', () => {
 
   it('tiene cada carácter de las fórmulas de bobinas', () => {
     const formulas = formulasDeBobinas();
+    expect(formulas.length).toBeGreaterThan(50);
+    expect(faltantes(formulas)).toEqual([]);
+  });
+
+  it('tiene cada carácter de las fórmulas de redes de adaptación', () => {
+    const formulas = formulasDeRedes();
     expect(formulas.length).toBeGreaterThan(50);
     expect(faltantes(formulas)).toEqual([]);
   });

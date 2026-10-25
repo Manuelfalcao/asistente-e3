@@ -15,7 +15,12 @@ import {
 import { mensajeDeResultados } from '../../entrada/campo';
 import { formatearDbm, formatearValor, vatiosADbm } from '../../entrada/formato';
 import type { Escalera } from '../esquema';
-import { CampoEntradaValor, type CampoEntrada, useCampoEntrada } from '../comun/CampoEntrada';
+import {
+  CampoEntradaValor,
+  type CampoEntrada,
+  intercambiar,
+  useCampoEntrada,
+} from '../comun/CampoEntrada';
 import { Esquema } from '../comun/Esquema';
 import { Formula } from '../comun/Formula';
 import { Aviso } from '../comun/Franjas';
@@ -137,14 +142,6 @@ export function Atenuadores() {
       </section>
     </div>
   );
-}
-
-function intercambiar(z1: CampoEntrada, z2: CampoEntrada) {
-  const [texto1, unidad1] = [z1.texto, z1.unidad];
-  z1.setTexto(z2.texto);
-  z2.setTexto(texto1);
-  if (z2.unidad !== undefined) z1.setUnidad(z2.unidad);
-  if (unidad1 !== undefined) z2.setUnidad(unidad1);
 }
 
 function Resultado({

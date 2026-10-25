@@ -95,6 +95,15 @@ export function CampoEntradaValor({
   );
 }
 
+// El ⇄ entre la fuente y la carga: cambia el texto y el Selector de unidad de los dos campos.
+export function intercambiar(a: CampoEntrada, b: CampoEntrada) {
+  const [textoA, unidadA] = [a.texto, a.unidad];
+  a.setTexto(b.texto);
+  b.setTexto(textoA);
+  if (b.unidad !== undefined) a.setUnidad(b.unidad);
+  if (unidadA !== undefined) b.setUnidad(unidadA);
+}
+
 // La opción elegida, guardada como el texto de un campo: vuelve al reabrir el Asistente (spec §4.4).
 // Si lo guardado ya no es una opción, vale la opción por defecto.
 export function useOpcionGuardada<V extends string>(
