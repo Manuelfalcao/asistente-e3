@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { kLorenz, laminaExacta, mutuaDeAnillos, sumaDeAnillos } from './anillos';
+import {
+  kLorenz,
+  laminaExacta,
+  mutuaDeAnillos,
+  sumaDeAnillos,
+  sumaDeAnillosDosCapas,
+} from './anillos';
 
 // El oráculo contra lo que se sabe sin él: los kL exactos y las sumas de anillos de
 // research/formulas-bobinas.md (§5.1 y §7), calculadas aparte, y los límites clásicos de la
@@ -62,5 +68,46 @@ describe('oráculo de suma de anillos', () => {
 
   it('la suma solo tiene sentido con vueltas enteras', () => {
     expect(() => sumaDeAnillos(5 * mm, 2.5, 1 * mm, 0.8 * mm)).toThrow();
+    expect(() => sumaDeAnillosDosCapas(5 * mm, 2.5, 1 * mm, 0.8 * mm)).toThrow();
+  });
+
+  it('la suma de anillos de dos capas de la investigación (research §5.4)', () => {
+    // [carrete, cable, Separación, vueltas por capa, suma en µH]
+    const casos: [number, number, number, number, number][] = [
+      [5, 0.5, 0, 10, 1.5595],
+      [5, 0.5, 0, 20, 3.8975],
+      [6, 0.8, 0, 8, 1.2052],
+      [8, 1, 0, 12, 2.8782],
+      [10, 0.5, 0, 30, 19.8888],
+      [6, 0.8, 0.4, 8, 0.9373],
+      [6, 0.8, 0.8, 6, 0.538],
+    ];
+    for (const [carrete, cable, separacion, n, uH] of casos) {
+      const suma = sumaDeAnillosDosCapas(carrete * mm, n, (cable + separacion) * mm, cable * mm);
+      expect(suma / 1e-6, `${carrete} mm, ${n} por capa`).toBeCloseTo(uH, 4);
+    }
+  });
+
+  it('dos capas es la suma de todos los pares de anillos, con el carrete y el cable', () => {
+    // A mano, con 2 vueltas por capa: cuatro anillos en (r1, 0), (r1, p), (r2, 0) y (r2, p).
+    const [carrete, cable, p] = [6 * mm, 0.8 * mm, 1 * mm];
+    const r1 = carrete / 2 + cable / 2;
+    const r2 = r1 + cable;
+    const anillos = [
+      [r1, 0],
+      [r1, p],
+      [r2, 0],
+      [r2, p],
+    ];
+    let suma = 0;
+    for (const [ri, zi] of anillos) {
+      for (const [rj, zj] of anillos) {
+        suma +=
+          ri === rj && zi === zj
+            ? mutuaDeAnillos(ri, ri, cable / 2)
+            : mutuaDeAnillos(ri, rj, zi - zj);
+      }
+    }
+    expect(sumaDeAnillosDosCapas(carrete, 2, p, cable) / suma).toBeCloseTo(1, 12);
   });
 });

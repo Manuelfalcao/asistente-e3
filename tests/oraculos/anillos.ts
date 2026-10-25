@@ -1,11 +1,13 @@
-// Oráculo de suma de anillos (spec §13.4): la L de una bobina de una capa como la suma de las
-// inductancias de N anillos coaxiales, cada uno al centro de su vuelta, con la fórmula exacta de
-// Maxwell para dos anillos (integrales elípticas K y E, por la media aritmético-geométrica). La
+// Oráculo de suma de anillos (spec §13.4): la L de una bobina de una o de dos capas como la suma de
+// las inductancias de sus anillos coaxiales, cada uno al centro de su vuelta, con la fórmula exacta
+// de Maxwell para dos anillos (integrales elípticas K y E, por la media aritmético-geométrica). La
 // autoinductancia de cada anillo es la mutua con otro a la distancia media geométrica de la
 // superficie del cable, d/2: la externa, la de VHF. Es el método de Knight, Solenoid Inductance
-// Calculation, sección 10c. Trae también la lámina de corriente exacta de Lorenz, contra la que se
-// mide Wheeler. Se escribe aparte y no importa nada de src/: no comparte ni kL ni ks ni km con
-// las fórmulas de Rosa y Nagaoka que verifica.
+// Calculation, sección 10c. En dos capas, la segunda va apilada sobre la primera, con las vueltas a
+// las mismas alturas. Trae también la lámina de corriente exacta de Lorenz, contra la que se mide
+// Wheeler. Se escribe aparte y no importa nada de src/: no comparte ni kL ni ks ni km con las
+// fórmulas de Rosa y Nagaoka que verifica, ni Bs ni la corrección de Maxwell con las de Rosa y
+// Grover.
 
 const MU0 = 4 * Math.PI * 1e-7;
 
@@ -59,6 +61,29 @@ export function sumaDeAnillos(
   for (let m = 1; m < vueltas; m++)
     suma += 2 * (vueltas - m) * mutuaDeAnillos(r, r, m * entreCentros);
   return suma;
+}
+
+// La L de dos capas apiladas de n vueltas enteras cada una sobre un carrete de diámetro `carrete`,
+// bobinadas en el mismo sentido, en H: la primera capa al radio carrete/2 + d/2 y la segunda, encima,
+// a carrete/2 + 3d/2, con las vueltas de las dos a las mismas alturas. Cada capa suma como una de una
+// capa, y entre las dos se suman 2·Σ M(r1, r2, z) sobre todos los pares, con z = 0 entre una vuelta
+// y la que tiene encima.
+export function sumaDeAnillosDosCapas(
+  carrete: number,
+  vueltasPorCapa: number,
+  entreCentros: number,
+  cable: number,
+) {
+  const r1 = carrete / 2 + cable / 2;
+  const r2 = r1 + cable;
+  const n = vueltasPorCapa;
+  let entreCapas = n * mutuaDeAnillos(r1, r2, 0);
+  for (let m = 1; m < n; m++) entreCapas += 2 * (n - m) * mutuaDeAnillos(r1, r2, m * entreCentros);
+  return (
+    sumaDeAnillos(2 * r1, n, entreCentros, cable) +
+    sumaDeAnillos(2 * r2, n, entreCentros, cable) +
+    2 * entreCapas
+  );
 }
 
 // Coeficiente de Nagaoka exacto de la lámina de corriente (Lorenz), con x = D/ℓ:

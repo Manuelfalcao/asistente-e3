@@ -25,6 +25,25 @@ describe('registro de Criterios prácticos y Deducciones propias', () => {
     expect(rf?.deduccion?.map((p) => p.latex).join(' ')).toContain('D_\\infty');
   });
 
+  it('registra las adaptaciones de dos capas como Deducción propia, con Rosa (91) sola de plan B', () => {
+    const dos = REGISTRO.find((e) => e.id === 'maxwell-externo-dos-capas');
+    expect(dos?.tipo).toBe('deduccion-propia');
+    expect(dos?.bandera).toBe('PLAN_B_DOS_CAPAS');
+    // Las tres adaptaciones: Maxwell externo, D′ = √(p·d) y el ajuste de Bs.
+    expect(dos?.adaptacion).toMatch(
+      /ln\(D\/d\) − 0,1119 \+ E en lugar de ln\(D\/d\) \+ 0,13806 \+ E/,
+    );
+    expect(dos?.adaptacion).toMatch(/D′ = √\(p·d\)/);
+    expect(dos?.adaptacion).toMatch(/Bs con un ajuste cerrado/);
+    // Y la decisión sobre E (pendiente P2).
+    expect(dos?.adaptacion).toMatch(/E = 0,017.*se mantiene/);
+    expect(dos?.planB).toMatch(/Rosa y Grover \(91\) sola/);
+    expect(dos?.respaldo).toMatch(/suma de anillos/);
+    const deduccion = dos?.deduccion?.map((p) => p.latex).join(' ');
+    expect(deduccion).toContain('0{,}13806 = \\ln(2 \\cdot 0{,}447049) + \\dfrac{1}{4}');
+    expect(deduccion).toContain("D' = \\sqrt{p d}");
+  });
+
   it('cada entrada dice qué es, qué se adaptó y por qué, su respaldo y su plan B', () => {
     for (const e of REGISTRO) {
       for (const campo of [e.nombre, e.queEs, e.adaptacion, e.respaldo, e.planB]) {

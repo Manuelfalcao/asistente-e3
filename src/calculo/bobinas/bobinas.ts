@@ -1,8 +1,9 @@
 import { formatearErrorRelativo, formatearValor } from '../../entrada/formato';
-import { numeroLatex as numero, valorLatex } from '../comun/latex';
+import { numeroLatex as numero } from '../comun/latex';
 import type { EntradaRegistro } from '../comun/registro';
 import type { Aviso, Paso, Referencia } from '../comun/resultado';
 import { type Componente, type Revision, revisarValores } from '../comun/valor-impracticable';
+import { type DosCapas, PLAN_B_DOS_CAPAS, calcularDosCapas } from './dos-capas';
 import {
   type DiametroRF,
   type Geometria,
@@ -13,14 +14,31 @@ import {
   despejarVueltas,
   diametroRF,
   geometria,
-  lundinCorta,
-  lundinLarga,
   unaCapa as laminaUnaCapa,
-  srfLargoDeHilo,
-  srfMedhurst,
   vueltasDeWheeler,
   wheeler1928,
 } from './formulas';
+import {
+  type Autorresonancia,
+  LUNDIN,
+  MARGEN_SRF,
+  MEDHURST,
+  SRF_DE_KNIGHT,
+  type Vecino,
+  WHEELER_1928,
+  autorresonancia,
+  cuatroCifras,
+  errorLatex,
+  henrios,
+  mm,
+  pasoDelMargen,
+  pasosDeLundin,
+  porciento,
+  pulgadas,
+  vecinosDe,
+} from './comun';
+
+export type { Autorresonancia, Vecino } from './comun';
 
 // La Calculadora de bobinas (spec §6): cuántas vueltas dar a una bobina solenoidal de aire para la
 // inductancia buscada. Pura: recibe H, m y Hz, y devuelve los valores con sus fórmulas, sus pasos y
@@ -39,7 +57,10 @@ export interface EntradaBobina extends Medidas {
 export const PLAN_B_DIAMETRO_RF = false;
 
 export interface OpcionesBobina {
+  // El plan B del diámetro de RF de una capa.
   planB?: boolean;
+  // El plan B de dos capas: Rosa y Grover (91) sin la corrección de Maxwell.
+  planBDosCapas?: boolean;
 }
 
 // Con qué diámetro se calcula la L: el de RF, D∞, o el de baja frecuencia, D0.
@@ -105,25 +126,6 @@ export interface LBuscada extends Componente {
   nombre: 'L buscada';
 }
 
-// Un vecino del N real, en pasos de media vuelta (spec §6.6).
-export interface Vecino {
-  vueltas: number;
-  // La del resultado principal: de RF con D∞, o con D0 en el plan B. En H.
-  inductancia: number;
-  // Fracción con signo: L / L buscada − 1.
-  error: number;
-  // (N − 1)·p + d, en m: el Largo de la bobina, medido por fuera.
-  largoBobina: number;
-  destacado: boolean;
-}
-
-// En Hz. La que se muestra es la estimada, rotulada como estimación.
-export interface Autorresonancia {
-  estimada: number;
-  largoDeHilo: number;
-  medhurst: number;
-}
-
 export interface UnaCapa {
   // Con qué diámetro está calculado el resultado principal.
   diametro: Diametro;
@@ -153,7 +155,13 @@ interface Comun {
 
 export type ResultadoBobinas =
   | (Comun & { estado: 'corte'; codigo: CodigoCorte; texto: string; pasos: readonly Paso[] })
-  | (Comun & { estado: 'calculado'; unaCapa: UnaCapa; avisos: readonly Aviso<CodigoAviso>[] });
+  | (Comun & {
+      estado: 'calculado';
+      unaCapa: UnaCapa;
+      // Siempre junto a la de una capa (spec §6.1): calculada o fuera del rango de la fórmula.
+      dosCapas: DosCapas;
+      avisos: readonly Aviso<CodigoAviso>[];
+    });
 
 // §6.8, lo que corresponde a una capa.
 export const REFERENCIAS_UNA_CAPA: readonly Referencia[] = [
@@ -164,13 +172,7 @@ export const REFERENCIAS_UNA_CAPA: readonly Referencia[] = [
     anio: 2016,
     ubicacion: 'ec. 10.6, 10.4 y 10.18, con el método de Rosa (1906) y de Rosa y Grover (1912)',
   },
-  {
-    autor: 'R. Lundin',
-    obra: 'Proc. IEEE',
-    volumen: '73(9)',
-    anio: 1985,
-    ubicacion: 'págs. 1428-1429',
-  },
+  LUNDIN,
   {
     autor: 'D. W. Knight',
     obra: 'Solenoid Inductance Calculation',
@@ -178,34 +180,15 @@ export const REFERENCIAS_UNA_CAPA: readonly Referencia[] = [
     anio: 2016,
     ubicacion: 'ec. 4.2 (diámetro efectivo de RF, semiempírica y sin referato)',
   },
-  {
-    autor: 'D. W. Knight',
-    obra: 'The self-resonance and self-capacitance of solenoid coils',
-    volumen: 'v1.00',
-    anio: 2016,
-    ubicacion: 'sec. 1.2 y 3',
-  },
-  {
-    autor: 'R. G. Medhurst',
-    obra: 'Wireless Engineer',
-    anio: 1947,
-    ubicacion: 'febrero y marzo',
-  },
-  {
-    autor: 'H. A. Wheeler',
-    obra: 'Proc. IRE',
-    volumen: '16(10)',
-    anio: 1928,
-    ubicacion: 'págs. 1398-1400',
-  },
+  SRF_DE_KNIGHT,
+  MEDHURST,
+  WHEELER_1928,
 ];
 
 // Debajo de esto la nota de terminales pasa a aviso destacado (spec §6.7).
 const L_TERMINALES = 100e-9;
 // Knight (part_1, B2): unos 20 nH por pulgada.
 const TERMINALES_POR_CM = 8e-9;
-// El aviso de autorresonancia salta con la frecuencia de trabajo por encima de SRF/3.
-const MARGEN_SRF = 3;
 // Un esmalte típico, para mostrar su efecto en ks: el 5 % del diámetro con esmalte.
 const ESMALTE = 0.05;
 
@@ -219,15 +202,6 @@ const NOTA_AJUSTE =
   'calcula la Separación que da la L exacta.';
 const NOTA_RF =
   'L de RF, con el diámetro efectivo de Knight (ec. 4.2): una fórmula semiempírica, sin referato.';
-
-const mm = (x: number) => valorLatex(x, 'largo');
-const henrios = (x: number) => valorLatex(x, 'inductancia');
-const hz = (x: number) => valorLatex(x, 'frecuencia');
-const pulgadas = (x: number) => `${numero(x)}\\,\\mathrm{in}`;
-const porciento = (fraccion: number) => `${numero(fraccion * 100, 2)}\\,\\%`;
-// Un error relativo, con signo (spec §5.2).
-const errorLatex = (fraccion: number) => `${fraccion > 0 ? '+' : ''}${porciento(fraccion)}`;
-const cuatroCifras = (x: number) => formatearValor(x, 'numero', 'paso');
 
 // La lámina con N vueltas y el diámetro de RF o el de baja frecuencia.
 function laminaCon(g: Geometria, diametro: Diametro) {
@@ -245,7 +219,7 @@ export function unaCapaConPasos(medidas: Medidas, n: number, diametro: Diametro)
 
 export function calcularBobinas(
   { inductancia: buscada, frecuencia = null, ...medidas }: EntradaBobina,
-  { planB = PLAN_B_DIAMETRO_RF }: OpcionesBobina = {},
+  { planB = PLAN_B_DIAMETRO_RF, planBDosCapas = PLAN_B_DOS_CAPAS }: OpcionesBobina = {},
 ): ResultadoBobinas {
   const g = geometria(medidas);
   const diametro: Diametro = planB ? 'd0' : 'rf';
@@ -293,13 +267,21 @@ export function calcularBobinas(
       destacado: false,
     };
   };
-  const abajo = vecino(Math.floor(vueltas * 2) / 2);
-  const arriba = vecino(abajo.vueltas + 0.5);
-  const cercano = Math.abs(abajo.error) <= Math.abs(arriba.error) ? abajo : arriba;
-  cercano.destacado = true;
+  const { vecinos, cercano } = vecinosDe(vueltas, vecino);
 
   const real = lamina(vueltas);
-  const srf = autorresonancia(g, real, buscada);
+  const srf = autorresonancia(
+    {
+      diametro: g.d0,
+      simboloDiametro: 'D_0',
+      vueltas: real.vueltas,
+      avance: real.largo,
+      simboloAvance: '\\ell',
+      largo: real.largo,
+      simboloLargo: '\\ell',
+    },
+    buscada,
+  );
   const otro = otroDiametro(g, buscada, cercano.vueltas, diametro);
   // Wheeler se compara con Rosa y Nagaoka con D0, el mismo diámetro.
   const conD0 = diametro === 'd0' ? vueltas : otro.vueltas;
@@ -325,7 +307,7 @@ export function calcularBobinas(
     unaCapa: {
       diametro,
       vueltas,
-      vecinos: [abajo, arriba],
+      vecinos,
       srf: srf.valores,
       formulas: formulasDe(diametro),
       pasos,
@@ -333,6 +315,7 @@ export function calcularBobinas(
       notas: [NOTA_AJUSTE],
       referencias: REFERENCIAS_UNA_CAPA,
     },
+    dosCapas: calcularDosCapas(medidas, buscada, frecuencia, planBDosCapas),
     avisos,
     notas: [
       ...(avisos.some((a) => a.codigo === 'terminales') ? [] : [NOTA_TERMINALES]),
@@ -455,68 +438,6 @@ function pasosDeD(g: Geometria, n: number, rf: DiametroRF): Paso[] {
         : `D_\\infty = \\dfrac{D_0 + D_{\\mathrm{min}} w}{1 + w} = ` +
           `\\dfrac{${mm(g.d0)} + ${mm(rf.dMin)} \\cdot ${numero(rf.w)}}{1 + ${numero(rf.w)}} = ` +
           mm(rf.dInfinito),
-    },
-  ];
-}
-
-// El coeficiente de Nagaoka de Lundin, por partes: Fn, F y la suma.
-function pasosDeLundin(x: number): Paso[] {
-  const X = numero(x);
-  if (x < 1) {
-    const { fn, f } = lundinLarga(x);
-    return [
-      {
-        texto: `Coeficiente de Nagaoka, fórmula de Lundin para bobina larga (x = ${cuatroCifras(x)} < 1), por partes`,
-        latex:
-          'F_n = 1 + 0{,}383901x^2 + 0{,}017108x^4 = ' +
-          `1 + 0{,}383901 \\cdot ${X}^2 + 0{,}017108 \\cdot ${X}^4 = ${numero(fn)}`,
-      },
-      {
-        texto: 'F, con su denominador',
-        latex:
-          `F = \\dfrac{F_n}{1 + 0{,}258952x^2} = ` +
-          `\\dfrac{${numero(fn)}}{1 + 0{,}258952 \\cdot ${X}^2} = ${numero(f)}`,
-      },
-      {
-        texto: 'Coeficiente de Nagaoka',
-        latex:
-          `k_L = F - \\dfrac{4x}{3\\pi} = ${numero(f)} - \\dfrac{4 \\cdot ${X}}{3\\pi} = ` +
-          numero(f - (4 * x) / (3 * Math.PI)),
-      },
-    ];
-  }
-  const { fn, f, g } = lundinCorta(x);
-  const logaritmo = Math.log(4 * x) - 0.5;
-  return [
-    {
-      texto: `Coeficiente de Nagaoka, fórmula de Lundin para bobina corta (x = ${cuatroCifras(x)} ≥ 1), por partes`,
-      latex:
-        'F_n = 1 + \\dfrac{0{,}383901}{x^2} + \\dfrac{0{,}017108}{x^4} = ' +
-        `1 + \\dfrac{0{,}383901}{${X}^2} + \\dfrac{0{,}017108}{${X}^4} = ${numero(fn)}`,
-    },
-    {
-      texto: 'F, con su denominador',
-      latex:
-        `F = \\dfrac{F_n}{1 + 0{,}258952/x^2} = ` +
-        `\\dfrac{${numero(fn)}}{1 + 0{,}258952/${X}^2} = ${numero(f)}`,
-    },
-    {
-      texto: 'G, los términos de cierre',
-      latex:
-        'G = \\dfrac{0{,}093842}{x^2} + \\dfrac{0{,}002029}{x^4} - \\dfrac{0{,}000801}{x^6} = ' +
-        `\\dfrac{0{,}093842}{${X}^2} + \\dfrac{0{,}002029}{${X}^4} - \\dfrac{0{,}000801}{${X}^6} = ` +
-        numero(g),
-    },
-    {
-      texto: 'El logaritmo',
-      latex: `\\ln 4x - \\dfrac{1}{2} = \\ln(4 \\cdot ${X}) - \\dfrac{1}{2} = ${numero(logaritmo)}`,
-    },
-    {
-      texto: 'Coeficiente de Nagaoka',
-      latex:
-        'k_L = \\dfrac{2}{\\pi x}\\left[\\left(\\ln 4x - \\dfrac{1}{2}\\right) F + G\\right] = ' +
-        `\\dfrac{2}{\\pi \\cdot ${X}}\\,(${numero(logaritmo)} \\cdot ${numero(f)} + ${numero(g)}) = ` +
-        numero((2 / (Math.PI * x)) * (logaritmo * f + g)),
     },
   ];
 }
@@ -647,71 +568,6 @@ function pasosDelOtroDiametro(
         errorLatex(otro.inductancia / cercano.inductancia - 1),
     },
   ];
-}
-
-// La SRF estimada con el N real y la L buscada: la menor entre el largo de hilo y Medhurst.
-function autorresonancia(g: Geometria, real: LaminaUnaCapa, buscada: number) {
-  const hilo = srfLargoDeHilo(g.d0, real.vueltas, real.largo);
-  const medhurst = srfMedhurst(g.d0, real.largo, buscada);
-  const estimada = Math.min(hilo.frecuencia, medhurst.frecuencia);
-  const relacion = real.largo / g.d0;
-  const vuelta = Math.PI * g.d0 * real.vueltas;
-  const pasos: Paso[] = [
-    {
-      texto: 'Largo del hilo en las vueltas',
-      latex: `\\pi D_0 N = \\pi \\cdot ${mm(g.d0)} \\cdot ${numero(real.vueltas)} = ${mm(vuelta)}`,
-    },
-    {
-      texto: 'Largo del hilo',
-      latex:
-        `\\ell_w = \\sqrt{(\\pi D_0 N)^2 + \\ell^2} = ` +
-        `\\sqrt{(${mm(vuelta)})^2 + (${mm(real.largo)})^2} = ${mm(hilo.hilo)}`,
-    },
-    {
-      texto:
-        'Autorresonancia con el largo de hilo cerca de media longitud de onda (Knight, The ' +
-        'self-resonance and self-capacitance of solenoid coils, sec. 1.2). Estimación',
-      latex: `f_{\\mathrm{hilo}} = \\dfrac{c}{2\\ell_w} = \\dfrac{c}{2 \\cdot ${mm(hilo.hilo)}} = ${hz(hilo.frecuencia)}`,
-    },
-    {
-      texto: 'Capacidad propia de Medhurst (1947), en pF por cm de diámetro',
-      latex:
-        `\\dfrac{C_L}{D_0} = 0{,}1126 \\dfrac{\\ell}{D_0} + 0{,}08 + \\dfrac{0{,}27}{\\sqrt{\\ell/D_0}} = ` +
-        `0{,}1126 \\cdot ${numero(relacion)} + 0{,}08 + \\dfrac{0{,}27}{\\sqrt{${numero(relacion)}}} = ` +
-        `${numero(medhurst.porCm)}\\,\\mathrm{pF/cm}`,
-    },
-    {
-      texto: 'Capacidad propia de esta bobina',
-      latex:
-        `C_L = ${numero(medhurst.porCm)}\\,\\mathrm{pF/cm} \\cdot ${numero(g.d0 * 100)}\\,\\mathrm{cm} = ` +
-        valorLatex(medhurst.capacidad, 'capacidad'),
-    },
-    {
-      texto: 'Autorresonancia de Medhurst, con la L buscada. Estimación',
-      latex:
-        `f_{\\mathrm{M}} = \\dfrac{1}{2\\pi\\sqrt{L C_L}} = ` +
-        `\\dfrac{1}{2\\pi\\sqrt{${henrios(buscada)} \\cdot ${valorLatex(medhurst.capacidad, 'capacidad')}}} = ` +
-        hz(medhurst.frecuencia),
-    },
-    {
-      texto: 'SRF estimada: la menor de las dos',
-      latex: `f_{\\mathrm{SRF}} \\approx \\min(f_{\\mathrm{hilo}}, f_{\\mathrm{M}}) = ${hz(estimada)}`,
-    },
-  ];
-  return {
-    valores: { estimada, largoDeHilo: hilo.frecuencia, medhurst: medhurst.frecuencia },
-    pasos,
-  };
-}
-
-function pasoDelMargen(frecuencia: number, srf: number): Paso {
-  const cerca = frecuencia > srf / MARGEN_SRF;
-  return {
-    texto: cerca
-      ? 'La frecuencia de trabajo supera SRF/3: aviso de autorresonancia'
-      : 'La frecuencia de trabajo queda debajo de SRF/3',
-    latex: `f = ${hz(frecuencia)} ${cerca ? '>' : '\\leq'} \\dfrac{f_{\\mathrm{SRF}}}{3} = ${hz(srf / MARGEN_SRF)}`,
-  };
 }
 
 // Wheeler 1928 contra Rosa y Nagaoka con D0, el mismo diámetro (spec §6.6).

@@ -127,7 +127,171 @@ export function unaCapa(g: Geometria, n: number, diametro: number): LaminaUnaCap
   };
 }
 
+// --- Dos capas (spec §6.2 y §6.4) -----------------------------------------------------------------
+
+// n vueltas por capa y N = 2n en total. La segunda capa va apilada sobre la primera y bobinada en el
+// mismo sentido, así que la sección del bobinado es un rectángulo de b × c con el centro en a.
+export interface GeometriaDosCapas {
+  cable: number;
+  entreCentros: number;
+  // a = Diámetro del carrete/2 + d: el radio medio, al centro de la sección.
+  radioMedio: number;
+  // c = 2d
+  profundidad: number;
+  // Diámetro del carrete + 4d
+  diametroExterior: number;
+}
+
+export function geometriaDosCapas({ carrete, cable, separacion }: Medidas): GeometriaDosCapas {
+  return {
+    cable,
+    entreCentros: cable + separacion,
+    radioMedio: carrete / 2 + cable,
+    profundidad: 2 * cable,
+    diametroExterior: carrete + 4 * cable,
+  };
+}
+
+// Bs de Rosa y Grover (Tabla X), con un ajuste cerrado propio de la misma forma que la serie de km:
+// error menor a 10⁻⁵ para n′ = b/c ≥ 1, con Bs(1) = 0 exacto. Es parte de la Deducción propia de
+// dos capas.
+export function bsAjuste(nPrima: number): number {
+  return (
+    0.3522843 -
+    Math.log(nPrima) / (6 * nPrima) -
+    0.3471888 / nPrima -
+    0.0004105 / nPrima ** 2 -
+    0.004685 / nPrima ** 3
+  );
+}
+
+// Rosa y Grover (91), la (156) de la Circular 74: la bobina de varias capas con la corriente
+// repartida en su sección de b × c, como la lámina de Nagaoka con el radio medio menos ΔL1.
+export interface RosaGrover91 {
+  radioMedio: number;
+  // b: el largo de la lámina, n·p en dos capas. No es el Largo de la bobina.
+  largo: number;
+  profundidad: number;
+  // N, el total de las capas.
+  vueltas: number;
+  // 2a/b
+  x: number;
+  kL: number;
+  ls: number;
+  // n′ = b/c
+  nPrima: number;
+  bs: number;
+  // μ0·a·N²·(c/b)·(0,693 + Bs)
+  deltaL1: number;
+}
+
+export function rosaGrover91(
+  radioMedio: number,
+  largo: number,
+  profundidad: number,
+  vueltas: number,
+): RosaGrover91 {
+  const x = (2 * radioMedio) / largo;
+  const kL = kLundin(x);
+  const nPrima = largo / profundidad;
+  const bs = bsAjuste(nPrima);
+  return {
+    radioMedio,
+    largo,
+    profundidad,
+    vueltas,
+    x,
+    kL,
+    ls: (MU0 * Math.PI * (2 * radioMedio) ** 2 * vueltas * vueltas * kL) / (4 * largo),
+    nPrima,
+    bs,
+    deltaL1: MU0 * radioMedio * vueltas * vueltas * (profundidad / largo) * (0.693 + bs),
+  };
+}
+
+// El término E de Maxwell (Circular 74): la diferencia entre la mutua de vueltas vecinas redondas y
+// la de celdas cuadradas. No depende de la inductancia interna, así que se mantiene en la versión
+// externa (pendiente P2 de la spec, decidido con la suma de anillos en el ticket 34).
+export const E_MAXWELL = 0.017;
+// 0,447049·D es la distancia media geométrica propia de un cuadrado de lado D.
+const DMG_CUADRADO = 0.447049;
+// La constante de Maxwell sin la inductancia interna de continua: ln(2·0,447049) = −0,1119 en lugar
+// de +0,13806, que es esto más 1/4. Adaptación propia para RF, como ks en una capa.
+export const MAXWELL_EXTERNO = Math.log(2 * DMG_CUADRADO);
+
+// La corrección de Maxwell (93) por el cable redondo, versión externa y con D′ = √(p·d) para la
+// Separación: con s > 0 las celdas son rectángulos de p × d. Las dos son adaptaciones propias.
+export interface Maxwell93 {
+  dPrima: number;
+  // ln(D′/d) − 0,1119 + E
+  termino: number;
+  // μ0·a·N·[ln(D′/d) − 0,1119 + E]
+  deltaL2: number;
+}
+
+export function maxwell93(
+  radioMedio: number,
+  vueltas: number,
+  entreCentros: number,
+  cable: number,
+): Maxwell93 {
+  const dPrima = Math.sqrt(entreCentros * cable);
+  const termino = Math.log(dPrima / cable) + MAXWELL_EXTERNO + E_MAXWELL;
+  return { dPrima, termino, deltaL2: MU0 * radioMedio * vueltas * termino };
+}
+
+export interface LaminaDosCapas extends RosaGrover91 {
+  vueltasPorCapa: number;
+  // Null en el plan B: Rosa y Grover (91) sola.
+  maxwell: Maxwell93 | null;
+  inductancia: number;
+}
+
+// L = Ls − ΔL1 + ΔL2 con n vueltas por capa, con D0 (la de baja frecuencia). Sin Maxwell, el plan B.
+export function dosCapas(g: GeometriaDosCapas, n: number, conMaxwell: boolean): LaminaDosCapas {
+  const vueltas = 2 * n;
+  const rosa = rosaGrover91(g.radioMedio, n * g.entreCentros, g.profundidad, vueltas);
+  const maxwell = conMaxwell ? maxwell93(g.radioMedio, vueltas, g.entreCentros, g.cable) : null;
+  return {
+    ...rosa,
+    vueltasPorCapa: n,
+    maxwell,
+    inductancia: rosa.ls - rosa.deltaL1 + (maxwell?.deltaL2 ?? 0),
+  };
+}
+
 export const PULGADA = 0.0254;
+
+// Hazeltine, publicada por Wheeler 1928 (Proc. IRE 16(10), ec. 1): L[µH] = 0,8a²N²/(6a + 9b + 10c),
+// con el radio medio a, el largo b y la profundidad c en pulgadas. Wheeler la declara correcta a
+// cerca del 1 % cuando los tres términos del denominador son parecidos.
+export function hazeltine(
+  radioMedio: number,
+  largo: number,
+  profundidad: number,
+  vueltas: number,
+): number {
+  const a = radioMedio / PULGADA;
+  const b = largo / PULGADA;
+  const c = profundidad / PULGADA;
+  return ((0.8 * a * a * vueltas * vueltas) / (6 * a + 9 * b + 10 * c)) * 1e-6;
+}
+
+// Las vueltas de Hazeltine para la L buscada, con b = (N/2)·p:
+// 0,8·a²·N² − 4,5·p·L·N − (6a + 10c)·L = 0.
+export function vueltasDeHazeltine(
+  { radioMedio, profundidad, entreCentros }: GeometriaDosCapas,
+  buscada: number,
+): number {
+  const a = radioMedio / PULGADA;
+  const c = profundidad / PULGADA;
+  const p = entreCentros / PULGADA;
+  const l = buscada * 1e6;
+  return (
+    (4.5 * p * l + Math.sqrt((4.5 * p * l) ** 2 + 3.2 * a * a * l * (6 * a + 10 * c))) /
+    (1.6 * a * a)
+  );
+}
 
 // Wheeler 1928 (Proc. IRE 16(10), ec. 2): L[µH] = a²n²/(9a + 10b), con el radio a y el largo b en
 // pulgadas. Es de lámina de corriente; Wheeler la declara exacta al 1 % con b > 0,8a.
@@ -171,13 +335,15 @@ export function srfMedhurst(d0: number, largo: number, inductancia: number) {
 const COTA = 2 ** 30;
 
 // El N real que da la L buscada (spec §6.5): bisección sobre N desde 1, con la cota de arriba
-// duplicándose hasta pasar la L buscada. Null si ninguna cota la alcanza.
+// duplicándose hasta pasar la L buscada. Null si ninguna cota la alcanza. En dos capas arranca desde
+// el n más chico que entra en el rango de la fórmula.
 export function despejarVueltas(
   inductancia: (n: number) => number,
   buscada: number,
+  desde = 1,
 ): number | null {
-  let lo = 1;
-  let hi = 2;
+  let lo = desde;
+  let hi = 2 * desde;
   while (inductancia(hi) < buscada) {
     lo = hi;
     hi *= 2;

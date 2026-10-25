@@ -6,6 +6,11 @@ import {
   calcularMinimaPerdida,
 } from '../../src/calculo/atenuadores/atenuadores';
 import { DEDUCCION_DIAMETRO_RF, calcularBobinas } from '../../src/calculo/bobinas/bobinas';
+import {
+  DEDUCCION_DOS_CAPAS,
+  dosCapasConPasos,
+  rosaGrover91ConPasos,
+} from '../../src/calculo/bobinas/dos-capas';
 import { revisarValores } from '../../src/calculo/comun/valor-impracticable';
 import { caracteresDeLaFuente } from './woff2';
 
@@ -46,8 +51,9 @@ function formulasDeAtenuadores(): string[] {
   return formulas;
 }
 
-// Bobinas de una capa: las dos ramas de Lundin, vueltas juntas y separadas, con frecuencia de
-// trabajo, los dos lados de la bandera del plan B y el corte de menos de una vuelta.
+// Bobinas de una y dos capas: las dos ramas de Lundin, vueltas juntas y separadas, con frecuencia
+// de trabajo, los dos lados de las dos banderas de plan B, el corte de menos de una vuelta y dos
+// capas fuera del rango (sus pasos con n fijo dicen "fuera del rango").
 function formulasDeBobinas(): string[] {
   const formulas: string[] = [];
   for (const [l, carrete, cable, separacion, frecuencia] of [
@@ -55,17 +61,28 @@ function formulasDeBobinas(): string[] {
     [1e-6, 6e-3, 0.5e-3, 0, 145e6],
     [100e-9, 6e-3, 1e-3, 1e-3, 50e6],
     [5e-9, 5e-3, 0.8e-3, 0, null],
+    [4.7e-6, 8e-3, 0.4e-3, 0, 50e6],
+    [2e-6, 10e-3, 0.4e-3, 0.2e-3, null],
   ] as const) {
     for (const planB of [false, true]) {
       const r = calcularBobinas(
         { inductancia: l, carrete, cable, separacion, frecuencia },
-        { planB },
+        { planB, planBDosCapas: planB },
       );
       if (r.estado === 'corte') formulas.push(...r.pasos.map((p) => p.latex));
-      else formulas.push(...r.unaCapa.formulas, ...r.unaCapa.pasos.map((p) => p.latex));
+      else {
+        formulas.push(...r.unaCapa.formulas, ...r.unaCapa.pasos.map((p) => p.latex));
+        if (r.dosCapas.estado === 'calculado') {
+          formulas.push(...r.dosCapas.formulas, ...r.dosCapas.pasos.map((p) => p.latex));
+        }
+      }
     }
   }
+  const fueraDeRango = { carrete: 4e-3, cable: 0.5e-3, separacion: 0 };
+  formulas.push(...dosCapasConPasos(fueraDeRango, 1, 'maxwell').pasos.map((p) => p.latex));
+  formulas.push(...rosaGrover91ConPasos(0.1, 0.1, 0.01, 1000).pasos.map((p) => p.latex));
   formulas.push(...DEDUCCION_DIAMETRO_RF.deduccion!.map((p) => p.latex));
+  formulas.push(...DEDUCCION_DOS_CAPAS.deduccion!.map((p) => p.latex));
   return formulas;
 }
 

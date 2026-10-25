@@ -5,8 +5,16 @@ import {
   unaCapaConPasos,
 } from '../../../src/calculo/bobinas/bobinas';
 import {
+  C_SOBRE_A_MAXIMO,
+  dosCapasConPasos,
+  rosaGrover91ConPasos,
+} from '../../../src/calculo/bobinas/dos-capas';
+import {
   type Medidas,
+  bsAjuste,
   geometria,
+  geometriaDosCapas,
+  hazeltine,
   kLundin,
   wheeler1928,
 } from '../../../src/calculo/bobinas/formulas';
@@ -33,6 +41,18 @@ import {
   LADOS,
   obtenidoDe,
 } from './casos';
+import {
+  type CasoComportamientoDosCapas,
+  CASOS_ANILLOS_DOS_CAPAS,
+  CASOS_BS,
+  CASOS_COMPORTAMIENTO_DOS_CAPAS,
+  CASOS_HAZELTINE,
+  CASO_C74_VARIAS_CAPAS,
+  type BobinaDosCapas,
+  LADOS_DOS_CAPAS,
+  obtenidoDeRosa,
+  sumaDosCapas,
+} from './casos-dos-capas';
 
 // El adaptador de las tablas de Casos de prueba de bobinas para el Informe de casos (spec §13.6):
 // corre el cálculo con las entradas de cada caso y deja el obtenido, el error y los pasos
@@ -103,6 +123,58 @@ const referenciaConD0 = (casos: readonly CasoConD0[]): CasoInforme[] =>
         pasos: [{ titulo: `Con D0 y ${cuatroCifras(vueltas)} vueltas`, pasos }],
       };
     }),
+  );
+
+// Rosa y Grover (91) con el ejemplo de varias capas de la Circular 74.
+const referenciaVariasCapas = (): CasoInforme[] => {
+  const caso = CASO_C74_VARIAS_CAPAS;
+  return [
+    enCaso(caso, () => {
+      const { rosa, pasos } = rosaGrover91ConPasos(
+        caso.radioMedio,
+        caso.largo,
+        caso.profundidad,
+        caso.vueltas,
+      );
+      return {
+        clase: 'referencia',
+        id: caso.id,
+        entradas:
+          `a = ${largo(caso.radioMedio)} · b = ${largo(caso.largo)} · ` +
+          `c = ${largo(caso.profundidad)} · N = ${caso.vueltas}`,
+        referencia: caso.referencia,
+        medidas: caso.medidas.map((m) =>
+          medidaImpresa({
+            nombre: m.nombre,
+            impreso: m.impreso,
+            obtenido: obtenidoDeRosa(rosa, m.que),
+            tolerancia: m.tolerancia,
+            unidad: 'µH',
+          }),
+        ),
+        pasos: [{ titulo: 'Rosa y Grover (91)', pasos }],
+      };
+    }),
+  ];
+};
+
+const referenciaBs = (): CasoInforme[] =>
+  CASOS_BS.map((caso) =>
+    enCaso(caso, () => ({
+      clase: 'referencia',
+      id: caso.id,
+      entradas: `n′ = b/c = ${cuatroCifras(caso.nPrima)}`,
+      referencia: caso.referencia,
+      medidas: [
+        medidaImpresa({
+          nombre: 'Bs con el ajuste',
+          impreso: caso.esperado,
+          obtenido: bsAjuste(caso.nPrima),
+          tolerancia: caso.tolerancia,
+        }),
+      ],
+      pasos: [],
+    })),
   );
 
 // --- Medición --------------------------------------------------------------------------------------
@@ -202,6 +274,74 @@ const verificacionWheeler = (): CasoInforme[] => {
   );
 };
 
+// La geometría de dos capas, con c/a: la mayoría de las 7 de la investigación quedan fuera del rango
+// que la Calculadora declara (c/a ≤ 0,25), y el caso lo dice.
+function dosCapasTexto(b: BobinaDosCapas): string {
+  const g = geometriaDosCapas(b);
+  const cSobreA = g.profundidad / g.radioMedio;
+  return (
+    `${geometriaTexto(b)} · n = ${b.vueltasPorCapa} por capa · c/a = ${cuatroCifras(cSobreA)}` +
+    (cSobreA > C_SOBRE_A_MAXIMO ? ' (fuera del rango de la Calculadora, c/a ≤ 0,25)' : '')
+  );
+}
+
+const verificacionAnillosDosCapas = (): CasoInforme[] =>
+  CASOS_ANILLOS_DOS_CAPAS.flatMap((caso) =>
+    LADOS_DOS_CAPAS.map((lado) => {
+      const id = `${caso.id}${lado.sufijo}`;
+      return enCaso({ id, referencia: caso.referencia }, () => {
+        const n = caso.bobina.vueltasPorCapa;
+        const { lamina, pasos } = dosCapasConPasos(caso.bobina, n, lado.correccion);
+        return {
+          clase: 'verificacion',
+          id,
+          entradas: dosCapasTexto(caso.bobina),
+          referencia: caso.referencia,
+          oraculo: caso.oraculo,
+          bandera: lado.bandera,
+          medidas: [
+            medidaNumerica({
+              nombre: lado.planB ? 'L de Rosa y Grover (91) sola (plan B)' : 'L de dos capas',
+              esperado: sumaDosCapas(caso.bobina) / 1e-9,
+              obtenido: lamina.inductancia / 1e-9,
+              tolerancia: lado.planB ? caso.toleranciaPlanB : caso.tolerancia,
+              decimales: 2,
+              unidad: 'nH',
+            }),
+          ],
+          pasos: [{ titulo: `Dos capas, ${n} vueltas por capa`, pasos }],
+        };
+      });
+    }),
+  );
+
+const verificacionHazeltine = (): CasoInforme[] =>
+  CASOS_HAZELTINE.map((caso) =>
+    enCaso(caso, () => {
+      const g = geometriaDosCapas(caso.bobina);
+      const n = caso.bobina.vueltasPorCapa;
+      return {
+        clase: 'verificacion',
+        id: caso.id,
+        entradas: dosCapasTexto(caso.bobina),
+        referencia: caso.referencia,
+        oraculo: caso.oraculo,
+        medidas: [
+          medidaNumerica({
+            nombre: 'L de Hazeltine contra la suma de anillos',
+            esperado: sumaDosCapas(caso.bobina) / 1e-9,
+            obtenido: hazeltine(g.radioMedio, n * g.entreCentros, g.profundidad, 2 * n) / 1e-9,
+            tolerancia: caso.tolerancia,
+            diferencia: caso.diferencia,
+            decimales: 2,
+            unidad: 'nH',
+          }),
+        ],
+        pasos: [],
+      };
+    }),
+  );
+
 // --- Comportamiento --------------------------------------------------------------------------------
 
 const nivelTexto = (nivel: string | null) => `L buscada: ${nivel ?? 'sin marca'}`;
@@ -240,14 +380,56 @@ const comportamiento = (): CasoInforme[] =>
     }),
   );
 
+function describirDosCapas(r: ResultadoBobinas): string {
+  if (r.estado !== 'calculado') return `una capa no calculó: ${r.codigo}`;
+  const { dosCapas } = r;
+  return dosCapas.estado === 'fuera-de-rango'
+    ? `dos capas fuera de rango: ${dosCapas.codigo}`
+    : `dos capas calculada · ${avisosTexto(dosCapas.avisos.map((a) => a.codigo))}`;
+}
+
+function esperadoDosCapasTexto(e: CasoComportamientoDosCapas['esperado']): string {
+  return 'fueraDeRango' in e
+    ? `dos capas fuera de rango: ${e.fueraDeRango}`
+    : `dos capas calculada · ${avisosTexto(e.avisos)}`;
+}
+
+const comportamientoDosCapas = (): CasoInforme[] =>
+  CASOS_COMPORTAMIENTO_DOS_CAPAS.flatMap((caso) =>
+    LADOS_DOS_CAPAS.map((lado) => {
+      const id = `${caso.id}${lado.sufijo}`;
+      return enCaso({ id, referencia: caso.referencia }, () => {
+        const esperado = esperadoDosCapasTexto(caso.esperado);
+        const obtenido = describirDosCapas(
+          calcularBobinas(caso.entrada, { planBDosCapas: lado.planB }),
+        );
+        return {
+          clase: 'comportamiento',
+          id,
+          entradas: entradasTexto(caso.entrada),
+          referencia: caso.referencia,
+          bandera: lado.bandera,
+          esperado,
+          obtenido,
+          coincide: esperado === obtenido,
+        };
+      });
+    }),
+  );
+
 export const INFORME: AporteInforme = {
   calculadora: 'bobinas',
   casos: () => [
     ...referenciaKL(),
     ...referenciaConD0([CASO_C74, ...CASOS_KNIGHT]),
+    ...referenciaVariasCapas(),
+    ...referenciaBs(),
     ...medicion(),
     ...verificacionAnillos(),
     ...verificacionWheeler(),
+    ...verificacionAnillosDosCapas(),
+    ...verificacionHazeltine(),
     ...comportamiento(),
+    ...comportamientoDosCapas(),
   ],
 };

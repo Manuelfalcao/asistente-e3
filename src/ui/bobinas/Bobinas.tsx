@@ -1,9 +1,12 @@
+import type { ComponentChildren } from 'preact';
 import {
+  type Autorresonancia,
   type EntradaBobina,
   type ResultadoBobinas,
   type Vecino,
   calcularBobinas,
 } from '../../calculo/bobinas/bobinas';
+import type { DosCapas, VecinoDosCapas } from '../../calculo/bobinas/dos-capas';
 import { mensajeDeResultados } from '../../entrada/campo';
 import { formatearErrorRelativo, formatearValor } from '../../entrada/formato';
 import { CampoEntradaValor, type CampoEntrada, useCampoEntrada } from '../comun/CampoEntrada';
@@ -21,9 +24,9 @@ import {
   SEPARACION_POR_DEFECTO,
 } from './campos';
 
-// La Calculadora de bobinas (spec §6): las vueltas de una bobina solenoidal de aire de una capa,
-// con los dos vecinos en pasos de media vuelta, la SRF estimada, la fórmula, la referencia y los
-// pasos intermedios. La tarjeta de dos capas llega con el ticket 34.
+// La Calculadora de bobinas (spec §6): las vueltas de una bobina solenoidal de aire de una y de dos
+// capas, cada una en su tarjeta con los dos vecinos en pasos de media vuelta, la SRF estimada, la
+// fórmula, la referencia y los pasos intermedios. Dos capas fuera de rango muestra solo el motivo.
 export function Bobinas() {
   const guardado = (campo: string) => ({ calculadora: 'bobinas', campo });
   const inductancia = useCampoEntrada(INDUCTANCIA, '', guardado('inductancia'));
@@ -120,7 +123,12 @@ function Resultado({ resultado }: { resultado: ResultadoBobinas }) {
           {a.texto}
         </Aviso>
       ))}
-      principal={<TarjetaUnaCapa resultado={resultado} />}
+      principal={
+        <div class="grilla-tarjetas">
+          <TarjetaUnaCapa resultado={resultado} />
+          <TarjetaDosCapas dosCapas={resultado.dosCapas} buscada={resultado.buscada.valor} />
+        </div>
+      }
       notas={resultado.notas}
     />
   );
@@ -130,19 +138,52 @@ function Resultado({ resultado }: { resultado: ResultadoBobinas }) {
 const vueltasTexto = (n: number) =>
   `${formatearValor(n, 'numero')} ${n === 1 ? 'vuelta' : 'vueltas'}`;
 
-function FilaVecino({ vecino }: { vecino: Vecino }) {
+// "5,5 por capa" y debajo el total, "11 vueltas": en dos renglones, para que la columna del nombre
+// no le quite el ancho al detalle.
+const vueltasDosCapas = (v: VecinoDosCapas) => (
+  <>
+    {formatearValor(v.vueltasPorCapa, 'numero')} por capa
+    <span class="total">{vueltasTexto(v.vueltas)}</span>
+  </>
+);
+
+function FilaVecino({
+  vecino,
+  nombre = vueltasTexto(vecino.vueltas),
+  sufijoDetalle = '',
+}: {
+  vecino: Vecino;
+  nombre?: ComponentChildren;
+  // Lo que se agrega al final del detalle: el diámetro exterior en dos capas.
+  sufijoDetalle?: string;
+}) {
   return (
     <div class={vecino.destacado ? 'vecino destacado' : 'vecino'}>
       <ValorResultado
-        nombre={vueltasTexto(vecino.vueltas)}
+        nombre={nombre}
         valor={henrios(vecino.inductancia)}
         detalle={
           `${vecino.destacado ? 'La más cercana · ' : ''}` +
           `${formatearErrorRelativo(vecino.error * 100)} · Largo de la bobina ` +
-          formatearValor(vecino.largoBobina, 'largo')
+          formatearValor(vecino.largoBobina, 'largo') +
+          sufijoDetalle
         }
       />
     </div>
+  );
+}
+
+function FilaSRF({ srf }: { srf: Autorresonancia }) {
+  return (
+    <ValorResultado
+      nombre="SRF"
+      valor={hz(srf.estimada)}
+      rotulos={<Rotulo tipo="estimacion" />}
+      detalle={
+        `La menor entre el largo de hilo (${hz(srf.largoDeHilo)}) y Medhurst ` +
+        `(${hz(srf.medhurst)})`
+      }
+    />
   );
 }
 
@@ -166,15 +207,7 @@ function TarjetaUnaCapa({
           <FilaVecino key={v.vueltas} vecino={v} />
         ))}
       </div>
-      <ValorResultado
-        nombre="SRF"
-        valor={hz(srf.estimada)}
-        rotulos={<Rotulo tipo="estimacion" />}
-        detalle={
-          `La menor entre el largo de hilo (${hz(srf.largoDeHilo)}) y Medhurst ` +
-          `(${hz(srf.medhurst)})`
-        }
-      />
+      <FilaSRF srf={srf} />
       <p class="nota-tarjeta">
         {unaCapa.diametro === 'rf' && (
           <>
@@ -194,6 +227,56 @@ function TarjetaUnaCapa({
         ))}
       </div>
       <Cita referencias={unaCapa.referencias} />
+    </TarjetaResultado>
+  );
+}
+
+// Junto a la de una capa, siempre (spec §6.6). Fuera del rango de la fórmula, solo el motivo.
+function TarjetaDosCapas({ dosCapas, buscada }: { dosCapas: DosCapas; buscada: number }) {
+  const titulo = `Dos capas de ${henrios(buscada)}`;
+  if (dosCapas.estado === 'fuera-de-rango') {
+    return (
+      <TarjetaResultado titulo={titulo}>
+        <p class="nota-tarjeta">{dosCapas.texto}</p>
+      </TarjetaResultado>
+    );
+  }
+  const exterior = ` · diámetro exterior ${formatearValor(dosCapas.diametroExterior, 'largo')}`;
+  return (
+    <TarjetaResultado titulo={titulo} pasos={<Pasos pasos={dosCapas.pasos} />}>
+      {dosCapas.avisos.map((a) => (
+        <Aviso key={a.codigo}>{a.texto}</Aviso>
+      ))}
+      <div class="vecinos" aria-label="Vecinos en pasos de media vuelta por capa">
+        {dosCapas.vecinos.map((v) => (
+          <FilaVecino
+            key={v.vueltasPorCapa}
+            vecino={v}
+            nombre={vueltasDosCapas(v)}
+            sufijoDetalle={exterior}
+          />
+        ))}
+      </div>
+      <FilaSRF srf={dosCapas.srf} />
+      <p class="nota-tarjeta">
+        {dosCapas.correccion === 'maxwell' && (
+          <>
+            <Rotulo tipo="deduccion-propia" />{' '}
+          </>
+        )}
+        {dosCapas.notaFormula}
+      </p>
+      {dosCapas.notas.map((n) => (
+        <p key={n} class="nota-tarjeta">
+          {n}
+        </p>
+      ))}
+      <div class="formulas">
+        {dosCapas.formulas.map((f) => (
+          <Formula key={f} latex={f} />
+        ))}
+      </div>
+      <Cita referencias={dosCapas.referencias} />
     </TarjetaResultado>
   );
 }

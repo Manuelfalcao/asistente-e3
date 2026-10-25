@@ -424,13 +424,14 @@ Ls  = μ0·π·(2a)²·N²·kL(2a/b)/(4b)
   - versión externa de Maxwell para RF: `−0,1119 = ln(2·0,447049)` en lugar de `+0,13806`;
   - D' = √(p·d) para la Separación entre vueltas;
   - el ajuste de Bs.
-- **Es una Deducción propia a aprobar** (sección 13.5). Plan B: Rosa (91) sin ΔL2, que tiene cita directa y da entre −0,83 % y +0,19 % con vueltas juntas.
+- **E = 0,017** (Circular 74) se mantiene en la versión externa: corrige la mutua entre vueltas vecinas, que no depende de la inductancia interna. Contra la suma de anillos acerca las 7 geometrías de los casos: de −0,51 a +0,05 % con E, de −0,60 a −0,09 % sin E (ticket 34, pendiente P2).
+- **Es una Deducción propia a aprobar** (sección 13.5). Plan B: Rosa (91) sin ΔL2, que tiene cita directa. Contra la suma de anillos da de −0,03 a +0,19 % con vueltas juntas, pero −0,83 % con s = d/2 y −2,8 % con s = d (ticket 34).
 - Se calcula con D0. Un aviso dice que en RF la L real va a quedar algo por debajo, sin cuantificarlo.
-- **Rango:** n' = b/c ≥ 1 y c/a ≤ 0,25. Fuera de ese rango no se muestran números de dos capas, solo el motivo.
+- **Rango:** n' = b/c ≥ 1 y c/a ≤ 0,25. Fuera de ese rango no se muestran números de dos capas, solo el motivo. n' se mira en el vecino de abajo, porque sus números también se muestran (ticket 34).
 
 ### 6.5 Despeje de N
 
-- L(N) es estrictamente creciente, así que se despeja **por bisección** sobre N real: `lo = 1`, `hi = 2` y se duplica `hi` hasta que L(hi) ≥ L buscada; después se itera hasta `(hi − lo)/hi < 10⁻⁹`. Converge siempre. En dos capas, lo mismo sobre n.
+- L(N) es estrictamente creciente, así que se despeja **por bisección** sobre N real: `lo = 1`, `hi = 2` y se duplica `hi` hasta que L(hi) ≥ L buscada; después se itera hasta `(hi − lo)/hi < 10⁻⁹`. Converge siempre. En dos capas, lo mismo sobre n, desde el n con n' = 1 (o desde una vuelta por capa, si las vueltas están tan separadas que n' = 1 pide menos): si ahí L ya pasa la buscada, dos capas queda fuera de rango (ticket 34).
 - **Con D∞, si el cable es más grueso que el carrete**, D∞ tiende al carrete y la corrección de Rosa supera a la lámina: la L de RF deja de crecer con N. Si `hi` pasa de 2³⁰ sin llegar a la L buscada, no se calcula y se avisa que el modelo de solenoide no sirve (ticket 33).
 - **Si L(1) > L buscada** (menos de una vuelta), no se calcula: se avisa que hace falta un lazo o una pista.
 
@@ -449,6 +450,8 @@ Ls  = μ0·π·(2a)²·N²·kL(2a/b)/(4b)
 - **SRF estimada**, rotulada como estimación: la menor entre
   - el criterio del largo de hilo, `f ≈ c/(2·ℓw)` con `ℓw = √((π·D·N)² + ℓ²)`, y
   - la fórmula de Medhurst, `CL/D [pF/cm] = 0,1126·(ℓ/D) + 0,08 + 0,27/√(ℓ/D)` y `f ≈ 1/(2π·√(L·CL))`.
+
+  En dos capas se usan las mismas con el diámetro medio D_m = 2a, N = 2n, el hilo que avanza b y vuelve b (`ℓw = √((π·D_m·N)² + (2b)²)`) y ℓ/D = b/D_m en Medhurst. Una nota aclara que son estimaciones de una capa y que la capacidad entre capas baja la SRF real (ticket 34).
 - Una nota corta: estirar o comprimir la bobina ajusta la L. No se calcula la Separación que da la L exacta con N entero.
 
 **Pasos intermedios:**
@@ -464,8 +467,9 @@ Ls  = μ0·π·(2a)²·N²·kL(2a/b)/(4b)
 | Menos de una vuelta | No se calcula; hace falta un lazo o una pista. La L buscada se marca igual (sección 5.6) |
 | Cable más grueso que el carrete, con D∞ | No se calcula: la L de RF no crece con las vueltas (sección 6.5) |
 | N < 2 en una capa | Se calcula, con aviso: el modelo de solenoide pierde precisión y los terminales dominan |
-| Dos capas fuera de rango (n' < 1 o c/a > 0,25) | Solo el motivo, sin números. Una capa se muestra siempre |
-| Frecuencia de trabajo > SRF/3 | Aviso de autorresonancia |
+| Dos capas fuera de rango (n' < 1 o c/a > 0,25) | Solo el motivo, sin números. Una capa se muestra siempre. Con vueltas muy separadas, el motivo puede ser que haría falta menos de una vuelta por capa |
+| Frecuencia de trabajo > SRF/3 | Aviso de autorresonancia. En dos capas, con su propia SRF, dentro de su tarjeta |
+| Dos capas, siempre | Aviso de que en RF la L real queda algo por debajo, sin cuantificarlo, y nota de las ranuras |
 | L buscada < 100 nH | La nota de terminales (unos 8 nH/cm, Knight) pasa a aviso destacado. No hay campo para el largo de los terminales |
 | L buscada debajo de la L mínima | Valor dudoso (< 15 nH) o impracticable (< 6 nH), sección 5.6 |
 | Siempre | Nota de terminales y nota de que el metal cercano baja la L |
@@ -991,7 +995,7 @@ Quedan para la construcción:
 | # | Punto | Propuesta |
 |---|---|---|
 | P1 | **Pérdida de Cohn en rechaza banda.** No se investigó cómo se aplica | No mostrarla en rechaza banda |
-| P2 | **Término E de Maxwell** en la versión externa de dos capas (sección 6.4). La investigación da E ≈ 0,017 (Circular 74) para la fórmula original y no aclara si lo mantuvo en la versión externa | Decidirlo al implementar, con los casos de verificación contra la suma de anillos (`research/formulas-bobinas.md` §5.4: −0,53 a +0,16 %) |
+| P2 | **Término E de Maxwell** en la versión externa de dos capas (sección 6.4). La investigación da E ≈ 0,017 (Circular 74) para la fórmula original y no aclara si lo mantuvo en la versión externa | **Resuelto en el ticket 34:** E = 0,017 se mantiene. Con E la fórmula reproduce las cifras de la investigación y las 7 geometrías dan de −0,51 a +0,05 % contra la suma de anillos; sin E, de −0,60 a −0,09 % |
 
 ### 12.2 Valores por defecto que fijó la redacción
 
@@ -1033,7 +1037,7 @@ Las cuatro corren en Vitest y aparecen en el informe, agrupadas por clase dentro
   - tabla publicada: media unidad de la última cifra impresa;
   - medición: la incertidumbre que declara la fuente;
   - verificación: 1e-9 relativo; en dB, por simulación, ±0,01 dB.
-- **Diferencia esperada:** si la referencia usó otra aproximación y no hay una que use la misma, el caso registra la diferencia esperada con su signo y su motivo, y la tolerancia se aplica alrededor de ella. Wheeler y Hazeltine, que van en los pasos intermedios, tienen sus propios casos con su diferencia esperada contra la lámina de corriente exacta.
+- **Diferencia esperada:** si la referencia usó otra aproximación y no hay una que use la misma, el caso registra la diferencia esperada con su signo y su motivo, y la tolerancia se aplica alrededor de ella. Wheeler y Hazeltine, que van en los pasos intermedios, tienen sus propios casos con su diferencia esperada: Wheeler contra la lámina de corriente exacta y Hazeltine contra la suma de anillos de dos capas, que es contra la que la investigación da su diferencia (ticket 34).
 
 ### 13.3 Casos por Calculadora
 
@@ -1043,7 +1047,7 @@ Los valores numéricos de cada caso están en las investigaciones de [`research/
 
 - *Referencia:* kL de la Circular 74, Tabla 10, con ℓ/D de 0,1 a 5; el ejemplo de una capa de la C74, pág. 253 (L = 12 909 µH); el de varias capas de la C74, ec. 156, pág. 260 (L = 195 200 µH); la Tabla X de Bs de Rosa y Grover; los L0 de Knight para M31, M32 y MKG1 a MKG4, como paso intermedio.
 - *Medición:* M31 y M32 (Medhurst), medidas en HF, contra el resultado principal con D∞. Tolerancia ±1 %, motivo: "D∞ semiempírico; residuo de Knight ≤ 0,5 % más la incertidumbre de la medición". Del lado del plan B (D0), ±3 %: el L0 de Knight queda +2,1 % y +2,4 % sobre lo medido. MKG1 a MKG4 están medidas a baja frecuencia (su Li es la inductancia interna de continua completa, μ0·D·N/8), así que el D∞ de RF no corresponde: quedan solo como referencia, con el L0 de Knight (ticket 33).
-- *Verificación:* las 7 geometrías de dos capas de §5.4, más 3 de VHF de una capa (22 nH, 100 nH y 1 µH), contra la suma de anillos. Tolerancia ±1 %.
+- *Verificación:* las 7 geometrías de dos capas de §5.4, más 3 de VHF de una capa (22 nH, 100 nH y 1 µH), contra la suma de anillos. Tolerancia ±1 %. Del lado del plan B de dos capas, la de s = d va con ±3 %: Rosa (91) sola deja afuera ΔL2, que ahí suma un 2,7 % de la L (ticket 34). Hazeltine va con su Diferencia esperada contra la suma de anillos (§5.4), en las 6 geometrías que la tienen.
 - *Comportamiento:* menos de una vuelta; f > SRF/3; nota de terminales debajo de 100 nH; dos capas fuera de rango; L mínima de Valor impracticable.
 
 **Filtros** (`research/sintesis-filtros-lc.md`, `filtros-terminaciones-desiguales.md`, `resonadores-acoplados.md`)
@@ -1090,7 +1094,7 @@ Cada Deducción propia tiene en el informe un ítem con lo que se adaptó y por 
 
 | Deducción propia | Respaldo | Plan B si no se aprueba |
 |---|---|---|
-| Dos capas: término de Maxwell ln(D/d) − 0,1119, D′ = √(p·d) y ajuste de Bs | 11 geometrías contra la suma de anillos (−0,53 a +0,16 %) y la Tabla X | Rosa (91) sola (−0,83 a +0,19 %) |
+| Dos capas: término de Maxwell ln(D/d) − 0,1119, D′ = √(p·d) y ajuste de Bs | 11 geometrías contra la suma de anillos (−0,53 a +0,16 %), 7 de ellas en los casos (−0,51 a +0,05 %), y la Tabla X | Rosa (91) sola (−0,03 a +0,19 % con vueltas juntas, −2,8 % con s = d) |
 | D∞ de RF de Knight en una capa (semiempírico) | M31 y M32 medidas en HF (MKG1 a MKG4 son de baja frecuencia y no lo respaldan) | Resultado principal con L0 de Rosa y Nagaoka, y la corrección de RF solo como nota |
 | Chebyshev par con terminaciones iguales en resonadores acoplados | Simulación (CR5, CR6) | Chebyshev par sube al impar, como en π y T |
 | Divisor capacitivo del Capacitor de extremo | −0,7 % contra la aproximación de Q alto | Se saca de los pasos intermedios |

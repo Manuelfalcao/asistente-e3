@@ -602,6 +602,13 @@
   border: 1px solid var(--acento);
   border-radius: var(--radio-1);
 }
+/* El total de vueltas de dos capas, debajo de las vueltas por capa. */
+.vecino .total {
+  display: block;
+  font-weight: 400;
+  font-size: var(--tam-3);
+  color: var(--texto-suave);
+}
 .nota-tarjeta {
   margin: var(--esp-2) 0;
   font-size: var(--tam-3);

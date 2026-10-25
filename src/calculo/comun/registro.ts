@@ -1,4 +1,5 @@
 import { DEDUCCION_DIAMETRO_RF } from '../bobinas/bobinas';
+import { DEDUCCION_DOS_CAPAS } from '../bobinas/dos-capas';
 import type { Paso } from './resultado';
 import { CRITERIO_UMBRALES } from './valor-impracticable';
 
@@ -25,4 +26,8 @@ export interface EntradaRegistro {
   bandera: string | null;
 }
 
-export const REGISTRO: readonly EntradaRegistro[] = [DEDUCCION_DIAMETRO_RF, CRITERIO_UMBRALES];
+export const REGISTRO: readonly EntradaRegistro[] = [
+  DEDUCCION_DIAMETRO_RF,
+  DEDUCCION_DOS_CAPAS,
+  CRITERIO_UMBRALES,
+];
