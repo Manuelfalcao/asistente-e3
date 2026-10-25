@@ -10,11 +10,17 @@ const MODULOS = import.meta.glob<{ INFORME: AporteInforme }>('../../tests/**/inf
   eager: true,
 });
 
-// Ordenados por ruta, para que el informe salga igual siempre.
+// Ordenados por ruta, para que el informe salga igual siempre. Los casos se calculan una sola vez
+// por aporte: los de Arreglos tardan segundos y el informe y sus tests los piden varias veces.
+const APORTES: AporteInforme[] = Object.entries(MODULOS)
+  .sort(([a], [b]) => a.localeCompare(b))
+  .map(([, { INFORME }]) => {
+    let casos: CasoInforme[] | undefined;
+    return { ...INFORME, casos: () => (casos ??= INFORME.casos()) };
+  });
+
 export function aportesDeTests(): AporteInforme[] {
-  return Object.entries(MODULOS)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([, modulo]) => modulo.INFORME);
+  return APORTES;
 }
 
 const TITULO_COMUN = 'Común';
