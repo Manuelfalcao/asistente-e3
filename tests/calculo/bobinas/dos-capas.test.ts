@@ -81,6 +81,29 @@ describe('dos capas junto a una capa (spec §6.1 y §6.6)', () => {
   });
 });
 
+describe('rango ampliado hasta c/a ≤ 0,42 (spec §6.4)', () => {
+  it('las cuatro bobinas de dos capas de la investigación se calculan, con su n real (research §7)', () => {
+    // [L en nH, carrete, cable, n real, c/a]
+    const tabla: [number, number, number, number][] = [
+      [470, 4, 0.5, 5.471],
+      [1000, 5, 0.5, 7.362],
+      [2200, 6, 0.5, 10.568],
+      [4700, 8, 0.4, 12.352],
+    ];
+    for (const [l, carrete, cable, n] of tabla) {
+      expect(dosCapas(entrada(l, carrete, cable)).vueltasPorCapa, `${l} nH`).toBeCloseTo(n, 3);
+    }
+  });
+
+  it('el paso del rango dice hasta dónde da el NBS y hasta dónde está verificado', () => {
+    const paso = dosCapas(entrada(470, 4, 0.5)).pasos.find((p) =>
+      p.latex.startsWith('\\dfrac{c}{a}'),
+    );
+    expect(paso?.latex).toMatch(/= 0\{,\}4 \\leq 0\{,\}42$/);
+    expect(paso?.texto).toMatch(/NBS da hasta 0,25.*0,42, verificado contra la suma de anillos/);
+  });
+});
+
 describe('plan B de dos capas (spec §6.4 y §13.5)', () => {
   it('por defecto se corrige con Maxwell: la bandera del plan B está apagada', () => {
     expect(PLAN_B_DOS_CAPAS).toBe(false);
@@ -112,10 +135,10 @@ describe('fuera de rango (spec §6.4 y §6.7)', () => {
     return { r, dosCapas: r.dosCapas };
   };
 
-  it('c/a > 0,25: 470 nH sobre 4 mm con 0,5 mm', () => {
-    const { r, dosCapas } = fuera(entrada(470, 4, 0.5));
+  it('c/a > 0,42: 470 nH sobre 4 mm con 0,8 mm (c/a = 0,57)', () => {
+    const { r, dosCapas } = fuera(entrada(470, 4, 0.8));
     expect(dosCapas.codigo).toBe('cable-grueso');
-    expect(dosCapas.texto).toMatch(/c\/a > 0,25/);
+    expect(dosCapas.texto).toMatch(/c\/a > 0,42/);
     // La de una capa se muestra siempre.
     expect(r.unaCapa.vecinos).toHaveLength(2);
   });
@@ -138,7 +161,7 @@ describe('fuera de rango (spec §6.4 y §6.7)', () => {
   });
 
   it('el motivo no lleva números de dos capas: ni vueltas ni L', () => {
-    for (const e of [entrada(470, 4, 0.5), entrada(150, 10, 0.5), entrada(40, 10, 0.5, 1)]) {
+    for (const e of [entrada(470, 4, 0.8), entrada(150, 10, 0.5), entrada(40, 10, 0.5, 1)]) {
       const { dosCapas } = fuera(e);
       expect(Object.keys(dosCapas).sort()).toEqual(['codigo', 'estado', 'texto']);
       expect(dosCapas.texto).not.toMatch(/\d+(,\d+)? ?(nH|µH|vueltas)/);

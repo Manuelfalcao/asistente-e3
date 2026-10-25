@@ -427,7 +427,7 @@ Ls  = μ0·π·(2a)²·N²·kL(2a/b)/(4b)
 - **E = 0,017** (Circular 74) se mantiene en la versión externa: corrige la mutua entre vueltas vecinas, que no depende de la inductancia interna. Contra la suma de anillos acerca las 7 geometrías de los casos: de −0,51 a +0,05 % con E, de −0,60 a −0,09 % sin E (ticket 34, pendiente P2).
 - **Es una Deducción propia a aprobar** (sección 13.5). Plan B: Rosa (91) sin ΔL2, que tiene cita directa. Contra la suma de anillos da de −0,03 a +0,19 % con vueltas juntas, pero −0,83 % con s = d/2 y −2,8 % con s = d (ticket 34).
 - Se calcula con D0. Un aviso dice que en RF la L real va a quedar algo por debajo, sin cuantificarlo.
-- **Rango:** n' = b/c ≥ 1 y c/a ≤ 0,25. Fuera de ese rango no se muestran números de dos capas, solo el motivo. n' se mira en el vecino de abajo, porque sus números también se muestran (ticket 34).
+- **Rango:** n' = b/c ≥ 1 y c/a ≤ 0,42. El NBS da unas pocas partes en mil hasta c/a = 0,25; de ahí a 0,42 el rango se amplió hasta donde está verificado contra la suma de anillos (−0,51 a +0,05 %), porque con 0,25 casi todas las bobinas de dos capas de VHF quedaban afuera (pide d ≤ Diámetro del carrete/14). La ampliación es parte de la Deducción propia (ticket 34). Fuera de ese rango no se muestran números de dos capas, solo el motivo. n' se mira en el vecino de abajo, porque sus números también se muestran (ticket 34).
 
 ### 6.5 Despeje de N
 
@@ -467,7 +467,7 @@ Ls  = μ0·π·(2a)²·N²·kL(2a/b)/(4b)
 | Menos de una vuelta | No se calcula; hace falta un lazo o una pista. La L buscada se marca igual (sección 5.6) |
 | Cable más grueso que el carrete, con D∞ | No se calcula: la L de RF no crece con las vueltas (sección 6.5) |
 | N < 2 en una capa | Se calcula, con aviso: el modelo de solenoide pierde precisión y los terminales dominan |
-| Dos capas fuera de rango (n' < 1 o c/a > 0,25) | Solo el motivo, sin números. Una capa se muestra siempre. Con vueltas muy separadas, el motivo puede ser que haría falta menos de una vuelta por capa |
+| Dos capas fuera de rango (n' < 1 o c/a > 0,42) | Solo el motivo, sin números. Una capa se muestra siempre. Con vueltas muy separadas, el motivo puede ser que haría falta menos de una vuelta por capa |
 | Frecuencia de trabajo > SRF/3 | Aviso de autorresonancia. En dos capas, con su propia SRF, dentro de su tarjeta |
 | Dos capas, siempre | Aviso de que en RF la L real queda algo por debajo, sin cuantificarlo, y nota de las ranuras |
 | L buscada < 100 nH | La nota de terminales (unos 8 nH/cm, Knight) pasa a aviso destacado. No hay campo para el largo de los terminales |
@@ -1094,7 +1094,7 @@ Cada Deducción propia tiene en el informe un ítem con lo que se adaptó y por 
 
 | Deducción propia | Respaldo | Plan B si no se aprueba |
 |---|---|---|
-| Dos capas: término de Maxwell ln(D/d) − 0,1119, D′ = √(p·d) y ajuste de Bs | 11 geometrías contra la suma de anillos (−0,53 a +0,16 %), 7 de ellas en los casos (−0,51 a +0,05 %), y la Tabla X | Rosa (91) sola (−0,03 a +0,19 % con vueltas juntas, −2,8 % con s = d) |
+| Dos capas: término de Maxwell ln(D/d) − 0,1119, D′ = √(p·d), ajuste de Bs y rango hasta c/a ≤ 0,42 | 11 geometrías contra la suma de anillos (−0,53 a +0,16 %), 7 de ellas en los casos (−0,51 a +0,05 %), y la Tabla X | Rosa (91) sola (−0,03 a +0,19 % con vueltas juntas, −2,8 % con s = d) |
 | D∞ de RF de Knight en una capa (semiempírico) | M31 y M32 medidas en HF (MKG1 a MKG4 son de baja frecuencia y no lo respaldan) | Resultado principal con L0 de Rosa y Nagaoka, y la corrección de RF solo como nota |
 | Chebyshev par con terminaciones iguales en resonadores acoplados | Simulación (CR5, CR6) | Chebyshev par sube al impar, como en π y T |
 | Divisor capacitivo del Capacitor de extremo | −0,7 % contra la aproximación de Q alto | Se saca de los pasos intermedios |

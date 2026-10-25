@@ -37,6 +37,8 @@ describe('registro de Criterios prácticos y Deducciones propias', () => {
     expect(dos?.adaptacion).toMatch(/Bs con un ajuste cerrado/);
     // Y la decisión sobre E (pendiente P2).
     expect(dos?.adaptacion).toMatch(/E = 0,017.*se mantiene/);
+    // Y el rango, ampliado más allá del NBS hasta lo verificado.
+    expect(dos?.adaptacion).toMatch(/c\/a ≤ 0,25.*a c\/a ≤ 0,42.*suma de anillos/);
     expect(dos?.planB).toMatch(/Rosa y Grover \(91\) sola/);
     expect(dos?.respaldo).toMatch(/suma de anillos/);
     const deduccion = dos?.deduccion?.map((p) => p.latex).join(' ');

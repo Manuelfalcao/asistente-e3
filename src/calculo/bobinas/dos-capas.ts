@@ -45,9 +45,10 @@ import {
 export const PLAN_B_DOS_CAPAS = false;
 
 // El rango de Rosa y Grover (spec §6.4): el bobinado al menos tan largo como profundo (n′ = b/c ≥ 1)
-// y la profundidad hasta un cuarto del radio medio, hasta donde el NBS da unas pocas partes en mil.
+// y la profundidad hasta 0,42 del radio medio. El NBS da unas pocas partes en mil hasta c/a = 0,25;
+// el resto, hasta 0,42, está verificado contra la suma de anillos (ticket 34).
 const N_PRIMA_MINIMO = 1;
-export const C_SOBRE_A_MAXIMO = 0.25;
+export const C_SOBRE_A_MAXIMO = 0.42;
 
 const LATEX_BS =
   "B_s(n') \\approx 0{,}3522843 - \\dfrac{\\ln n'}{6n'} - \\dfrac{0{,}3471888}{n'} - " +
@@ -68,7 +69,10 @@ export const DEDUCCION_DOS_CAPAS: EntradaRegistro = {
     'con s > 0 las celdas de cada vuelta son rectángulos de p × d y no cuadrados. Bs con un ajuste ' +
     'cerrado en lugar de la Tabla X, con error menor a 10⁻⁵ para n′ ≥ 1. El término E = 0,017 de ' +
     'la Circular 74 se mantiene: corrige la mutua entre vueltas vecinas, que no depende de la ' +
-    'inductancia interna (pendiente P2 de la spec, decidido con la suma de anillos). La L se ' +
+    'inductancia interna (pendiente P2 de la spec, decidido con la suma de anillos). El rango ' +
+    'se lleva de c/a ≤ 0,25, hasta donde el NBS da unas pocas partes en mil, a c/a ≤ 0,42, hasta ' +
+    'donde está verificado contra la suma de anillos: en dos capas de VHF casi siempre c/a > ' +
+    '0,25. La L se ' +
     'calcula con D0: no hay un diámetro de RF publicado para dos capas, y un aviso dice que en RF ' +
     'la L real queda algo por debajo.',
   respaldo:
@@ -205,7 +209,7 @@ const AVISO_RF =
 const MOTIVOS: Record<CodigoFueraDeRango, string> = {
   'cable-grueso':
     'Dos capas queda fuera del rango de la fórmula de Rosa y Grover: con este cable la ' +
-    'profundidad de las dos capas (c = 2d) pasa de un cuarto del radio medio (c/a > 0,25). Para ' +
+    'profundidad de las dos capas (c = 2d) pasa de 0,42 veces el radio medio (c/a > 0,42). Para ' +
     'dos capas hace falta un cable más fino o un carrete más grueso.',
   'mas-corta-que-profunda':
     'Dos capas queda fuera del rango de la fórmula de Rosa y Grover: con tan pocas vueltas por ' +
@@ -410,10 +414,10 @@ function pasosDeGeometria(medidas: Medidas, g: GeometriaDosCapas): Paso[] {
       latex: `c = 2d = 2 \\cdot ${mm(g.cable)} = ${mm(g.profundidad)}`,
     },
     {
-      texto: `Rango de Rosa y Grover: la profundidad hasta un cuarto del radio medio. ${dentro ? 'Dentro' : 'Fuera'} del rango`,
+      texto: `Rango: la profundidad hasta 0,42 veces el radio medio (el NBS da hasta 0,25; hasta 0,42, verificado contra la suma de anillos). ${dentro ? 'Dentro' : 'Fuera'} del rango`,
       latex:
         `\\dfrac{c}{a} = \\dfrac{${mm(g.profundidad)}}{${mm(g.radioMedio)}} = ${numero(cSobreA)} ` +
-        `${dentro ? '\\leq' : '>'} 0{,}25`,
+        `${dentro ? '\\leq' : '>'} 0{,}42`,
     },
     {
       texto: 'Diámetro exterior',

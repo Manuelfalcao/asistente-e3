@@ -274,14 +274,14 @@ const verificacionWheeler = (): CasoInforme[] => {
   );
 };
 
-// La geometría de dos capas, con c/a: la mayoría de las 7 de la investigación quedan fuera del rango
-// que la Calculadora declara (c/a ≤ 0,25), y el caso lo dice.
+// La geometría de dos capas, con c/a: las de 6 mm con 0,8 mm de la investigación (c/a = 0,421) quedan
+// apenas fuera del rango que la Calculadora declara (c/a ≤ 0,42), y el caso lo dice.
 function dosCapasTexto(b: BobinaDosCapas): string {
   const g = geometriaDosCapas(b);
   const cSobreA = g.profundidad / g.radioMedio;
   return (
     `${geometriaTexto(b)} · n = ${b.vueltasPorCapa} por capa · c/a = ${cuatroCifras(cSobreA)}` +
-    (cSobreA > C_SOBRE_A_MAXIMO ? ' (fuera del rango de la Calculadora, c/a ≤ 0,25)' : '')
+    (cSobreA > C_SOBRE_A_MAXIMO ? ' (fuera del rango de la Calculadora, c/a ≤ 0,42)' : '')
   );
 }
 

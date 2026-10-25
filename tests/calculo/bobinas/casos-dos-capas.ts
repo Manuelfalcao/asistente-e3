@@ -318,8 +318,8 @@ const comportamiento = (
 
 export const CASOS_COMPORTAMIENTO_DOS_CAPAS: readonly CasoComportamientoDosCapas[] = [
   comportamiento(
-    'Dos capas fuera de rango, c/a > 0,25: 470 nH sobre 4 mm con 0,5 mm',
-    [470, 4, 0.5, 0],
+    'Dos capas fuera de rango, c/a > 0,42: 470 nH sobre 4 mm con 0,8 mm',
+    [470, 4, 0.8, 0],
     {
       fueraDeRango: 'cable-grueso',
     },
@@ -340,6 +340,11 @@ export const CASOS_COMPORTAMIENTO_DOS_CAPAS: readonly CasoComportamientoDosCapas
     'Dos capas con menos de una vuelta por capa: 40 nH sobre 10 mm separado 1 mm',
     [40, 10, 0.5, 1],
     { fueraDeRango: 'menos-de-una-vuelta-por-capa' },
+  ),
+  comportamiento(
+    'Dos capas dentro del rango ampliado, c/a = 0,4: 470 nH sobre 4 mm con 0,5 mm',
+    [470, 4, 0.5, 0],
+    { avisos: ['rf'] },
   ),
   comportamiento('Dos capas dentro del rango: 4,7 µH sobre 8 mm con 0,4 mm', [4700, 8, 0.4, 0], {
     avisos: ['rf'],
