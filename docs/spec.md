@@ -431,6 +431,7 @@ Ls  = μ0·π·(2a)²·N²·kL(2a/b)/(4b)
 ### 6.5 Despeje de N
 
 - L(N) es estrictamente creciente, así que se despeja **por bisección** sobre N real: `lo = 1`, `hi = 2` y se duplica `hi` hasta que L(hi) ≥ L buscada; después se itera hasta `(hi − lo)/hi < 10⁻⁹`. Converge siempre. En dos capas, lo mismo sobre n.
+- **Con D∞, si el cable es más grueso que el carrete**, D∞ tiende al carrete y la corrección de Rosa supera a la lámina: la L de RF deja de crecer con N. Si `hi` pasa de 2³⁰ sin llegar a la L buscada, no se calcula y se avisa que el modelo de solenoide no sirve (ticket 33).
 - **Si L(1) > L buscada** (menos de una vuelta), no se calcula: se avisa que hace falta un lazo o una pista.
 
 ### 6.6 Salidas
@@ -460,7 +461,8 @@ Ls  = μ0·π·(2a)²·N²·kL(2a/b)/(4b)
 
 | Caso | Tratamiento |
 |---|---|
-| Menos de una vuelta | No se calcula; hace falta un lazo o una pista |
+| Menos de una vuelta | No se calcula; hace falta un lazo o una pista. La L buscada se marca igual (sección 5.6) |
+| Cable más grueso que el carrete, con D∞ | No se calcula: la L de RF no crece con las vueltas (sección 6.5) |
 | N < 2 en una capa | Se calcula, con aviso: el modelo de solenoide pierde precisión y los terminales dominan |
 | Dos capas fuera de rango (n' < 1 o c/a > 0,25) | Solo el motivo, sin números. Una capa se muestra siempre |
 | Frecuencia de trabajo > SRF/3 | Aviso de autorresonancia |
@@ -1040,7 +1042,7 @@ Los valores numéricos de cada caso están en las investigaciones de [`research/
 **Bobinas** (`research/formulas-bobinas.md`)
 
 - *Referencia:* kL de la Circular 74, Tabla 10, con ℓ/D de 0,1 a 5; el ejemplo de una capa de la C74, pág. 253 (L = 12 909 µH); el de varias capas de la C74, ec. 156, pág. 260 (L = 195 200 µH); la Tabla X de Bs de Rosa y Grover; los L0 de Knight para M31, M32 y MKG1 a MKG4, como paso intermedio.
-- *Medición:* M31 y M32 (Medhurst) y MKG1 a MKG4, contra el resultado principal con D∞. Tolerancia ±1 %, motivo: "D∞ semiempírico; residuo de Knight ≤ 0,5 % más la incertidumbre de la medición". Son 6 bobinas.
+- *Medición:* M31 y M32 (Medhurst), medidas en HF, contra el resultado principal con D∞. Tolerancia ±1 %, motivo: "D∞ semiempírico; residuo de Knight ≤ 0,5 % más la incertidumbre de la medición". Del lado del plan B (D0), ±3 %: el L0 de Knight queda +2,1 % y +2,4 % sobre lo medido. MKG1 a MKG4 están medidas a baja frecuencia (su Li es la inductancia interna de continua completa, μ0·D·N/8), así que el D∞ de RF no corresponde: quedan solo como referencia, con el L0 de Knight (ticket 33).
 - *Verificación:* las 7 geometrías de dos capas de §5.4, más 3 de VHF de una capa (22 nH, 100 nH y 1 µH), contra la suma de anillos. Tolerancia ±1 %.
 - *Comportamiento:* menos de una vuelta; f > SRF/3; nota de terminales debajo de 100 nH; dos capas fuera de rango; L mínima de Valor impracticable.
 
@@ -1089,7 +1091,7 @@ Cada Deducción propia tiene en el informe un ítem con lo que se adaptó y por 
 | Deducción propia | Respaldo | Plan B si no se aprueba |
 |---|---|---|
 | Dos capas: término de Maxwell ln(D/d) − 0,1119, D′ = √(p·d) y ajuste de Bs | 11 geometrías contra la suma de anillos (−0,53 a +0,16 %) y la Tabla X | Rosa (91) sola (−0,83 a +0,19 %) |
-| D∞ de RF de Knight en una capa (semiempírico) | M31, M32 y MKG1 a MKG4 medidas | Resultado principal con L0 de Rosa y Nagaoka, y la corrección de RF solo como nota |
+| D∞ de RF de Knight en una capa (semiempírico) | M31 y M32 medidas en HF (MKG1 a MKG4 son de baja frecuencia y no lo respaldan) | Resultado principal con L0 de Rosa y Nagaoka, y la corrección de RF solo como nota |
 | Chebyshev par con terminaciones iguales en resonadores acoplados | Simulación (CR5, CR6) | Chebyshev par sube al impar, como en π y T |
 | Divisor capacitivo del Capacitor de extremo | −0,7 % contra la aproximación de Q alto | Se saca de los pasos intermedios |
 

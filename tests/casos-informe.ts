@@ -153,12 +153,14 @@ export function medidaImpresa({
 }
 
 // Un número que no viene de una tabla impresa (lo calculó un oráculo): se compara con la tolerancia
-// relativa o absoluta del caso. `decimales` es cuántos se muestran.
+// relativa o absoluta del caso, alrededor de la Diferencia esperada si hay. `decimales` es cuántos
+// se muestran.
 export function medidaNumerica({
   nombre,
   esperado,
   obtenido,
   tolerancia,
+  diferencia,
   decimales,
   unidad,
 }: {
@@ -166,6 +168,7 @@ export function medidaNumerica({
   esperado: number;
   obtenido: number;
   tolerancia: Extract<Tolerancia, { tipo: 'relativa' | 'absoluta' }>;
+  diferencia?: DiferenciaEsperada;
   // Cuántos decimales se muestran; null: notación científica, para errores del orden de 1e-14.
   decimales: number | null;
   unidad?: string;
@@ -173,6 +176,7 @@ export function medidaNumerica({
   const sufijo = unidad ? ` ${unidad}` : '';
   const cota =
     tolerancia.tipo === 'relativa' ? tolerancia.valor * Math.abs(esperado) : tolerancia.valor;
+  const corrido = esperado * (1 + (diferencia?.relativa ?? 0));
   const escribir = (x: number) =>
     decimales === null
       ? x.toExponential(2).replace('.', ',').replace('e-', 'e−')
@@ -184,7 +188,8 @@ export function medidaNumerica({
     errorRelativo: esperado === 0 ? null : obtenido / esperado - 1,
     tolerancia: textoTolerancia(tolerancia, ''),
     motivo: tolerancia.motivo,
-    dentro: Math.abs(obtenido - esperado) <= cota,
+    diferencia: diferencia && textoDiferencia(diferencia),
+    dentro: Math.abs(obtenido - corrido) <= cota,
   };
 }
 

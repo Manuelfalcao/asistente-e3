@@ -75,6 +75,31 @@ describe('medida contra un número que dio un oráculo', () => {
     expect(mal.dentro).toBe(false);
   });
 
+  it('con Diferencia esperada, la tolerancia se aplica alrededor de ella', () => {
+    const diferencia = { relativa: -0.005, motivo: 'otra aproximación' };
+    const tolerancia = { tipo: 'relativa', valor: 1e-4, motivo: 'm' } as const;
+    const corrida = medidaNumerica({
+      nombre: 'L',
+      esperado: 100,
+      obtenido: 99.5,
+      tolerancia,
+      diferencia,
+      decimales: 3,
+    });
+    expect(corrida.dentro).toBe(true);
+    expect(corrida.errorRelativo).toBeCloseTo(-0.005, 12);
+    expect(corrida.diferencia).toEqual({ texto: '−0,50 %', motivo: 'otra aproximación' });
+    const sinCorrer = medidaNumerica({
+      nombre: 'L',
+      esperado: 100,
+      obtenido: 100,
+      tolerancia,
+      diferencia,
+      decimales: 3,
+    });
+    expect(sinCorrer.dentro).toBe(false);
+  });
+
   it('en notación científica para errores del orden de 1e-14', () => {
     const m = medidaNumerica({
       nombre: 'peor',

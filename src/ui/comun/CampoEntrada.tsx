@@ -75,6 +75,8 @@ export function CampoEntradaValor({
 }) {
   const { spec, unidad } = campo;
   const opciones = opcionesDelSelector(spec.magnitud, spec.dbm);
+  // Con una sola unidad (los largos, en mm) no hay nada que elegir: va fija, sin desplegable.
+  const conSelector = opciones.length > 1;
   return (
     <CampoValor
       id={id}
@@ -82,11 +84,11 @@ export function CampoEntradaValor({
       texto={campo.texto}
       onTexto={campo.setTexto}
       selector={
-        opciones.length > 0 && unidad !== undefined
+        conSelector && unidad !== undefined
           ? { unidades: opciones, unidad, onUnidad: campo.setUnidad }
           : undefined
       }
-      unidadFija={opciones.length === 0 ? unidadFija : undefined}
+      unidadFija={conSelector ? undefined : (unidadFija ?? opciones[0])}
       lectura={lecturaDe(campo.estado)}
     />
   );

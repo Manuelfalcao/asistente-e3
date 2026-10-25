@@ -587,6 +587,26 @@
 .potencia {
   margin-top: var(--esp-3);
 }
+
+/* ---------- Vecinos en pasos de media vuelta (bobinas) ---------- */
+
+.vecinos {
+  margin: var(--esp-2) 0;
+}
+.vecino .valor-resultado {
+  padding-inline: var(--esp-2);
+}
+/* El más cercano a la L buscada: fondo de acento y borde, para que no dependa solo del color. */
+.vecino.destacado .valor-resultado {
+  background: var(--acento-suave);
+  border: 1px solid var(--acento);
+  border-radius: var(--radio-1);
+}
+.nota-tarjeta {
+  margin: var(--esp-2) 0;
+  font-size: var(--tam-3);
+  color: var(--texto-suave);
+}
 .potencia-titulo {
   margin: 0 0 var(--esp-1);
   font-size: var(--tam-3);

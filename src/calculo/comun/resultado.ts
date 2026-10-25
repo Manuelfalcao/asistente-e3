@@ -12,10 +12,15 @@ export interface Paso {
 
 // Una obra de la bibliografía. Si hay varias ediciones, una entrada por edición.
 export interface Referencia {
+  // "R. Lundin". Las obras sin autor, como el Reference Data, no lo llevan.
+  autor?: string;
+  // El libro, el informe o la revista: va en cursiva.
   obra: string;
-  // "4.ª"
-  edicion: string;
+  // "4.ª". Un artículo o un informe no lleva edición.
+  edicion?: string;
   editor?: string;
+  // El volumen y número de una revista, o la versión de un informe: "73(9)", "v0.20".
+  volumen?: string;
   anio: number;
   // Capítulo, ecuación o páginas: "cap. 9, págs. 252-254".
   ubicacion: string;

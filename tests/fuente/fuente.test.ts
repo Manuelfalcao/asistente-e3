@@ -5,6 +5,7 @@ import {
   calcularAtenuadores,
   calcularMinimaPerdida,
 } from '../../src/calculo/atenuadores/atenuadores';
+import { DEDUCCION_DIAMETRO_RF, calcularBobinas } from '../../src/calculo/bobinas/bobinas';
 import { revisarValores } from '../../src/calculo/comun/valor-impracticable';
 import { caracteresDeLaFuente } from './woff2';
 
@@ -42,6 +43,29 @@ function formulasDeAtenuadores(): string[] {
       formulas.push(...r.pad.formulas, ...r.pad.pasos.map((p) => p.latex));
     }
   }
+  return formulas;
+}
+
+// Bobinas de una capa: las dos ramas de Lundin, vueltas juntas y separadas, con frecuencia de
+// trabajo, los dos lados de la bandera del plan B y el corte de menos de una vuelta.
+function formulasDeBobinas(): string[] {
+  const formulas: string[] = [];
+  for (const [l, carrete, cable, separacion, frecuencia] of [
+    [100e-9, 5e-3, 0.8e-3, 0, null],
+    [1e-6, 6e-3, 0.5e-3, 0, 145e6],
+    [100e-9, 6e-3, 1e-3, 1e-3, 50e6],
+    [5e-9, 5e-3, 0.8e-3, 0, null],
+  ] as const) {
+    for (const planB of [false, true]) {
+      const r = calcularBobinas(
+        { inductancia: l, carrete, cable, separacion, frecuencia },
+        { planB },
+      );
+      if (r.estado === 'corte') formulas.push(...r.pasos.map((p) => p.latex));
+      else formulas.push(...r.unaCapa.formulas, ...r.unaCapa.pasos.map((p) => p.latex));
+    }
+  }
+  formulas.push(...DEDUCCION_DIAMETRO_RF.deduccion!.map((p) => p.latex));
   return formulas;
 }
 
@@ -109,25 +133,30 @@ describe('fuente recortada de las fórmulas', () => {
     );
   });
 
-  it('tiene cada carácter de las fórmulas de atenuadores', () => {
+  // Los caracteres de las fórmulas que no están en la fuente, como "U+2113".
+  const faltantes = (formulas: readonly string[]) => {
     const faltan = new Set<string>();
-    for (const latex of formulasDeAtenuadores()) {
-      for (const c of caracteresDelMathml(temml.renderToString(latex, { wrap: 'tex' }))) {
-        if (!enLaFuente.has(c)) faltan.add(`U+${c.toString(16).toUpperCase().padStart(4, '0')}`);
-      }
-    }
-    expect([...faltan]).toEqual([]);
-  });
-
-  it('tiene cada carácter de las cuentas del criterio de valor impracticable', () => {
-    const faltan = new Set<string>();
-    const formulas = formulasDelCriterio();
-    expect(formulas.length).toBeGreaterThanOrEqual(6);
     for (const latex of formulas) {
       for (const c of caracteresDelMathml(temml.renderToString(latex, { wrap: 'tex' }))) {
         if (!enLaFuente.has(c)) faltan.add(`U+${c.toString(16).toUpperCase().padStart(4, '0')}`);
       }
     }
-    expect([...faltan]).toEqual([]);
+    return [...faltan];
+  };
+
+  it('tiene cada carácter de las fórmulas de atenuadores', () => {
+    expect(faltantes(formulasDeAtenuadores())).toEqual([]);
+  });
+
+  it('tiene cada carácter de las fórmulas de bobinas', () => {
+    const formulas = formulasDeBobinas();
+    expect(formulas.length).toBeGreaterThan(50);
+    expect(faltantes(formulas)).toEqual([]);
+  });
+
+  it('tiene cada carácter de las cuentas del criterio de valor impracticable', () => {
+    const formulas = formulasDelCriterio();
+    expect(formulas.length).toBeGreaterThanOrEqual(6);
+    expect(faltantes(formulas)).toEqual([]);
   });
 });

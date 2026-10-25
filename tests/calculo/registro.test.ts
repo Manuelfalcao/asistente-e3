@@ -15,6 +15,16 @@ describe('registro de Criterios prácticos y Deducciones propias', () => {
     expect(umbrales?.queEs).toContain('0,43 pF');
   });
 
+  it('registra el D∞ de RF de una capa como Deducción propia, con el plan B detrás de una bandera', () => {
+    const rf = REGISTRO.find((e) => e.id === 'diametro-rf-una-capa');
+    expect(rf?.tipo).toBe('deduccion-propia');
+    expect(rf?.bandera).toBe('PLAN_B_DIAMETRO_RF');
+    expect(rf?.queEs).toMatch(/Knight.*ec\. 4\.2/);
+    expect(rf?.adaptacion).toMatch(/semiempírica/);
+    expect(rf?.planB).toMatch(/D0/);
+    expect(rf?.deduccion?.map((p) => p.latex).join(' ')).toContain('D_\\infty');
+  });
+
   it('cada entrada dice qué es, qué se adaptó y por qué, su respaldo y su plan B', () => {
     for (const e of REGISTRO) {
       for (const campo of [e.nombre, e.queEs, e.adaptacion, e.respaldo, e.planB]) {

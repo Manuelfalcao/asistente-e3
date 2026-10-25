@@ -27,4 +27,32 @@ describe('cita de la referencia bibliográfica', () => {
     ]);
     expect(plano(partes)).toBe('A, 2.ª ed. (2000), pág. 3; B, 1.ª ed. (X, 1990), ec. 4.');
   });
+
+  it('un artículo lleva autor, revista y volumen, sin edición', () => {
+    const partes = citar([
+      {
+        autor: 'R. Lundin',
+        obra: 'Proc. IEEE',
+        volumen: '73(9)',
+        anio: 1985,
+        ubicacion: 'págs. 1428-1429',
+      },
+    ]);
+    expect(plano(partes)).toBe('R. Lundin, Proc. IEEE 73(9), 1985, págs. 1428-1429.');
+    expect(partes.map((p) => p.obra)).toEqual([null, 'Proc. IEEE']);
+  });
+
+  it('dos citas seguidas de la misma obra sin edición no van como "junto con"', () => {
+    const knight = { autor: 'D. W. Knight', obra: 'Solenoids', volumen: 'v0.20', anio: 2016 };
+    expect(
+      plano(
+        citar([
+          { ...knight, ubicacion: 'ec. 10.6' },
+          { ...knight, ubicacion: 'ec. 4.2' },
+        ]),
+      ),
+    ).toBe(
+      'D. W. Knight, Solenoids v0.20, 2016, ec. 10.6; D. W. Knight, Solenoids v0.20, 2016, ec. 4.2.',
+    );
+  });
 });
