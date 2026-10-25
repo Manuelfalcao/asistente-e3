@@ -1,15 +1,25 @@
+import type { ComponentChildren } from 'preact';
 import {
   type BarridoVariante,
   type ComponenteRed,
   type EntradaRedL,
   type ResultadoRedL,
   type VarianteL,
+  type VarianteRed,
   NOTAS_REDES,
   calcularRedL,
 } from '../../calculo/redes/redes';
+import {
+  type ResultadoRedPiT,
+  type TipoVariantePiT,
+  type VariantePiT,
+  calcularRedPiT,
+  qMinimoDe,
+} from '../../calculo/redes/redes-pi-t';
 import { mensajeDeResultados } from '../../entrada/campo';
 import { formatearValor } from '../../entrada/formato';
 import type { Escalera } from '../esquema';
+import type { IdCalculadora } from '../calculadoras';
 import { BotonesSegmentados } from '../comun/BotonesSegmentados';
 import {
   CampoEntradaValor,
@@ -23,20 +33,31 @@ import { Aviso } from '../comun/Franjas';
 import { Cita, FormaResultado, Pasos } from '../comun/Resultado';
 import { Rotulo } from '../comun/Rotulo';
 import { Desplegable, TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
-import { F0, Q_BOBINA, Q_BOBINA_POR_DEFECTO, RL, RS, RS_POR_DEFECTO, TOPOLOGIAS } from './campos';
+import {
+  F0,
+  Q_BOBINA,
+  Q_BOBINA_POR_DEFECTO,
+  Q_DISENO,
+  RL,
+  RS,
+  RS_POR_DEFECTO,
+  TOPOLOGIAS,
+} from './campos';
 
-// La Calculadora de redes de adaptación (spec §9). Por ahora la red L: el Q que fijan las dos
-// resistencias y las dos variantes, pasa bajos y pasa altos, cada una con su esquema, sus valores
-// y lo que hace fuera de f₀.
-export function Redes() {
+// La Calculadora de redes de adaptación (spec §9): la red L, con el Q que fijan las dos
+// resistencias, y la π y la T, con el Q de diseño que elige el Alumno. De cada una salen todas las
+// variantes con solución, cada una con su esquema, sus valores y lo que hace fuera de f₀.
+export function Redes({ onIr }: { onIr?: (id: IdCalculadora) => void }) {
   const guardado = (campo: string) => ({ calculadora: 'redes', campo });
   const [topologia, setTopologia] = useOpcionGuardada(TOPOLOGIAS, 'L', guardado('topologia'));
   const f0 = useCampoEntrada(F0, '', guardado('f0'));
   const rs = useCampoEntrada(RS, RS_POR_DEFECTO, guardado('rs'));
   const rl = useCampoEntrada(RL, '', guardado('rl'));
+  const qDiseno = useCampoEntrada(Q_DISENO, '', guardado('q-diseno'));
   const qBobina = useCampoEntrada(Q_BOBINA, Q_BOBINA_POR_DEFECTO, guardado('q-bobina'));
 
-  const campos = [f0, rs, rl, qBobina];
+  const esL = topologia === 'L';
+  const campos = [f0, rs, rl, ...(esL ? [] : [qDiseno]), qBobina];
   const mensaje = mensajeDeResultados(
     campos.map((c) => ({
       nombre: c.spec.nombre,
@@ -44,11 +65,14 @@ export function Redes() {
       estado: c.estado,
     })),
   );
-  const valores = campos.map((c) => (c.estado.estado === 'valido' ? c.estado.valor : null));
+  const valor = (c: typeof f0) => (c.estado.estado === 'valido' ? c.estado.valor : null);
+  const [vf0, vrs, vrl, vqBobina] = [f0, rs, rl, qBobina].map(valor);
   const entrada: EntradaRedL | null =
-    mensaje === null && valores.every((v) => v !== null)
-      ? { f0: valores[0]!, rs: valores[1]!, rl: valores[2]!, qBobina: valores[3]! }
+    mensaje === null && vf0 !== null && vrs !== null && vrl !== null && vqBobina !== null
+      ? { f0: vf0, rs: vrs, rl: vrl, qBobina: vqBobina }
       : null;
+  // Con la fuente y la carga leídas, el Q mínimo se ve en el campo mientras se escribe el Q.
+  const qMinimo = vrs !== null && vrl !== null ? qMinimoDe(vrs, vrl) : null;
 
   return (
     <div class="cuerpo-calculadora">
@@ -74,17 +98,39 @@ export function Redes() {
           </button>
         </div>
         <CampoEntradaValor id="rl" etiqueta="RL (carga)" campo={rl} />
+        {!esL && (
+          <CampoEntradaValor
+            id="q-diseno"
+            etiqueta="Q de diseño"
+            campo={qDiseno}
+            ayuda={
+              qMinimo === null
+                ? undefined
+                : qMinimo === 0
+                  ? 'Sin mínimo: Rs = RL'
+                  : `Mínimo: ${formatearValor(qMinimo, 'numero')}`
+            }
+          />
+        )}
         <CampoEntradaValor id="q-bobina" etiqueta="Q de la bobina" campo={qBobina} />
       </section>
       <section class="resultados" aria-label="Resultados" aria-live="polite">
-        {topologia !== 'L' ? (
-          <p class="sin-resultado">
-            Las redes π y T todavía no están en esta Versión. Por ahora, usá la red L.
-          </p>
-        ) : entrada ? (
+        {!entrada ? (
+          <p class="sin-resultado corregir">{mensaje}</p>
+        ) : esL ? (
           <Resultado resultado={calcularRedL(entrada)} entrada={entrada} />
         ) : (
-          <p class="sin-resultado corregir">{mensaje}</p>
+          <ResultadoPiT
+            resultado={calcularRedPiT({
+              ...entrada,
+              topologia,
+              q: valor(qDiseno),
+            })}
+            entrada={entrada}
+            topologia={topologia}
+            onUsarL={() => setTopologia('L')}
+            onIr={onIr}
+          />
         )}
       </section>
     </div>
@@ -96,7 +142,7 @@ const hz = (f: number) => formatearValor(f, 'frecuencia');
 const db = (x: number) => formatearValor(x, 'decibeles');
 
 // "Rs" y "RL" con el subíndice.
-function R({ lado }: { lado: ComponenteRed['lado'] }) {
+function R({ lado }: { lado: 'R_s' | 'R_L' }) {
   return (
     <>
       R<sub>{lado === 'R_s' ? 's' : 'L'}</sub>
@@ -121,7 +167,12 @@ function Resultado({ resultado, entrada }: { resultado: ResultadoRedL; entrada: 
       principal={
         <div class="grilla-tarjetas">
           {resultado.variantes.map((v) => (
-            <TarjetaVariante key={v.filtrado} variante={v} />
+            <TarjetaVariante
+              key={v.filtrado}
+              titulo={TITULO_L[v.filtrado]}
+              variante={v}
+              q={<ValorResultado nombre="Q" valor={formatearValor(v.q, 'numero')} />}
+            />
           ))}
         </div>
       }
@@ -143,12 +194,160 @@ function Resultado({ resultado, entrada }: { resultado: ResultadoRedL; entrada: 
   );
 }
 
-const TITULO: Record<VarianteL['filtrado'], string> = {
+// "Calculadora de filtros" del texto, como enlace que abre esa Calculadora.
+function TextoConEnlace({ texto, onIr }: { texto: string; onIr?: (id: IdCalculadora) => void }) {
+  const enlace = 'Calculadora de filtros';
+  const i = texto.indexOf(enlace);
+  if (i < 0 || !onIr) return <>{texto}</>;
+  return (
+    <>
+      {texto.slice(0, i)}
+      <button type="button" class="enlace" onClick={() => onIr('filtros')}>
+        {enlace}
+      </button>
+      {texto.slice(i + enlace.length)}
+    </>
+  );
+}
+
+function ResultadoPiT({
+  resultado,
+  entrada,
+  topologia,
+  onUsarL,
+  onIr,
+}: {
+  resultado: ResultadoRedPiT;
+  entrada: EntradaRedL;
+  topologia: 'π' | 'T';
+  onUsarL: () => void;
+  onIr?: (id: IdCalculadora) => void;
+}) {
+  switch (resultado.estado) {
+    case 'corte':
+      // Sin Q, lo pide con el mínimo a la vista, como cualquier campo que falta.
+      if (resultado.codigo === 'falta-q') {
+        return <p class="sin-resultado corregir">{resultado.texto}</p>;
+      }
+      return (
+        <FormaResultado
+          avisos={
+            <Aviso fuerte>
+              {resultado.texto}
+              {resultado.codigo === 'q-bajo' && (
+                <>
+                  {' '}
+                  <button type="button" class="boton-minima en-aviso" onClick={onUsarL}>
+                    Usar red L
+                  </button>
+                </>
+              )}
+            </Aviso>
+          }
+          principal={null}
+          notas={NOTAS_REDES}
+        />
+      );
+    case 'reducida-a-l':
+      return (
+        <>
+          <Aviso>{resultado.texto}</Aviso>
+          <Resultado resultado={resultado.redL} entrada={entrada} />
+        </>
+      );
+    case 'calculado': {
+      const titulo = `Red ${topologia} de ${ohms(entrada.rs)} a ${ohms(entrada.rl)} en ${hz(entrada.f0)}`;
+      return (
+        <FormaResultado
+          avisos={resultado.avisos.map((a) => (
+            <Aviso key={a.codigo}>
+              <TextoConEnlace texto={a.texto} onIr={onIr} />
+            </Aviso>
+          ))}
+          principal={
+            <div class="grilla-tarjetas">
+              {resultado.variantes.map((v) => (
+                <TarjetaVariante
+                  key={v.tipo}
+                  titulo={TITULO_PI_T[v.tipo]}
+                  variante={v}
+                  q={
+                    <>
+                      {v.secciones.map((s, i) => (
+                        <ValorResultado
+                          key={s.lado}
+                          nombre={
+                            <>
+                              Q<sub>{i + 1}</sub>
+                            </>
+                          }
+                          valor={formatearValor(s.q, 'numero')}
+                          detalle={
+                            <>
+                              sección del lado de <R lado={s.lado} />
+                            </>
+                          }
+                        />
+                      ))}
+                      <ValorResultado
+                        nombre={
+                          <>
+                            R<sub>v</sub>
+                          </>
+                        }
+                        valor={ohms(resultado.resistenciaVirtual)}
+                        detalle="Resistencia virtual"
+                      />
+                    </>
+                  }
+                />
+              ))}
+            </div>
+          }
+          tarjetas={
+            <TarjetaResultado titulo={titulo} destacada pasos={<Pasos pasos={resultado.pasos} />}>
+              <ValorResultado
+                nombre="Q de diseño"
+                valor={formatearValor(resultado.q, 'numero')}
+                detalle={`Q mínimo: ${formatearValor(resultado.qMinimo, 'numero')}`}
+              />
+              <ValorResultado
+                nombre={
+                  <>
+                    R<sub>v</sub>
+                  </>
+                }
+                valor={ohms(resultado.resistenciaVirtual)}
+                detalle="Resistencia virtual"
+              />
+              <div class="formulas">
+                {resultado.formulas.map((f) => (
+                  <Formula key={f} latex={f} />
+                ))}
+              </div>
+              <Cita referencias={resultado.referencias} />
+            </TarjetaResultado>
+          }
+          notas={resultado.notas}
+        />
+      );
+    }
+  }
+}
+
+const TITULO_L: Record<VarianteL['filtrado'], string> = {
   'pasa-bajos': 'Pasa bajos',
   'pasa-altos': 'Pasa altos',
 };
 
-function escalera(v: VarianteL): Escalera {
+const TITULO_PI_T: Record<TipoVariantePiT, string> = {
+  'pasa-bajos': 'Pasa bajos',
+  'pasa-altos': 'Pasa altos',
+  'mixta-bajos-altos': 'Mixta: pasa bajos del lado de Rs, pasa altos del de RL',
+  'mixta-altos-bajos': 'Mixta: pasa altos del lado de Rs, pasa bajos del de RL',
+};
+
+function escalera(v: VarianteRed): Escalera {
   return {
     fuente: 'R_s',
     carga: 'R_L',
@@ -160,12 +359,21 @@ function escalera(v: VarianteL): Escalera {
   };
 }
 
-function TarjetaVariante({ variante: v }: { variante: VarianteL }) {
+// La tarjeta de una variante, igual para la L, la π y la T: cambian el título y las filas de Q.
+function TarjetaVariante({
+  titulo,
+  variante: v,
+  q,
+}: {
+  titulo: string;
+  variante: VarianteL | VariantePiT;
+  q: ComponentChildren;
+}) {
   const { revision } = v;
   const nivel = (c: ComponenteRed) => revision.marcados.find((m) => m.nombre === c.nombre)?.nivel;
   return (
     <TarjetaResultado
-      titulo={TITULO[v.filtrado]}
+      titulo={titulo}
       pasos={<Pasos pasos={v.pasos} />}
       motivos={revision.marcados.map((m) => ({ nivel: m.nivel, texto: m.motivo }))}
       sugerencia={revision.sugerencia ?? undefined}
@@ -187,14 +395,20 @@ function TarjetaVariante({ variante: v }: { variante: VarianteL }) {
             detalle={
               <>
                 X = {formatearValor(c.reactancia, 'resistencia')},{' '}
-                {c.posicion === 'serie' ? 'en serie' : 'en derivación'}, del lado de{' '}
-                <R lado={c.lado} />
+                {c.posicion === 'serie' ? 'en serie' : 'en derivación'},{' '}
+                {c.lado ? (
+                  <>
+                    del lado de <R lado={c.lado} />
+                  </>
+                ) : (
+                  'entre las dos secciones'
+                )}
               </>
             }
           />
         );
       })}
-      <ValorResultado nombre="Q" valor={formatearValor(v.q, 'numero')} />
+      {q}
       {/* Cerrados, como los pasos: para no cargar la primera vista. */}
       <Desplegable titulo="Fuera de f₀">
         <Barrido barrido={v.barrido} />

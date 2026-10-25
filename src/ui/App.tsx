@@ -98,7 +98,7 @@ export function App() {
           ) : activa.id === 'arreglos' ? (
             <Arreglos />
           ) : activa.id === 'redes' ? (
-            <Redes />
+            <Redes onIr={setActivaId} />
           ) : activa.id === 'atenuadores' ? (
             <Atenuadores />
           ) : (

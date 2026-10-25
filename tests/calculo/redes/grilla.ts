@@ -1,7 +1,15 @@
 import { type RedBarrido, respuesta } from '../../../src/calculo/comun/barrido';
 import { calcularRedL } from '../../../src/calculo/redes/redes';
+import { calcularRedPiT } from '../../../src/calculo/redes/redes-pi-t';
 import { c, cascada, modulo, zEntrada } from '../../oraculos/abcd';
 import { GRILLA_FRECUENCIAS, GRILLA_RESISTENCIAS, VECES_F0 } from './casos';
+import {
+  GRILLA_FRECUENCIAS_PI_T,
+  GRILLA_Q_SIN_MINIMO,
+  GRILLA_RESISTENCIAS_PI_T,
+  MULTIPLOS_DEL_Q_MINIMO,
+  entradaPiT,
+} from './casos-pi-t';
 import { elementoOraculo, s21Oraculo, zEntradaOraculo } from './elementos';
 
 // Las grillas de verificación de redes de adaptación contra el oráculo ABCD (spec §13.3): las
@@ -46,6 +54,40 @@ export function recorrerGrilla(): { redes: number; zEntrada: Peor } {
             `${v.filtrado} ${rs} → ${rl} Ω, ${f0 / 1e6} MHz`,
           );
           redes++;
+        }
+      }
+    }
+  }
+  return { redes, zEntrada: acc.peor };
+}
+
+// Todas las variantes de la π y de la T en cada par de la grilla, con Q de 1,2, 2 y 5 veces el
+// mínimo (donde R_s = R_L, que no tiene mínimo, con Q de 1 y 10): |Zin − R_s|/R_s en f₀ con el
+// oráculo.
+export function recorrerGrillaPiT(): { redes: number; zEntrada: Peor } {
+  const acc = acumulador();
+  let redes = 0;
+  for (const topologia of ['π', 'T'] as const) {
+    for (const f0 of GRILLA_FRECUENCIAS_PI_T) {
+      for (const rs of GRILLA_RESISTENCIAS_PI_T) {
+        for (const rl of GRILLA_RESISTENCIAS_PI_T) {
+          const qMinimo = rs === rl ? 0 : Math.sqrt(Math.max(rs, rl) / Math.min(rs, rl) - 1);
+          const qs =
+            rs === rl ? GRILLA_Q_SIN_MINIMO : MULTIPLOS_DEL_Q_MINIMO.map((k) => k * qMinimo);
+          for (const q of qs) {
+            const r = calcularRedPiT(entradaPiT(topologia, rs, rl, q, f0));
+            if (r.estado !== 'calculado') {
+              throw new Error(`no calculó ${topologia} ${rs} → ${rl} Ω con Q = ${q}: ${r.estado}`);
+            }
+            for (const v of r.variantes) {
+              const z = zEntradaOraculo(v, f0, rl);
+              acc.registrar(
+                modulo(c(z.re - rs, z.im)) / rs,
+                `${topologia} ${v.tipo} ${rs} → ${rl} Ω, Q = ${q}, ${f0 / 1e6} MHz`,
+              );
+              redes++;
+            }
+          }
         }
       }
     }

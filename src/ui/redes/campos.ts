@@ -31,6 +31,15 @@ export const RS: EspecSinSelector = {
 
 export const RL: EspecSinSelector = { ...RS, nombre: 'RL' };
 
+// El de la sección de mayor Q, no f₀/BW (spec §9.1). Vacío vale: la Calculadora pide completarlo
+// con el mínimo a la vista.
+export const Q_DISENO: EspecSinSelector = {
+  nombre: 'Q de diseño',
+  magnitud: 'numero',
+  obligatorio: false,
+  rango: MAYOR_QUE_CERO,
+};
+
 // Para la pérdida estimada: una R de ω₀·L/Q en serie con cada L.
 export const Q_BOBINA: EspecSinSelector = {
   nombre: 'Q de la bobina',

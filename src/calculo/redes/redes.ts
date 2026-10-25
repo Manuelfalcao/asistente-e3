@@ -46,7 +46,8 @@ export interface ComponenteRed {
   // En Ω, con signo: X > 0 es una L.
   reactancia: number;
   posicion: 'serie' | 'derivacion';
-  lado: Lado;
+  // Null en la rama del medio de la π y la T, que no toca ninguna de las dos resistencias.
+  lado: Lado | null;
 }
 
 // Lo que hace la variante fuera de f₀ (spec §9.5).
@@ -64,9 +65,8 @@ export interface BarridoVariante {
   perdidaInsercion: number;
 }
 
-export interface VarianteL {
-  filtrado: Filtrado;
-  q: number;
+// Lo que tiene toda variante de una red de adaptación, sea L, π o T.
+export interface VarianteRed {
   // De la fuente a la carga.
   componentes: readonly ComponenteRed[];
   // Las de Bowick: "deja pasar la continua" o "bloquea la continua", y "atenúa armónicas".
@@ -79,6 +79,11 @@ export interface VarianteL {
   pasos: readonly Paso[];
   // Valor dudoso o impracticable de cada L y C en f₀ (spec §5.6). Su cuenta está al final de pasos.
   revision: Revision;
+}
+
+export interface VarianteL extends VarianteRed {
+  filtrado: Filtrado;
+  q: number;
 }
 
 export type ResultadoRedL =
@@ -123,14 +128,14 @@ export const NOTAS_REDES: readonly string[] = [
 
 export const SUGERENCIA_REDES = 'Probá otra variante o bajá el Q de diseño.';
 
-const ETIQUETA_CONTINUA: Record<Filtrado, string> = {
+export const ETIQUETA_CONTINUA: Record<Filtrado, string> = {
   'pasa-bajos': 'deja pasar la continua',
   'pasa-altos': 'bloquea la continua',
 };
-const ETIQUETA_ARMONICAS = 'atenúa armónicas';
+export const ETIQUETA_ARMONICAS = 'atenúa armónicas';
 
 const FORMULA_Q = 'Q = \\sqrt{\\dfrac{R_{\\mathrm{mayor}}}{R_{\\mathrm{menor}}} - 1}';
-const FORMULA_S21 =
+export const FORMULA_S21 =
   '|S_{21}|^2 = \\dfrac{4 R_s R_L}{\\left|A R_L + B + C R_s R_L + D R_s\\right|^2}';
 
 const ohms = (r: number) => valorLatex(r, 'resistencia');
@@ -227,7 +232,7 @@ function variante(
   };
 }
 
-function elementoDe(c: ComponenteRed, rSerie?: number): ElementoBarrido {
+export function elementoDe(c: ComponenteRed, rSerie?: number): ElementoBarrido {
   return {
     componente: c.componente,
     posicion: c.posicion,
@@ -236,7 +241,7 @@ function elementoDe(c: ComponenteRed, rSerie?: number): ElementoBarrido {
   };
 }
 
-function pasoComponente(c: ComponenteRed, f0: number): Paso {
+export function pasoComponente(c: ComponenteRed, f0: number): Paso {
   const donde = c.posicion === 'serie' ? 'en serie' : 'en derivación';
   const x = numero(c.reactancia);
   return c.componente === 'L'
@@ -255,7 +260,7 @@ function pasoComponente(c: ComponenteRed, f0: number): Paso {
 }
 
 // "1000 + j0 Ω": la parte imaginaria que queda es redondeo de la aritmética.
-function complejoLatex(z: Complejo): string {
+export function complejoLatex(z: Complejo): string {
   const im = Math.abs(z.im) < 1e-9 * Math.abs(z.re) ? 0 : z.im;
   return `${numero(z.re)} ${im < 0 ? '-' : '+'} j${numero(Math.abs(im))}\\,\\mathrm{\\Omega}`;
 }
@@ -278,7 +283,7 @@ function pasoZEntrada(
 }
 
 // El barrido del circuito ideal y la pérdida con el Q de la bobina (spec §9.5).
-function barrer(
+export function barrer(
   ideal: RedBarrido,
   componentes: readonly ComponenteRed[],
   f0: number,

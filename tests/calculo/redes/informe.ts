@@ -5,6 +5,12 @@ import {
   type VarianteL,
   calcularRedL,
 } from '../../../src/calculo/redes/redes';
+import {
+  type EntradaRedPiT,
+  type ResultadoRedPiT,
+  type TipoVariantePiT,
+  calcularRedPiT,
+} from '../../../src/calculo/redes/redes-pi-t';
 import { formatearValor } from '../../../src/entrada/formato';
 import {
   type AporteInforme,
@@ -25,8 +31,18 @@ import {
   TOLERANCIA_ORACULO,
   VECES_F0,
 } from './casos';
+import {
+  CASOS_ANCHO_DE_BANDA_PI_T,
+  CASOS_COMPORTAMIENTO_PI_T,
+  CASOS_REFERENCIA_PI_T,
+  GRILLA_FRECUENCIAS_PI_T,
+  GRILLA_RESISTENCIAS_PI_T,
+  MULTIPLOS_DEL_Q_MINIMO,
+  type CasoComportamientoPiT,
+  ORACULO_PI_T,
+} from './casos-pi-t';
 import { cruceDeGamma } from './elementos';
-import { type Peor, recorrerBarrido, recorrerGrilla } from './grilla';
+import { type Peor, recorrerBarrido, recorrerGrilla, recorrerGrillaPiT } from './grilla';
 
 // El adaptador de las tablas de Casos de prueba de redes de adaptación para el Informe de casos
 // (spec §13.6): corre el cálculo con las entradas de cada caso y deja el obtenido, el error y los
@@ -276,6 +292,161 @@ const comportamiento = () =>
     }),
   );
 
+// --- Redes π y T ---------------------------------------------------------------------------------
+
+const TITULO_PI_T: Record<TipoVariantePiT, string> = {
+  'pasa-bajos': 'pasa bajos',
+  'pasa-altos': 'pasa altos',
+  'mixta-bajos-altos': 'mixta (pasa bajos del lado de Rs, pasa altos del lado de RL)',
+  'mixta-altos-bajos': 'mixta (pasa altos del lado de Rs, pasa bajos del lado de RL)',
+};
+
+function entradasTextoPiT(e: EntradaRedPiT): string {
+  return [
+    `red ${e.topologia}`,
+    `f₀ = ${HZ(e.f0)}`,
+    `Rs = ${R(e.rs)}`,
+    `RL = ${R(e.rl)}`,
+    `Q de diseño = ${e.q === null ? 'vacío' : formatearValor(e.q, 'numero')}`,
+    `Q de la bobina = ${formatearValor(e.qBobina, 'numero')}`,
+  ].join(' · ');
+}
+
+function calculadoPiT(e: EntradaRedPiT) {
+  const r = calcularRedPiT(e);
+  if (r.estado !== 'calculado') throw new Error(`no calculó: ${r.estado}`);
+  return r;
+}
+
+const pasosDePiT = (
+  e: EntradaRedPiT,
+  r: Extract<ResultadoRedPiT, { estado: 'calculado' }>,
+): GrupoPasos[] => [
+  { titulo: `Q mínimo y Resistencia virtual de la red ${e.topologia}`, pasos: r.pasos },
+  ...r.variantes.map((v) => ({
+    titulo: `Red ${e.topologia} ${TITULO_PI_T[v.tipo]}`,
+    pasos: v.pasos,
+  })),
+];
+
+const referenciaPiT = () =>
+  CASOS_REFERENCIA_PI_T.map((caso) =>
+    enCaso(caso, () => {
+      const r = calculadoPiT(caso.entradas);
+      const v = r.variantes.find((x) => x.tipo === caso.variante)!;
+      return {
+        clase: 'referencia',
+        id: caso.id,
+        entradas: `${entradasTextoPiT(caso.entradas)} · ${TITULO_PI_T[caso.variante]}`,
+        referencia: caso.omitidas ? `${caso.referencia}. ${caso.omitidas}` : caso.referencia,
+        medidas: caso.impresos.map(({ nombre, impreso, unidad, medido }) =>
+          medidaImpresa({
+            nombre,
+            impreso,
+            obtenido:
+              medido.de === 'resistencia-virtual'
+                ? r.resistenciaVirtual
+                : medido.de === 'reactancia'
+                  ? Math.abs(v.componentes[medido.indice].reactancia)
+                  : v.secciones[medido.seccion].q,
+            tolerancia: caso.tolerancia,
+            ...(unidad && { unidad }),
+          }),
+        ),
+        pasos: pasosDePiT(caso.entradas, r),
+      };
+    }),
+  );
+
+const anchoDeBandaPiT = () =>
+  CASOS_ANCHO_DE_BANDA_PI_T.map((caso) =>
+    enCaso(caso, () => {
+      const r = calculadoPiT(caso.entradas);
+      const { f0, rs, rl } = caso.entradas;
+      return {
+        clase: 'verificacion',
+        id: caso.id,
+        entradas: entradasTextoPiT(caso.entradas),
+        referencia: caso.referencia,
+        oraculo: `${caso.oraculo}, con el cruce de |Γ| = 1/√2 de tests/calculo/redes/elementos.ts`,
+        medidas: r.variantes.flatMap((v) => [
+          medidaBorde(`f inf (${v.tipo})`, v.barrido.fInf, cruceDeGamma(v, f0, rs, rl, 1 / 50)),
+          medidaBorde(`f sup (${v.tipo})`, v.barrido.fSup, cruceDeGamma(v, f0, rs, rl, 50)),
+          ...(caso.investigacion === undefined ||
+          v.tipo !== 'pasa-bajos' ||
+          v.barrido.f0SobreBw === null
+            ? []
+            : [
+                medidaImpresa({
+                  nombre: 'f₀/BW (pasa bajos), de la investigación',
+                  impreso: caso.investigacion,
+                  obtenido: v.barrido.f0SobreBw,
+                  tolerancia: {
+                    tipo: 'media-unidad',
+                    motivo: 'Barrido propio de la investigación: media unidad de la cifra impresa.',
+                  },
+                }),
+              ]),
+        ]),
+        pasos: pasosDePiT(caso.entradas, r),
+      };
+    }),
+  );
+
+const grillaPiT = (): CasoInforme =>
+  enCaso({ id: 'Grilla de R_s, R_L, Q y variantes', referencia: 'spec §13.3' }, () => {
+    const g = recorrerGrillaPiT();
+    return {
+      clase: 'verificacion',
+      id: 'Grilla de R_s, R_L, Q y variantes',
+      entradas:
+        `π y T con Rs y RL en {${lista(GRILLA_RESISTENCIAS_PI_T, R)}}; Q de diseño de ` +
+        `${MULTIPLOS_DEL_Q_MINIMO.join(', ')} veces el mínimo (1 y 10 donde Rs = RL); f₀ en ` +
+        `{${lista(GRILLA_FRECUENCIAS_PI_T, HZ)}}; todas las variantes con solución`,
+      referencia: 'spec §13.3 (Redes de adaptación, verificación)',
+      oraculo: ORACULO_PI_T,
+      medidas: [medidaPeor(`Peor |Zin − Rs|/Rs en f₀, en ${g.redes} redes`, g.zEntrada)],
+      pasos: [],
+    };
+  });
+
+function describirPiT(r: ResultadoRedPiT): string {
+  switch (r.estado) {
+    case 'corte':
+      return `corte: ${r.codigo}${r.codigo === 'entrada-invalida' ? '' : `, Q mínimo ${formatearValor(r.qMinimo!, 'numero')}`}`;
+    case 'reducida-a-l':
+      return 'se reduce a una red L';
+    case 'calculado':
+      return `${r.variantes.length} variantes · avisos: ${r.avisos.map((a) => a.codigo).join(', ') || 'ninguno'}`;
+  }
+}
+
+function textoEsperadoPiT(caso: CasoComportamientoPiT): string {
+  const { esperado } = caso;
+  if ('corte' in esperado) {
+    return `corte: ${esperado.corte}${esperado.qMinimo === undefined ? '' : `, Q mínimo ${formatearValor(esperado.qMinimo, 'numero')}`}`;
+  }
+  if ('reducida' in esperado) return 'se reduce a una red L';
+  return `${esperado.variantes} variantes · avisos: ${esperado.avisos.join(', ') || 'ninguno'}`;
+}
+
+const comportamientoPiT = () =>
+  CASOS_COMPORTAMIENTO_PI_T.map((caso) =>
+    enCaso(caso, () => {
+      const esperado = textoEsperadoPiT(caso);
+      const obtenido = describirPiT(calcularRedPiT(caso.entradas));
+      return {
+        clase: 'comportamiento',
+        id: caso.id,
+        entradas: entradasTextoPiT(caso.entradas),
+        referencia: caso.referencia,
+        esperado,
+        obtenido,
+        coincide: esperado === obtenido,
+      };
+    }),
+  );
+
 export const INFORME: AporteInforme = {
   calculadora: 'redes',
   casos: () => [
@@ -284,5 +455,9 @@ export const INFORME: AporteInforme = {
     grilla(),
     barridoContraOraculo(),
     ...comportamiento(),
+    ...referenciaPiT(),
+    ...anchoDeBandaPiT(),
+    grillaPiT(),
+    ...comportamientoPiT(),
   ],
 };

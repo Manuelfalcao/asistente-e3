@@ -67,10 +67,13 @@ export function CampoEntradaValor({
   etiqueta,
   campo,
   unidadFija,
+  ayuda,
 }: {
   id: string;
   etiqueta: string;
   campo: CampoEntrada;
+  // Una línea fija debajo de la lectura, como el mínimo de un campo.
+  ayuda?: string;
   // Para los campos sin Selector de unidad, como los dB o los largos en mm.
   unidadFija?: string;
 }) {
@@ -91,6 +94,7 @@ export function CampoEntradaValor({
       }
       unidadFija={conSelector ? undefined : (unidadFija ?? opciones[0])}
       lectura={lecturaDe(campo.estado)}
+      ayuda={ayuda}
     />
   );
 }

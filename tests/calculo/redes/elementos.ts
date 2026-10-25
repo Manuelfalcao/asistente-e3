@@ -1,5 +1,5 @@
 import type { ElementoBarrido } from '../../../src/calculo/comun/barrido';
-import type { VarianteL } from '../../../src/calculo/redes/redes';
+import type { VarianteRed } from '../../../src/calculo/redes/redes';
 import {
   type Complejo,
   type Elemento,
@@ -30,11 +30,15 @@ export function elementoOraculo(e: ElementoBarrido, f: number): Elemento {
   return derivacion(c(z.re / d, -z.im / d));
 }
 
-export const escaleraDeVariante = (v: VarianteL, f: number): Elemento[] =>
+export const escaleraDeVariante = (v: Pick<VarianteRed, 'componentes'>, f: number): Elemento[] =>
   v.componentes.map((x) => elementoOraculo(x, f));
 
 // Con los valores calculados, en f₀ y con R_L conectada.
-export function zEntradaOraculo(v: VarianteL, f: number, rl: number): Complejo {
+export function zEntradaOraculo(
+  v: Pick<VarianteRed, 'componentes'>,
+  f: number,
+  rl: number,
+): Complejo {
   return zEntrada(cascada(escaleraDeVariante(v, f)), rl);
 }
 
@@ -48,7 +52,7 @@ export function s21Oraculo(
 }
 
 // |Γ| a la entrada contra R_s.
-function gamma(v: VarianteL, f: number, rs: number, rl: number): number {
+function gamma(v: Pick<VarianteRed, 'componentes'>, f: number, rs: number, rl: number): number {
   const z = zEntradaOraculo(v, f, rl);
   return modulo(c(z.re - rs, z.im)) / modulo(c(z.re + rs, z.im));
 }
@@ -56,7 +60,7 @@ function gamma(v: VarianteL, f: number, rs: number, rl: number): number {
 // El primer cruce de |Γ| = 1/√2 desde f₀ hacia `hasta` (f₀/50 o 50·f₀): un paso fijo de 1/1000 de
 // década y después bisección. Null si no cruza.
 export function cruceDeGamma(
-  v: VarianteL,
+  v: Pick<VarianteRed, 'componentes'>,
   f0: number,
   rs: number,
   rl: number,

@@ -14,6 +14,7 @@ import {
 } from '../../src/calculo/bobinas/dos-capas';
 import { revisarValores } from '../../src/calculo/comun/valor-impracticable';
 import { calcularRedL } from '../../src/calculo/redes/redes';
+import { calcularRedPiT } from '../../src/calculo/redes/redes-pi-t';
 import { caracteresDeLaFuente } from './woff2';
 
 // Si una fórmula usa un carácter que la fuente recortada no tiene, el navegador lo dibuja con otra
@@ -124,6 +125,18 @@ function formulasDeRedes(): string[] {
     if (r.estado !== 'calculado') continue;
     formulas.push(r.formula, ...r.pasos.map((p) => p.latex));
     for (const v of r.variantes) formulas.push(...v.formulas, ...v.pasos.map((p) => p.latex));
+  }
+  // La π y la T, con sus cuatro variantes (en 5 → 50 Ω a 300 MHz, valores chicos con motivos).
+  for (const topologia of ['π', 'T'] as const) {
+    for (const [rs, rl, f0, q] of [
+      [100, 1000, 100e6, 15],
+      [5, 50, 300e6, 10],
+    ]) {
+      const r = calcularRedPiT({ topologia, f0, rs, rl, qBobina: 100, q });
+      if (r.estado !== 'calculado') continue;
+      formulas.push(...r.formulas, ...r.pasos.map((p) => p.latex));
+      for (const v of r.variantes) formulas.push(...v.formulas, ...v.pasos.map((p) => p.latex));
+    }
   }
   return formulas;
 }

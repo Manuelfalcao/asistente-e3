@@ -22,6 +22,7 @@ export function CampoValor({
   selector,
   unidadFija,
   lectura,
+  ayuda,
 }: {
   id: string;
   etiqueta: string;
@@ -31,6 +32,8 @@ export function CampoValor({
   // Para los campos sin Selector de unidad, como los largos en mm.
   unidadFija?: string;
   lectura?: Lectura;
+  // Una línea fija debajo de la lectura, como el mínimo de un campo: "Mínimo: 4,36".
+  ayuda?: string;
 }) {
   const idLectura = `${id}-lectura`;
   const invalido = lectura?.tipo === 'error';
@@ -69,6 +72,7 @@ export function CampoValor({
       <div id={idLectura} class={`lectura lectura-${lectura?.tipo ?? 'eco'}`} aria-live="polite">
         {lectura?.texto}
       </div>
+      {ayuda && <div class="ayuda-campo">{ayuda}</div>}
     </div>
   );
 }

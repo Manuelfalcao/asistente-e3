@@ -408,6 +408,12 @@
   font-size: var(--tam-2);
   color: var(--texto-suave);
 }
+.campo-valor .ayuda-campo {
+  grid-column: 2;
+  padding: 0 0 0 1px;
+  font-size: var(--tam-2);
+  color: var(--texto-suave);
+}
 .campo-valor .lectura-aviso {
   color: var(--dudoso-texto);
 }
@@ -580,6 +586,16 @@
   background: var(--acento);
   color: var(--sobre-acento);
 }
+.enlace {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--acento);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .boton-minima.en-aviso {
   margin-top: var(--esp-2);
 }
