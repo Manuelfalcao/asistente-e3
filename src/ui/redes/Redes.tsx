@@ -22,7 +22,7 @@ import { Formula } from '../comun/Formula';
 import { Aviso } from '../comun/Franjas';
 import { Cita, FormaResultado, Pasos } from '../comun/Resultado';
 import { Rotulo } from '../comun/Rotulo';
-import { TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
+import { Desplegable, TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
 import { F0, Q_BOBINA, Q_BOBINA_POR_DEFECTO, RL, RS, RS_POR_DEFECTO, TOPOLOGIAS } from './campos';
 
 // La Calculadora de redes de adaptación (spec §9). Por ahora la red L: el Q que fijan las dos
@@ -115,9 +115,17 @@ function Resultado({ resultado, entrada }: { resultado: ResultadoRedL; entrada: 
     );
   }
   const titulo = `Red L de ${ohms(entrada.rs)} a ${ohms(entrada.rl)} en ${hz(entrada.f0)}`;
+  // Las variantes van primero, por encima del Q: son lo que el Alumno vino a buscar.
   return (
     <FormaResultado
       principal={
+        <div class="grilla-tarjetas">
+          {resultado.variantes.map((v) => (
+            <TarjetaVariante key={v.filtrado} variante={v} />
+          ))}
+        </div>
+      }
+      tarjetas={
         <TarjetaResultado titulo={titulo} destacada pasos={<Pasos pasos={resultado.pasos} />}>
           <ValorResultado
             nombre="Q"
@@ -129,13 +137,6 @@ function Resultado({ resultado, entrada }: { resultado: ResultadoRedL; entrada: 
           </div>
           <Cita referencias={resultado.referencias} />
         </TarjetaResultado>
-      }
-      tarjetas={
-        <div class="grilla-tarjetas">
-          {resultado.variantes.map((v) => (
-            <TarjetaVariante key={v.filtrado} variante={v} />
-          ))}
-        </div>
       }
       notas={resultado.notas}
     />
@@ -194,12 +195,17 @@ function TarjetaVariante({ variante: v }: { variante: VarianteL }) {
         );
       })}
       <ValorResultado nombre="Q" valor={formatearValor(v.q, 'numero')} />
-      <Barrido barrido={v.barrido} />
-      <div class="formulas">
-        {v.formulas.map((f) => (
-          <Formula key={f} latex={f} />
-        ))}
-      </div>
+      {/* Cerrados, como los pasos: para no cargar la primera vista. */}
+      <Desplegable titulo="Fuera de f₀">
+        <Barrido barrido={v.barrido} />
+      </Desplegable>
+      <Desplegable titulo="Fórmulas">
+        <div class="formulas">
+          {v.formulas.map((f) => (
+            <Formula key={f} latex={f} />
+          ))}
+        </div>
+      </Desplegable>
     </TarjetaResultado>
   );
 }
@@ -207,8 +213,7 @@ function TarjetaVariante({ variante: v }: { variante: VarianteL }) {
 // Lo que hace la variante fuera de f₀ (spec §9.5), sin curva.
 function Barrido({ barrido: b }: { barrido: BarridoVariante }) {
   return (
-    <div class="barrido">
-      <h4 class="barrido-titulo">Fuera de f₀</h4>
+    <>
       <ValorResultado
         nombre={
           <>
@@ -241,6 +246,6 @@ function Barrido({ barrido: b }: { barrido: BarridoVariante }) {
         rotulos={<Rotulo tipo="estimacion" />}
         detalle="pérdida de inserción en f₀, con el Q de la bobina"
       />
-    </div>
+    </>
   );
 }

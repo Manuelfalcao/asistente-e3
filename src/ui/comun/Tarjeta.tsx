@@ -28,12 +28,7 @@ export function TarjetaResultado({
     <section class={destacada ? 'tarjeta destacada' : 'tarjeta'}>
       {titulo && <h3 class="tarjeta-titulo">{titulo}</h3>}
       {children}
-      {pasos && (
-        <details class="pasos">
-          <summary>Pasos intermedios</summary>
-          <div class="pasos-cuerpo">{pasos}</div>
-        </details>
-      )}
+      {pasos && <Desplegable titulo="Pasos intermedios">{pasos}</Desplegable>}
       {motivos.length > 0 && (
         <div class="motivos">
           <ul>
@@ -48,6 +43,23 @@ export function TarjetaResultado({
         </div>
       )}
     </section>
+  );
+}
+
+// Un desplegable cerrado por defecto dentro de una tarjeta, como el de los pasos intermedios: para lo
+// que no hace falta ver de entrada.
+export function Desplegable({
+  titulo,
+  children,
+}: {
+  titulo: ComponentChildren;
+  children: ComponentChildren;
+}) {
+  return (
+    <details class="pasos">
+      <summary>{titulo}</summary>
+      <div class="pasos-cuerpo">{children}</div>
+    </details>
   );
 }
 
