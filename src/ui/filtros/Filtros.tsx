@@ -22,7 +22,7 @@ import { Formula } from '../comun/Formula';
 import { Aviso } from '../comun/Franjas';
 import { Cita, FormaResultado, Pasos } from '../comun/Resultado';
 import { Rotulo } from '../comun/Rotulo';
-import { TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
+import { Desplegable, TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
 import {
   APROXIMACIONES,
   ATAJOS_RIPPLE,
@@ -244,11 +244,14 @@ function Resultado({ resultado, entrada }: { resultado: ResultadoFiltro; entrada
             rotulos={<Rotulo tipo="estimacion" />}
             detalle={`de Cohn en la banda pasante, con Qu = ${formatearValor(entrada.qBobina, 'numero')}`}
           />
-          <div class="formulas">
-            {r.formulas.map((f) => (
-              <Formula key={f} latex={f} />
-            ))}
-          </div>
+          {/* Cerradas, como los pasos: para no cargar la primera vista. */}
+          <Desplegable titulo="Fórmulas">
+            <div class="formulas">
+              {r.formulas.map((f) => (
+                <Formula key={f} latex={f} />
+              ))}
+            </div>
+          </Desplegable>
           <Cita referencias={r.referencias} />
         </TarjetaResultado>
       }
