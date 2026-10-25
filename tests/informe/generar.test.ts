@@ -17,8 +17,10 @@ describe('las tablas de casos, vistas desde el informe', () => {
     a.casos().map((caso) => ({ calculadora: a.calculadora, caso })),
   );
 
-  it('hay casos de atenuadores y de Común, y nada más por ahora', () => {
-    expect(new Set(aportes.map((a) => a.calculadora))).toEqual(new Set(['atenuadores', 'comun']));
+  it('hay casos de atenuadores, bobinas y Común, y nada más por ahora', () => {
+    expect(new Set(aportes.map((a) => a.calculadora))).toEqual(
+      new Set(['atenuadores', 'bobinas', 'comun']),
+    );
   });
 
   it('cada caso tiene id y referencia, y los ids no se repiten dentro de la sección', () => {
