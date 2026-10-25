@@ -186,8 +186,8 @@ function BloqueInventario({ componente, serie }: { componente: TipoComponente; s
   );
 }
 
-// Primero la tarjeta del valor buscado con las fórmulas, la referencia y los pasos; después, la de
-// los 10 Arreglos (spec §4.5).
+// Primero la tarjeta de los 10 Arreglos, con el valor buscado y su rótulo; después, la de las
+// fórmulas, la referencia y los pasos intermedios de la fila elegida.
 function Resultado({
   resultado,
   calculando,
@@ -202,43 +202,25 @@ function Resultado({
   const { buscado, filas, revision } = resultado;
   const fila = filas[Math.min(elegida, filas.length - 1)];
   const marca = revision.marcados[0]?.nivel;
+  const para = formatearValor(buscado.valor, magnitud);
   const titulo =
-    filas.length === ARREGLOS_A_MOSTRAR ? `Los ${ARREGLOS_A_MOSTRAR} mejores` : 'Arreglos';
+    filas.length === ARREGLOS_A_MOSTRAR
+      ? `Los ${ARREGLOS_A_MOSTRAR} mejores Arreglos para ${para}`
+      : `Arreglos para ${para}`;
 
   return (
     <FormaResultado
       principal={
         <TarjetaResultado
-          titulo={`Arreglos equivalentes para ${formatearValor(buscado.valor, magnitud)}`}
+          titulo={titulo}
           destacada
-          pasos={
-            <>
-              <Pasos pasos={resultado.pasos} />
-              {fila && (
-                <>
-                  <h4 class="pasos-subtitulo">Fila elegida: {fila.conexion}</h4>
-                  <Pasos pasos={fila.pasos} />
-                </>
-              )}
-            </>
-          }
           motivos={revision.marcados.map((m) => ({ nivel: m.nivel, texto: m.motivo }))}
         >
           <ValorResultado
             nombre={buscado.nombre}
-            valor={formatearValor(buscado.valor, magnitud)}
+            valor={para}
             rotulos={marca && <Rotulo tipo={marca} />}
           />
-          <div class="formulas">
-            {resultado.formulas.map((f) => (
-              <Formula key={f} latex={f} />
-            ))}
-          </div>
-          <Cita referencias={resultado.referencias} />
-        </TarjetaResultado>
-      }
-      tarjetas={
-        <TarjetaResultado titulo={titulo}>
           {calculando && (
             <p class="calculando" role="status">
               Calculando…
@@ -258,6 +240,29 @@ function Resultado({
           <p class="nota-tarjeta">
             Tocá una fila para ver la cuenta de su Tolerancia del arreglo en los pasos intermedios.
           </p>
+        </TarjetaResultado>
+      }
+      tarjetas={
+        <TarjetaResultado
+          titulo="Fórmulas y referencias"
+          pasos={
+            <>
+              <Pasos pasos={resultado.pasos} />
+              {fila && (
+                <>
+                  <h4 class="pasos-subtitulo">Fila elegida: {fila.conexion}</h4>
+                  <Pasos pasos={fila.pasos} />
+                </>
+              )}
+            </>
+          }
+        >
+          <div class="formulas">
+            {resultado.formulas.map((f) => (
+              <Formula key={f} latex={f} />
+            ))}
+          </div>
+          <Cita referencias={resultado.referencias} />
         </TarjetaResultado>
       }
     />
