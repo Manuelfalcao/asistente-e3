@@ -7,6 +7,7 @@ import {
   type EspecSinSelector,
   type EstadoCampo,
 } from '../../entrada/campo';
+import type { Opcion } from './BotonesSegmentados';
 import { CampoValor, type Lectura } from './CampoValor';
 
 // El texto de un campo de valor y su Selector de unidad, leídos con la Entrada flexible. La
@@ -92,4 +93,21 @@ export function CampoEntradaValor({
       lectura={lecturaDe(campo.estado)}
     />
   );
+}
+
+// La opción elegida, guardada como el texto de un campo: vuelve al reabrir el Asistente (spec §4.4).
+// Si lo guardado ya no es una opción, vale la opción por defecto.
+export function useOpcionGuardada<V extends string>(
+  opciones: readonly Opcion<V>[],
+  porDefecto: V,
+  guardado: { calculadora: string; campo: string },
+): [V, (valor: V) => void] {
+  const previa = almacen.entrada(guardado.calculadora, guardado.campo)?.texto;
+  const [valor, setValor] = useState<V>(
+    opciones.find((o) => o.valor === previa)?.valor ?? porDefecto,
+  );
+  useEffect(() => {
+    almacen.guardarEntrada(guardado.calculadora, guardado.campo, { texto: valor });
+  }, [valor]);
+  return [valor, setValor];
 }

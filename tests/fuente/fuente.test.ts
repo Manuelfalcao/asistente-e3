@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import temml from 'temml';
 import { describe, expect, it } from 'vitest';
+import { calcularArreglos } from '../../src/calculo/arreglos/arreglos';
 import {
   calcularAtenuadores,
   calcularMinimaPerdida,
@@ -86,6 +87,29 @@ function formulasDeBobinas(): string[] {
   return formulas;
 }
 
+// Arreglos equivalentes: capacitores con tolerancia relativa y absoluta (debajo de 10 pF), C mínima,
+// resistencias y Arreglos de 1 a 4 componentes.
+function formulasDeArreglos(): string[] {
+  const formulas: string[] = [];
+  const base = {
+    serie: 'E12',
+    umbral: 0.01,
+    tolerancia: 0.05,
+    toleranciaChicos: 0.25e-12,
+  } as const;
+  for (const [componente, buscado, umbral] of [
+    ['capacitor', 47e-12, 0.01],
+    ['capacitor', 2e-12, 0.01],
+    ['capacitor', 37.3e-12, 0],
+    ['resistencia', 66.9, 0.01],
+  ] as const) {
+    const r = calcularArreglos({ ...base, componente, buscado, umbral });
+    formulas.push(...r.formulas, ...r.pasos.map((p) => p.latex));
+    for (const f of r.filas) formulas.push(...f.pasos.map((p) => p.latex));
+  }
+  return formulas;
+}
+
 // Las cuentas del criterio de valor impracticable, con un valor por cada rama.
 function formulasDelCriterio(): string[] {
   const resultado = {
@@ -167,6 +191,12 @@ describe('fuente recortada de las fórmulas', () => {
 
   it('tiene cada carácter de las fórmulas de bobinas', () => {
     const formulas = formulasDeBobinas();
+    expect(formulas.length).toBeGreaterThan(50);
+    expect(faltantes(formulas)).toEqual([]);
+  });
+
+  it('tiene cada carácter de las fórmulas de Arreglos equivalentes', () => {
+    const formulas = formulasDeArreglos();
     expect(formulas.length).toBeGreaterThan(50);
     expect(faltantes(formulas)).toEqual([]);
   });

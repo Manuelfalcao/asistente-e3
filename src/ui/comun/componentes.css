@@ -619,3 +619,91 @@
   font-size: var(--tam-3);
   font-weight: 600;
 }
+
+/* ---------- Arreglos equivalentes ---------- */
+
+/* El bloque de Inventario, separado de las entradas (spec §8.2). */
+.bloque-inventario {
+  margin-top: var(--esp-4);
+  padding: var(--esp-3) var(--esp-4);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-2);
+  background: var(--superficie-2);
+}
+.bloque-inventario h3 {
+  margin: 0 0 var(--esp-1);
+  font-size: var(--tam-3);
+  font-weight: 600;
+  color: var(--texto-suave);
+}
+.bloque-inventario p {
+  margin: 0;
+}
+.bloque-inventario .detalle {
+  font-size: var(--tam-3);
+  color: var(--texto-suave);
+}
+
+.calculando {
+  margin: var(--esp-2) 0;
+  font-size: var(--tam-3);
+  font-weight: 600;
+  color: var(--acento);
+}
+.lista-arreglos {
+  margin: var(--esp-2) 0;
+  padding: 0;
+  list-style: none;
+}
+/* Mientras se recalcula queda la lista anterior, atenuada. */
+.lista-arreglos.desactualizada {
+  opacity: 0.5;
+}
+.fila-arreglo label {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-1) var(--esp-3);
+  min-height: var(--toque);
+  padding: var(--esp-2);
+  border-top: 1px solid var(--borde);
+  cursor: pointer;
+}
+.fila-arreglo input {
+  position: absolute;
+  opacity: 0;
+}
+.fila-arreglo input:focus-visible + .conexion {
+  outline: 2px solid var(--acento);
+  outline-offset: 2px;
+}
+/* La fila elegida: fondo de acento y borde, para que no dependa solo del color. */
+.fila-arreglo.elegida label {
+  background: var(--acento-suave);
+  border: 1px solid var(--acento);
+  border-radius: var(--radio-1);
+}
+.fila-arreglo .conexion {
+  flex-basis: 100%;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.fila-arreglo .datos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-1) var(--esp-3);
+  align-items: baseline;
+}
+.fila-arreglo .tolerancia,
+.fila-arreglo .nota {
+  flex-basis: 100%;
+  font-size: var(--tam-3);
+  color: var(--texto-suave);
+}
+.fila-arreglo .nota {
+  font-style: italic;
+}
+.pasos-subtitulo {
+  margin: var(--esp-4) 0 var(--esp-2);
+  font-size: var(--tam-3);
+  font-weight: 600;
+}

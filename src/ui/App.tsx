@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { almacen } from '../almacen/almacen';
+import { Arreglos } from './arreglos/Arreglos';
 import { Atenuadores } from './atenuadores/Atenuadores';
 import { Bobinas } from './bobinas/Bobinas';
 import {
@@ -93,6 +94,8 @@ export function App() {
         <main class="calculadora">
           {activa.id === 'bobinas' ? (
             <Bobinas />
+          ) : activa.id === 'arreglos' ? (
+            <Arreglos />
           ) : activa.id === 'atenuadores' ? (
             <Atenuadores />
           ) : (

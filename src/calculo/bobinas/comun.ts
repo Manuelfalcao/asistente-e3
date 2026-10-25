@@ -69,9 +69,7 @@ export const mm = (x: number) => valorLatex(x, 'largo');
 export const henrios = (x: number) => valorLatex(x, 'inductancia');
 export const hz = (x: number) => valorLatex(x, 'frecuencia');
 export const pulgadas = (x: number) => `${numero(x)}\\,\\mathrm{in}`;
-export const porciento = (fraccion: number) => `${numero(fraccion * 100, 2)}\\,\\%`;
-// Un error relativo, con signo (spec §5.2).
-export const errorLatex = (fraccion: number) => `${fraccion > 0 ? '+' : ''}${porciento(fraccion)}`;
+export { porcentajeLatex as porciento, errorLatex } from '../comun/latex';
 export const cuatroCifras = (x: number) => formatearValor(x, 'numero', 'paso');
 
 // El aviso de autorresonancia salta con la frecuencia de trabajo por encima de SRF/3.
