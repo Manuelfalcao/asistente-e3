@@ -8,6 +8,12 @@
 00B5         # µ (signo micro)
 00B7         # ·
 00D7         # ×
+00E1         # á é í ñ ó ú: el texto en castellano dentro de una fórmula
+00E9
+00ED
+00F1
+00F3
+00FA
 0391-03A1    # griegas mayúsculas
 03A3-03A9
 03B1-03C9    # griegas minúsculas

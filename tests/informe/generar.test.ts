@@ -17,9 +17,9 @@ describe('las tablas de casos, vistas desde el informe', () => {
     a.casos().map((caso) => ({ calculadora: a.calculadora, caso })),
   );
 
-  it('hay casos de arreglos, atenuadores, bobinas, redes y Común, y nada más por ahora', () => {
+  it('hay casos de arreglos, atenuadores, bobinas, filtros, redes y Común, y nada más por ahora', () => {
     expect(new Set(aportes.map((a) => a.calculadora))).toEqual(
-      new Set(['arreglos', 'atenuadores', 'bobinas', 'redes', 'comun']),
+      new Set(['arreglos', 'atenuadores', 'bobinas', 'filtros', 'redes', 'comun']),
     );
   });
 

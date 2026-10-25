@@ -880,3 +880,20 @@
   font-size: var(--tam-3);
   font-weight: 600;
 }
+
+/* ---------- Filtros ---------- */
+
+/* Los atajos del ripple (0,1, 0,5 y 1 dB), alineados con los campos. */
+.atajos {
+  display: flex;
+  grid-column: 2;
+  flex-wrap: wrap;
+  gap: var(--esp-2);
+}
+
+/* Una línea debajo de un campo de opciones, como la que explica la Topología por defecto. */
+.nota-campo {
+  margin: calc(-1 * var(--esp-2)) 0 var(--esp-4);
+  font-size: var(--tam-2);
+  color: var(--texto-suave);
+}

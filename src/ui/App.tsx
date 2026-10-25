@@ -11,6 +11,7 @@ import {
   esIdCalculadora,
 } from './calculadoras';
 import { Aviso } from './comun/Franjas';
+import { Filtros } from './filtros/Filtros';
 import { IconoCalculadora } from './comun/Icono';
 import { FranjaVersionNueva } from './FranjaVersionNueva';
 import { Redes } from './redes/Redes';
@@ -95,6 +96,8 @@ export function App() {
         <main class="calculadora">
           {activa.id === 'bobinas' ? (
             <Bobinas />
+          ) : activa.id === 'filtros' ? (
+            <Filtros />
           ) : activa.id === 'arreglos' ? (
             <Arreglos />
           ) : activa.id === 'redes' ? (

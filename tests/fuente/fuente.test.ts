@@ -13,6 +13,7 @@ import {
   rosaGrover91ConPasos,
 } from '../../src/calculo/bobinas/dos-capas';
 import { revisarValores } from '../../src/calculo/comun/valor-impracticable';
+import { calcularFiltro, prototipo } from '../../src/calculo/filtros/filtros';
 import { calcularRedL } from '../../src/calculo/redes/redes';
 import { calcularRedPiT } from '../../src/calculo/redes/redes-pi-t';
 import { caracteresDeLaFuente } from './woff2';
@@ -141,6 +142,36 @@ function formulasDeRedes(): string[] {
   return formulas;
 }
 
+// Filtros: pasa bajos y pasa altos, π y T, Butterworth de Orden 1 (sin bobinas en π) y 5, Chebyshev
+// de Orden par (sube al impar) y valores marcados a 300 MHz. El prototipo par, con su carga, aparte.
+function formulasDeFiltros(): string[] {
+  const formulas = prototipo('chebyshev', 4, 0.5).pasos.map((p) => p.latex);
+  for (const tipo of ['pasa-bajos', 'pasa-altos'] as const) {
+    for (const topologia of ['π', 'T'] as const) {
+      for (const [aproximacion, orden, ripple, fc] of [
+        ['butterworth', 5, null, 100e6],
+        ['butterworth', 1, null, 100e6],
+        ['chebyshev', 4, 0.5, 100e6],
+        ['chebyshev', 5, 2, 300e6],
+      ] as const) {
+        const r = calcularFiltro({
+          tipo,
+          aproximacion,
+          ripple,
+          topologia,
+          orden,
+          fc,
+          rs: 50,
+          rl: 50,
+          qBobina: 100,
+        });
+        if (r.estado === 'calculado') formulas.push(...r.formulas, ...r.pasos.map((p) => p.latex));
+      }
+    }
+  }
+  return formulas;
+}
+
 // Las cuentas del criterio de valor impracticable, con un valor por cada rama.
 function formulasDelCriterio(): string[] {
   const resultado = {
@@ -228,6 +259,12 @@ describe('fuente recortada de las fórmulas', () => {
 
   it('tiene cada carácter de las fórmulas de redes de adaptación', () => {
     const formulas = formulasDeRedes();
+    expect(formulas.length).toBeGreaterThan(50);
+    expect(faltantes(formulas)).toEqual([]);
+  });
+
+  it('tiene cada carácter de las fórmulas de filtros', () => {
+    const formulas = formulasDeFiltros();
     expect(formulas.length).toBeGreaterThan(50);
     expect(faltantes(formulas)).toEqual([]);
   });
