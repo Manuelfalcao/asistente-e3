@@ -20,9 +20,10 @@ import {
   type CasoComportamientoFiltro,
   TOLERANCIA_COHN,
   TOLERANCIA_DB,
-  TOLERANCIA_ORACULO,
   TOLERANCIA_VALORES,
   bordesDe,
+  comoImpresos,
+  toleranciaBorde,
 } from './casos';
 import {
   atenuacionOraculo,
@@ -45,7 +46,11 @@ const TIPO = {
   'pasa-banda': 'pasa banda',
   'rechaza-banda': 'rechaza banda',
 } as const;
-const APROXIMACION = { butterworth: 'Butterworth', chebyshev: 'Chebyshev' } as const;
+const APROXIMACION = {
+  butterworth: 'Butterworth',
+  chebyshev: 'Chebyshev',
+  bessel: 'Bessel',
+} as const;
 const ESCALA = { nH: 1e9, pF: 1e12 } as const;
 
 function frecuenciasTexto(e: EntradaFiltro): string {
@@ -83,7 +88,7 @@ const referencia = () =>
   CASOS_REFERENCIA_G.map((caso) =>
     enCaso(caso, () => {
       const p = prototipo(caso.aproximacion, caso.orden, caso.ripple);
-      const obtenidos = [...p.g, p.carga];
+      const obtenidos = comoImpresos(p);
       return {
         clase: 'referencia',
         id: caso.id,
@@ -145,7 +150,7 @@ const verificacion = () =>
               nombre: `Atenuación en ${HZ(borde)}, contra la de ${APROXIMACION[aproximacion]}`,
               esperado: teorica,
               obtenido: atenuacion(borde),
-              tolerancia: TOLERANCIA_ORACULO,
+              tolerancia: toleranciaBorde(aproximacion),
               decimales: 9,
               unidad: 'dB',
             }),

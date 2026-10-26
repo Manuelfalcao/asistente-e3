@@ -270,9 +270,11 @@ function Resultado({ resultado, entrada }: { resultado: ResultadoFiltro; entrada
   }
   const r = resultado;
   const aproximacion =
-    r.aproximacion === 'butterworth'
-      ? 'Butterworth'
-      : `Chebyshev de ${formatearValor(entrada.ripple!, 'decibeles')}`;
+    r.aproximacion === 'chebyshev'
+      ? `Chebyshev de ${formatearValor(entrada.ripple!, 'decibeles')}`
+      : r.aproximacion === 'bessel'
+        ? 'Bessel'
+        : 'Butterworth';
   // "Pasa bajos Butterworth de Orden 5 en π, fc = 100 MHz"
   const titulo =
     `${TIPOS.find((t) => t.valor === r.tipo)!.texto} ${aproximacion} de Orden ${r.orden} en ${r.topologia}, ` +
@@ -335,6 +337,13 @@ function Resultado({ resultado, entrada }: { resultado: ResultadoFiltro; entrada
               />
             );
           })}
+          {r.retardoContinua !== null && (
+            <ValorResultado
+              nombre="τ0"
+              valor={`${formatearValor(r.retardoContinua * 1e9, 'numero')} ns`}
+              detalle="retardo de grupo en continua; sin curva de retardo"
+            />
+          )}
           {r.perdidaCohn !== null && (
             <ValorResultado
               nombre="Pérdida"

@@ -4,14 +4,14 @@ import type { Aviso, Paso, Referencia } from '../comun/resultado';
 import { type Revision, revisarValores } from '../comun/valor-impracticable';
 
 // La Calculadora de filtros (spec §7): escaleras LC π y T con fuente y carga iguales. Por ahora
-// los cuatro Tipos de filtro, Butterworth y Chebyshev. Prototipo pasa bajos normalizado (g0 = 1,
+// los cuatro Tipos de filtro, Butterworth, Chebyshev y Bessel. Prototipo pasa bajos normalizado (g0 = 1,
 // corte en 1 rad/s), transformación de frecuencia según el Tipo de filtro y escala de impedancia por
 // R0. Puro: recibe Hz, ohms, dB y el Q de las bobinas.
 
 export type TipoBajoAlto = 'pasa-bajos' | 'pasa-altos';
 export type TipoDeBanda = 'pasa-banda' | 'rechaza-banda';
 export type TipoFiltro = TipoBajoAlto | TipoDeBanda;
-export type Aproximacion = 'butterworth' | 'chebyshev';
+export type Aproximacion = 'butterworth' | 'chebyshev' | 'bessel';
 export type TopologiaFiltro = 'π' | 'T';
 
 export const esDeBanda = (tipo: TipoFiltro): tipo is TipoDeBanda =>
@@ -45,7 +45,7 @@ interface EntradaComun {
 export type EntradaFiltro =
   | (EntradaComun & {
       tipo: TipoBajoAlto;
-      // En Hz: −3 dB en Butterworth, el borde del ripple en Chebyshev.
+      // En Hz: −3 dB en Butterworth y Bessel, el borde del ripple en Chebyshev.
       fc: number;
     })
   | (EntradaComun & {
@@ -78,6 +78,8 @@ export interface Prototipo {
   // Solo en Chebyshev.
   beta: number | null;
   gamma: number | null;
+  // Solo en Bessel: el ω3dB del Orden, por el que se multiplicó la tabla de retardo de 1 s.
+  factorRetardo: number | null;
   pasos: readonly Paso[];
 }
 
@@ -137,6 +139,8 @@ export type ResultadoFiltro =
       resonadores: readonly ResonadorFiltro[];
       // Estimación de Cohn, en dB. Null en rechaza banda (spec §12.1, P1).
       perdidaCohn: number | null;
+      // Solo en Bessel pasa bajos: τ0 = factor/ωc, en s. Sin curva de retardo (spec §7.3).
+      retardoContinua: number | null;
       // Las fórmulas del resultado principal, sin números.
       formulas: readonly string[];
       pasos: readonly Paso[];
@@ -156,7 +160,7 @@ export const REFERENCIAS_FILTROS: readonly Referencia[] = [
     editor: 'McGraw-Hill',
     anio: 1964,
     ubicacion:
-      'ec. 4.04-2 a 4.04-4, 4.05-1, 4.05-2, 4.13-2 y 4.13-11, Sec. 12.02, tablas 4.05-1 y 4.05-2',
+      'ec. 4.04-2 a 4.04-4, 4.05-1, 4.05-2, 4.13-2 y 4.13-11, Sec. 12.02, tablas 4.05-1, 4.05-2 y 4.07-1',
   },
   {
     autor: 'D. M. Pozar',
@@ -374,11 +378,71 @@ const FORMULAS_CHEBYSHEV = [
   'g_1 = \\dfrac{2 a_1}{\\gamma},\\; g_k = \\dfrac{4 a_{k-1} a_k}{b_{k-1} g_{k-1}}',
 ];
 
+const FORMULA_BESSEL =
+  'g_k = g_k^{(\\tau)} \\cdot \\omega_{3\\mathrm{dB}},\\; ' +
+  '\\tau_0 = \\dfrac{\\omega_{3\\mathrm{dB}}}{2\\pi f_c}';
+
 const FUENTE_BUTTERWORTH = 'Matthaei, Young y Jones, ec. 4.05-1.';
 const FUENTE_CHEBYSHEV = 'Matthaei, Young y Jones, ec. 4.05-2.';
+const FUENTE_BESSEL =
+  'Matthaei, Young y Jones, tabla 4.07-1 (datos de Weinberg), normalizada a retardo de 1 s y ' +
+  'renormalizada a −3 dB.';
+
+// La Tabla 4.07-1: g1 … gn con el retardo en continua en 1 s, y el factor ω3dB de cada Orden (la
+// frecuencia de −3 dB, en rad/s, de ese filtro). El g grande va del lado de g1. Con n = 1 coincide
+// con Butterworth (g1 = 2, ω3dB = 1). Se guarda la tabla: la síntesis pierde precisión desde n ≈ 10.
+const BESSEL_RETARDO: Record<number, { g: readonly number[]; factor: number }> = {
+  1: { g: [2], factor: 1 },
+  2: { g: [1.5774, 0.4226], factor: 1.3617 },
+  3: { g: [1.255, 0.5528, 0.1922], factor: 1.7557 },
+  4: { g: [1.0598, 0.5116, 0.3181, 0.1104], factor: 2.1139 },
+  5: { g: [0.9303, 0.4577, 0.3312, 0.209, 0.0718], factor: 2.4274 },
+  6: { g: [0.8377, 0.4116, 0.3158, 0.2364, 0.148, 0.0505], factor: 2.7034 },
+  7: { g: [0.7677, 0.3744, 0.2944, 0.2378, 0.1778, 0.1104, 0.0375], factor: 2.9517 },
+  8: { g: [0.7125, 0.3446, 0.2735, 0.2297, 0.1867, 0.1387, 0.0855, 0.0289], factor: 3.1796 },
+  9: {
+    g: [0.6678, 0.3203, 0.2547, 0.2184, 0.1859, 0.1506, 0.1112, 0.0682, 0.023],
+    factor: 3.3917,
+  },
+  10: {
+    g: [0.6305, 0.3002, 0.2384, 0.2066, 0.1808, 0.1539, 0.124, 0.091, 0.0556, 0.0187],
+    factor: 3.591,
+  },
+};
 
 export function prototipo(aproximacion: Aproximacion, n: number, ripple: number | null): Prototipo {
+  if (aproximacion === 'bessel') return bessel(n);
   return aproximacion === 'butterworth' ? butterworth(n) : chebyshev(n, ripple!);
+}
+
+function bessel(n: number): Prototipo {
+  const { g: retardo, factor } = BESSEL_RETARDO[n];
+  const g = retardo.map((x) => x * factor);
+  const pasos: Paso[] = [
+    {
+      texto: 'Factor ω3dB del Orden, de la tabla de retardo de 1 s',
+      latex: `\\omega_{3\\mathrm{dB}} = ${numero(factor)}`,
+      fuente: FUENTE_BESSEL,
+    },
+    ...g.map((gk, i) => ({
+      texto: `g${i + 1}`,
+      latex:
+        `g_{${i + 1}} = g_{${i + 1}}^{(\\tau)} \\cdot \\omega_{3\\mathrm{dB}} = ` +
+        `${numero(retardo[i])} \\cdot ${numero(factor)} = ${numero(gk)}`,
+    })),
+    { texto: 'Carga del prototipo: igual a la fuente', latex: `g_{${n + 1}} = 1` },
+  ];
+  return {
+    aproximacion: 'bessel',
+    orden: n,
+    ripple: null,
+    g,
+    carga: 1,
+    beta: null,
+    gamma: null,
+    factorRetardo: factor,
+    pasos,
+  };
 }
 
 function butterworth(n: number): Prototipo {
@@ -399,6 +463,7 @@ function butterworth(n: number): Prototipo {
     carga: 1,
     beta: null,
     gamma: null,
+    factorRetardo: null,
     pasos,
   };
 }
@@ -468,7 +533,17 @@ function chebyshev(n: number, ripple: number): Prototipo {
         }
       : { texto: 'Carga del prototipo: Orden impar, igual a la fuente', latex: `g_{${n + 1}} = 1` },
   ];
-  return { aproximacion: 'chebyshev', orden: n, ripple, g, carga, beta, gamma, pasos };
+  return {
+    aproximacion: 'chebyshev',
+    orden: n,
+    ripple,
+    g,
+    carga,
+    beta,
+    gamma,
+    factorRetardo: null,
+    pasos,
+  };
 }
 
 // --- Escalera ------------------------------------------------------------------------------------
@@ -676,6 +751,7 @@ export function calcularFiltro(entrada: EntradaFiltro): ResultadoFiltro {
     sugerencia: tipo === 'rechaza-banda' ? SUGERENCIA_RECHAZA_BANDA : SUGERENCIA_FILTROS,
   });
   const cohn = perdidaDeCohn(tipo, elementos, p, banda, qBobina);
+  const retardo = retardoDe(entrada, p);
 
   return {
     estado: 'calculado',
@@ -690,16 +766,49 @@ export function calcularFiltro(entrada: EntradaFiltro): ResultadoFiltro {
     elementos,
     resonadores,
     perdidaCohn: cohn.perdida,
+    retardoContinua: retardo.valor,
     formulas: [
-      ...(aproximacion === 'butterworth' ? [FORMULA_BUTTERWORTH] : FORMULAS_CHEBYSHEV),
+      ...formulasPrototipo(aproximacion),
       ...(esDeBanda(tipo) ? formulasBanda(tipo) : formulasEscala(tipo)),
       ...(cohn.formula ? [cohn.formula] : []),
     ],
-    pasos: [...p.pasos, ...pasosEscalera, ...cohn.pasos, ...revision.pasos],
+    pasos: [...p.pasos, ...pasosEscalera, ...cohn.pasos, ...retardo.pasos, ...revision.pasos],
     revision,
     referencias: REFERENCIAS_FILTROS,
     avisos,
     notas: notasDe(tipo, aproximacion),
+  };
+}
+
+const formulasPrototipo = (aproximacion: Aproximacion): readonly string[] =>
+  aproximacion === 'butterworth'
+    ? [FORMULA_BUTTERWORTH]
+    : aproximacion === 'bessel'
+      ? [FORMULA_BESSEL]
+      : FORMULAS_CHEBYSHEV;
+
+// El retardo en continua de Bessel, τ0 = factor/ωc (spec §7.3). Solo en pasa bajos: en pasa altos
+// no hay retardo en continua, y en pasa banda y rechaza banda el retardo no es el del prototipo.
+function retardoDe(
+  entrada: EntradaFiltro,
+  p: Prototipo,
+): { valor: number | null; pasos: Paso[] } {
+  if (p.factorRetardo === null || entrada.tipo !== 'pasa-bajos' || !('fc' in entrada)) {
+    return { valor: null, pasos: [] };
+  }
+  const valor = p.factorRetardo / (2 * Math.PI * entrada.fc);
+  return {
+    valor,
+    pasos: [
+      {
+        texto: 'Retardo en continua de Bessel',
+        latex:
+          `\\tau_0 = \\dfrac{\\omega_{3\\mathrm{dB}}}{2\\pi f_c} = ` +
+          `\\dfrac{${numero(p.factorRetardo)}}{2\\pi \\cdot ${hz(entrada.fc)}} = ` +
+          `${numero(valor * 1e9)}\\,\\mathrm{ns}`,
+        fuente: FUENTE_BESSEL,
+      },
+    ],
   };
 }
 
@@ -825,7 +934,7 @@ function pasoCohnBanda(g: readonly number[], banda: Banda, qu: number, perdida: 
 }
 
 function notasDe(tipo: TipoFiltro, aproximacion: Aproximacion): string[] {
-  const borde = aproximacion === 'butterworth' ? 'los puntos de −3 dB' : 'los bordes del ripple';
+  const borde = aproximacion === 'chebyshev' ? 'los bordes del ripple' : 'los puntos de −3 dB';
   return [
     ...notasDeFrecuencia(tipo, aproximacion, borde),
     'π y T dan la misma respuesta con los mismos g: la diferencia es cuántas bobinas llevan.',
@@ -860,9 +969,12 @@ function notasDeFrecuencia(tipo: TipoFiltro, aproximacion: Aproximacion, borde: 
     ];
   }
   return [
-    aproximacion === 'butterworth'
-      ? 'En Butterworth, fc es el punto de −3 dB.'
-      : 'En Chebyshev, fc es el borde del ripple: ahí la atenuación vale el ripple, no 3 dB.',
+    aproximacion === 'chebyshev'
+      ? 'En Chebyshev, fc es el borde del ripple: ahí la atenuación vale el ripple, no 3 dB.'
+      : `En ${aproximacion === 'bessel' ? 'Bessel' : 'Butterworth'}, fc es el punto de −3 dB.` +
+        (aproximacion === 'bessel'
+          ? ' La tabla de Bessel está normalizada a retardo de 1 s y se renormalizó a −3 dB.'
+          : ''),
   ];
 }
 

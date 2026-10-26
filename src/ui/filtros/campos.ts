@@ -30,6 +30,7 @@ export const MODOS_BANDA: readonly Opcion<ModoBanda>[] = [
 export const APROXIMACIONES: readonly Opcion<Aproximacion>[] = [
   { valor: 'butterworth', texto: 'Butterworth' },
   { valor: 'chebyshev', texto: 'Chebyshev' },
+  { valor: 'bessel', texto: 'Bessel' },
 ];
 
 export const TOPOLOGIAS: readonly Opcion<TopologiaFiltro>[] = [

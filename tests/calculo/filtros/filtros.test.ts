@@ -19,11 +19,12 @@ import {
   CASOS_VERIFICACION,
   TOLERANCIA_COHN,
   TOLERANCIA_DB,
-  TOLERANCIA_ORACULO,
   TOLERANCIA_VALORES,
   bordesDe,
+  comoImpresos,
   entradaBanda,
   entradaFiltro,
+  toleranciaBorde,
 } from './casos';
 import {
   atenuacionOraculo,
@@ -54,7 +55,7 @@ describe('casos de referencia: los g de Matthaei', () => {
   for (const caso of CASOS_REFERENCIA_G) {
     it(caso.id, () => {
       const p = prototipo(caso.aproximacion, caso.orden, caso.ripple);
-      const obtenidos = [...p.g, p.carga];
+      const obtenidos = comoImpresos(p);
       expect(obtenidos).toHaveLength(caso.impresos.length);
       caso.impresos.forEach((impreso, i) => {
         expect(
@@ -87,7 +88,7 @@ describe('casos de verificación: C1, C2, C4, C5, C6 y C7 contra el oráculo ABC
       for (const borde of bordesDe(caso.entradas)) {
         const enBorde = atenuacion(r, borde, rs);
         const teorica = atenuacionTeorica(aproximacion, r.orden, 1, ripple);
-        expect(Math.abs(enBorde / teorica - 1)).toBeLessThan(TOLERANCIA_ORACULO.valor);
+        expect(Math.abs(enBorde / teorica - 1)).toBeLessThan(toleranciaBorde(aproximacion).valor);
       }
     });
   }
@@ -160,6 +161,19 @@ describe('el prototipo', () => {
     expect(p6.carga).toBeCloseTo(p4.carga, 12);
   });
 
+  it('Bessel: con n = 1 coincide con Butterworth (g1 = 2)', () => {
+    const p = prototipo('bessel', 1, null);
+    expect(p.g).toHaveLength(1);
+    expect(p.g[0]).toBeCloseTo(2, 12);
+    expect(p.carga).toBe(1);
+  });
+
+  it('Bessel: los g de −3 dB son los de retardo por el factor ω3dB (n = 3: 2,2034 0,9705 0,3374)', () => {
+    const p = prototipo('bessel', 3, null);
+    expect(p.factorRetardo).toBeCloseTo(1.7557, 4);
+    [2.2034, 0.9705, 0.3374].forEach((g, i) => expect(p.g[i]).toBeCloseTo(g, 3));
+  });
+
   it('los pasos muestran cada g', () => {
     const p = prototipo('chebyshev', 3, 0.5);
     const textos = p.pasos.map((x) => x.texto);
@@ -214,6 +228,42 @@ describe('la escalera', () => {
     );
     expect(b.elementos[0].valor / a.elementos[0].valor).toBeCloseTo(50 / 75, 12);
     expect(b.elementos[1].valor / a.elementos[1].valor).toBeCloseTo(75 / 50, 12);
+  });
+});
+
+describe('Bessel', () => {
+  it('el g grande va del lado de g1', () => {
+    const { g } = prototipo('bessel', 5, null);
+    expect(g[0]).toBe(Math.max(...g));
+  });
+
+  it('muestra el retardo en continua τ0 = factor/ωc: n = 5 a 100 MHz, 3,86 ns', () => {
+    const r = calculado(entradaFiltro('pasa-bajos', 'bessel', 'π', 5, 100e6));
+    expect(r.retardoContinua!).toBeCloseTo(2.4274 / (2 * Math.PI * 1e8), 12);
+    expect(r.retardoContinua! * 1e9).toBeCloseTo(3.863, 3);
+  });
+
+  it('Butterworth y Chebyshev no traen retardo', () => {
+    expect(calculado(entradaFiltro('pasa-bajos', 'butterworth', 'π', 5, 100e6)).retardoContinua).toBeNull();
+  });
+
+  it('anda en pasa altos: −3 dB en fc, y π y T dan la misma respuesta', () => {
+    const pi = calculado(entradaFiltro('pasa-altos', 'bessel', 'π', 4, 80e6));
+    const t = calculado(entradaFiltro('pasa-altos', 'bessel', 'T', 4, 80e6));
+    expect(atenuacionOraculo(pi.elementos, 80e6, 50)).toBeCloseTo(10 * Math.log10(2), 3);
+    for (const f of [20e6, 80e6, 200e6]) {
+      expect(atenuacionOraculo(pi.elementos, f, 50)).toBeCloseTo(
+        atenuacionOraculo(t.elementos, f, 50),
+        9,
+      );
+    }
+  });
+
+  it('anda en pasa banda: −3 dB en f1 y f2', () => {
+    const r = calculado(entradaBanda('pasa-banda', 'bessel', 'π', 3, { f1: 88e6, f2: 108e6 }));
+    for (const f of [88e6, 108e6]) {
+      expect(atenuacionResonadores(r.resonadores, f, 50)).toBeCloseTo(10 * Math.log10(2), 3);
+    }
   });
 });
 

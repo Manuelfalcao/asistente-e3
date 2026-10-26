@@ -4,6 +4,7 @@ import type {
   CodigoAvisoFiltro,
   CodigoCorteFiltro,
   EntradaFiltro,
+  Prototipo,
   TipoBajoAlto,
   TipoDeBanda,
   TipoFiltro,
@@ -179,9 +180,46 @@ const CHEBYSHEV: readonly { ripple: number; filas: Record<number, FilaChebyshev>
   },
 ];
 
+// La Tabla 4.07-1 (Weinberg) imprime los g normalizados a retardo de 1 s, con 4 decimales, y el
+// factor ω3dB de cada Orden es el de research/sintesis-filtros-lc.md §3.3. La tabla guardada tiene
+// los g renormalizados a −3 dB: acá se comparan de vuelta contra los impresos (ver `comoImpresos`).
+const BESSEL: readonly (readonly string[])[] = [
+  ['1,5774', '0,4226', '1,0000'],
+  ['1,2550', '0,5528', '0,1922', '1,0000'],
+  ['1,0598', '0,5116', '0,3181', '0,1104', '1,0000'],
+  ['0,9303', '0,4577', '0,3312', '0,2090', '0,0718', '1,0000'],
+  ['0,8377', '0,4116', '0,3158', '0,2364', '0,1480', '0,0505', '1,0000'],
+  ['0,7677', '0,3744', '0,2944', '0,2378', '0,1778', '0,1104', '0,0375', '1,0000'],
+  ['0,7125', '0,3446', '0,2735', '0,2297', '0,1867', '0,1387', '0,0855', '0,0289', '1,0000'],
+  [
+    '0,6678', '0,3203', '0,2547', '0,2184', '0,1859', '0,1506', '0,1112', '0,0682', '0,0230',
+    '1,0000',
+  ],
+  [
+    '0,6305', '0,3002', '0,2384', '0,2066', '0,1808', '0,1539', '0,1240', '0,0910', '0,0556',
+    '0,0187', '1,0000',
+  ],
+];
+
+// Los g y la carga en la normalización de la tabla impresa. Solo Bessel cambia: se guarda a −3 dB.
+export const comoImpresos = (p: Prototipo): number[] => {
+  const escala = p.factorRetardo ?? 1;
+  return [...p.g.map((g) => g / escala), p.carga];
+};
+
 const rippleTexto = (r: number) => `${String(r).replace('.', ',')} dB`;
 
 export const CASOS_REFERENCIA_G: readonly CasoReferenciaG[] = [
+  ...BESSEL.map((impresos, i): CasoReferenciaG => ({
+    clase: 'referencia',
+    id: `Bessel n = ${i + 2}`,
+    aproximacion: 'bessel',
+    orden: i + 2,
+    ripple: null,
+    impresos,
+    tolerancia: MEDIA_UNIDAD,
+    referencia: `${MATTHAEI}, tabla 4.07-1`,
+  })),
   ...BUTTERWORTH.map((impresos, i): CasoReferenciaG => ({
     clase: 'referencia',
     id: `Butterworth n = ${i + 1}`,
@@ -213,6 +251,17 @@ export const TOLERANCIA_ORACULO: Extract<Tolerancia, { tipo: 'relativa' }> = {
   valor: 1e-9,
   motivo: 'Dos vías exactas en doble precisión: queda solo el redondeo de la aritmética.',
 };
+
+// La tabla de Bessel se guarda con 4 cifras (g y factor), así que el −3 dB en fc no es exacto como en
+// las fórmulas cerradas; medido: 1,3·10⁻⁴ en C3.
+export const TOLERANCIA_BORDE_BESSEL: Extract<Tolerancia, { tipo: 'relativa' }> = {
+  tipo: 'relativa',
+  valor: 1e-3,
+  motivo: 'Los g y el factor ω3dB de la tabla de Bessel tienen 4 cifras: el borde queda a ~1e-4.',
+};
+
+export const toleranciaBorde = (aproximacion: Aproximacion) =>
+  aproximacion === 'bessel' ? TOLERANCIA_BORDE_BESSEL : TOLERANCIA_ORACULO;
 
 export const TOLERANCIA_VALORES: Extract<Tolerancia, { tipo: 'relativa' }> = {
   tipo: 'relativa',
@@ -325,6 +374,17 @@ export const CASOS_VERIFICACION: readonly CasoVerificacionFiltro[] = [
     entradaFiltro('pasa-bajos', 'chebyshev', 'T', 5, 100e6, { ripple: 0.5 }),
     'L1 135,7 nH · C2 39,14 pF · L3 202,2 nH · C4 39,14 pF · L5 135,7 nH',
     ATENUACION_C2,
+  ),
+  verificacion(
+    'C3 π: Bessel pasa bajos, n = 5, 100 MHz',
+    entradaFiltro('pasa-bajos', 'bessel', 'π', 5, 100e6),
+    'C1 71,88 pF · L2 88,41 nH · C3 25,59 pF · L4 40,36 nH · C5 5,549 pF',
+    [
+      { f: 50e6, impreso: '0,720' },
+      { f: 100e6, impreso: '3,010' },
+      { f: 200e6, impreso: '14,06' },
+      { f: 300e6, impreso: '28,34' },
+    ],
   ),
   verificacion(
     'C4 T: Butterworth pasa altos, n = 3, 50 MHz',
@@ -501,6 +561,20 @@ export const CASOS_COMPORTAMIENTO: readonly CasoComportamientoFiltro[] = [
     entradas: entradaFiltro('pasa-bajos', 'butterworth', 'π', 4, 100e6),
     esperado: { orden: 4, avisos: [] },
     referencia: 'spec §7.3',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Bessel de Orden 4 no cambia de Orden',
+    entradas: entradaFiltro('pasa-bajos', 'bessel', 'π', 4, 100e6),
+    esperado: { orden: 4, avisos: [] },
+    referencia: 'spec §7.3',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Bessel con Rs ≠ RL todavía no se calcula',
+    entradas: entradaFiltro('pasa-bajos', 'bessel', 'π', 5, 100e6, { rs: 50, rl: 75 }),
+    esperado: { corte: 'terminaciones-distintas' },
+    referencia: 'spec §7.4',
   },
   {
     clase: 'comportamiento',

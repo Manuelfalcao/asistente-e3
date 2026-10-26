@@ -1,4 +1,5 @@
 import type {
+  Aproximacion,
   ElementoFiltro,
   ResonadorFiltro,
   TipoBajoAlto,
@@ -54,11 +55,16 @@ export function perdidaSimulada(
 
 // La atenuación de la Aproximación en la frecuencia normalizada Ω (Matthaei ec. 4.03-1 y 4.03-3).
 export function atenuacionTeorica(
-  aproximacion: 'butterworth' | 'chebyshev',
+  aproximacion: Aproximacion,
   n: number,
   omega: number,
   ripple: number | null,
 ): number {
+  // Bessel no tiene fórmula cerrada simple; en su fc, por construcción, la atenuación es 3,01 dB.
+  if (aproximacion === 'bessel') {
+    if (omega !== 1) throw new Error('Bessel: la atenuación teórica solo se da en Ω = 1');
+    return 10 * Math.log10(2);
+  }
   if (aproximacion === 'butterworth') return 10 * Math.log10(1 + omega ** (2 * n));
   const eps2 = 10 ** (ripple! / 10) - 1;
   const t = omega <= 1 ? Math.cos(n * Math.acos(omega)) : Math.cosh(n * Math.acosh(omega));
