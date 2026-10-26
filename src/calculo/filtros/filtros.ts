@@ -4,7 +4,8 @@ import type { Aviso, Paso, Referencia } from '../comun/resultado';
 import { type Revision, revisarValores } from '../comun/valor-impracticable';
 
 // La Calculadora de filtros (spec §7): escaleras LC π y T con fuente y carga iguales. Por ahora
-// los cuatro Tipos de filtro, Butterworth, Chebyshev y Bessel. Prototipo pasa bajos normalizado (g0 = 1,
+// los cuatro Tipos de filtro, Butterworth, Chebyshev y Bessel, con el Orden ingresado o calculado
+// desde una atenuación (spec §7.6). Prototipo pasa bajos normalizado (g0 = 1,
 // corte en 1 rad/s), transformación de frecuencia según el Tipo de filtro y escala de impedancia por
 // R0. Puro: recibe Hz, ohms, dB y el Q de las bobinas.
 
@@ -30,12 +31,20 @@ export interface Banda {
   fbw: number;
 }
 
+// En lugar del Orden, la atenuación mínima As (dB) que el Alumno pide a la frecuencia fs (Hz): el
+// Asistente calcula el Orden más chico que la cumple (spec §7.6).
+export interface PedidoAtenuacion {
+  as: number;
+  fs: number;
+}
+
 interface EntradaComun {
   aproximacion: Aproximacion;
   // En dB; solo en Chebyshev.
   ripple: number | null;
   topologia: TopologiaFiltro;
-  orden: number;
+  // El que escribió el Alumno (1 a 10), o la atenuación de la que se calcula.
+  orden: number | PedidoAtenuacion;
   rs: number;
   rl: number;
   // Qu, para la pérdida de Cohn.
@@ -113,9 +122,40 @@ export interface ResonadorFiltro {
   c: ElementoFiltro;
 }
 
-export type CodigoCorteFiltro = 'entrada-invalida' | 'terminaciones-distintas';
+export type CodigoCorteFiltro =
+  | 'entrada-invalida'
+  | 'terminaciones-distintas'
+  // Orden calculado (spec §7.6 y §7.10): fs cae en la banda pasante, haría falta más de 10, o
+  // Bessel no llega a la atenuación con ningún Orden hasta 10.
+  | 'banda-pasante'
+  | 'orden-excedido'
+  | 'bessel-sin-solucion';
 
 export type CodigoAvisoFiltro = 'chebyshev-par' | 'f0-geometrica';
+
+// El Orden calculado desde una atenuación y lo que muestra el resultado (spec §7.6 y §7.9).
+export interface OrdenCalculado {
+  as: number;
+  fs: number;
+  // La frecuencia fs en el prototipo; infinita si cae justo en la central de un rechaza banda.
+  omegaS: number;
+  // El n de la fórmula sin redondear; null en Bessel, que no tiene fórmula.
+  nExacto: number | null;
+  // El elegido: redondeado hacia arriba, y impar en Chebyshev con terminaciones iguales.
+  orden: number;
+  // La atenuación del prototipo en fs con el n elegido, en dB.
+  atenuacionReal: number;
+  // Ωs, la fórmula del Orden con sus valores y la atenuación real.
+  pasos: readonly Paso[];
+}
+
+export type ResultadoOrden =
+  | ({ estado: 'calculado' } & OrdenCalculado)
+  | {
+      estado: 'corte';
+      codigo: Extract<CodigoCorteFiltro, 'banda-pasante' | 'orden-excedido' | 'bessel-sin-solucion'>;
+      texto: string;
+    };
 
 export type ResultadoFiltro =
   | { estado: 'corte'; codigo: CodigoCorteFiltro; texto: string }
@@ -124,9 +164,12 @@ export type ResultadoFiltro =
       tipo: TipoFiltro;
       aproximacion: Aproximacion;
       topologia: TopologiaFiltro;
-      // El que escribió el Alumno y el que se usa: Chebyshev par sube al impar.
-      ordenPedido: number;
+      // El que escribió el Alumno (null si lo pidió desde una atenuación) y el que se usa: Chebyshev
+      // par sube al impar.
+      ordenPedido: number | null;
       orden: number;
+      // Solo si el Orden se calculó desde una atenuación.
+      ordenCalculado: OrdenCalculado | null;
       prototipo: Prototipo;
       // La banda de pasa banda y rechaza banda; null en pasa bajos y pasa altos.
       banda: Banda | null;
@@ -688,12 +731,359 @@ function pasosDeBanda(entrada: BandaEntrada, b: Banda): Paso[] {
   ];
 }
 
+// --- Orden calculado desde una atenuación (spec §7.6) -------------------------------------------
+
+// Lo que hace falta para pasar fs al prototipo: el Tipo de filtro, la Aproximación y las frecuencias.
+export type DatosDeOrden =
+  | { tipo: TipoBajoAlto; aproximacion: Aproximacion; ripple: number | null; fc: number }
+  | { tipo: TipoDeBanda; aproximacion: Aproximacion; ripple: number | null; banda: BandaEntrada };
+
+// Matthaei ec. 8.04-1 y 12.02-1: la frecuencia fs en el prototipo pasa bajos. En pasa banda y
+// rechaza banda el valor absoluto es la simetría geométrica de la respuesta. Ωs ≤ 1 es la banda
+// pasante; en el rechaza banda, fs justo en f0 da infinito.
+export function frecuenciaNormalizada(datos: DatosDeOrden, fs: number): number {
+  if ('fc' in datos) return datos.tipo === 'pasa-bajos' ? fs / datos.fc : datos.fc / fs;
+  const { f0, fbw } = bandaDe(datos.banda);
+  const separacion = Math.abs(fs / f0 - f0 / fs);
+  return datos.tipo === 'pasa-banda' ? separacion / fbw : fbw / separacion;
+}
+
+const factorial = (m: number): number => (m <= 1 ? 1 : m * factorial(m - 1));
+
+// El cuadrado del módulo del polinomio inverso de Bessel, θn(jx) = Σ (2n−k)!/(2^(n−k)·k!·(n−k)!)·(jx)^k,
+// dividido por θn(0)²: la atenuación de Bessel es 10·log10 de eso.
+function moduloBessel2(n: number, x: number): number {
+  const coef = (k: number) =>
+    factorial(2 * n - k) / (2 ** (n - k) * factorial(k) * factorial(n - k));
+  let re = 0;
+  let im = 0;
+  for (let k = 0; k <= n; k++) {
+    const termino = coef(k) * x ** k;
+    // j^k recorre 1, j, −1, −j.
+    if (k % 4 === 0) re += termino;
+    else if (k % 4 === 1) im += termino;
+    else if (k % 4 === 2) re -= termino;
+    else im -= termino;
+  }
+  return (re * re + im * im) / coef(0) ** 2;
+}
+
+// La atenuación del prototipo de Orden n en la frecuencia normalizada Ω, en dB (Matthaei ec. 4.03-1 y
+// 4.03-3). Bessel usa el polinomio normalizado a −3 dB con el mismo factor ω3dB de la tabla de g, así
+// que describe a la escalera que se arma.
+export function atenuacionPrototipo(
+  aproximacion: Aproximacion,
+  n: number,
+  omega: number,
+  ripple: number | null,
+): number {
+  if (omega === Infinity) return Infinity;
+  if (aproximacion === 'butterworth') return 10 * Math.log10(1 + omega ** (2 * n));
+  if (aproximacion === 'bessel') {
+    return 10 * Math.log10(moduloBessel2(n, omega * BESSEL_RETARDO[n].factor));
+  }
+  const epsilon2 = 10 ** (ripple! / 10) - 1;
+  const t = omega <= 1 ? Math.cos(n * Math.acos(omega)) : Math.cosh(n * Math.acosh(omega));
+  return 10 * Math.log10(1 + epsilon2 * t * t);
+}
+
+// Cuánto puede quedar corta la atenuación por el redondeo de las cuentas y seguir cumpliendo.
+const TOLERANCIA_CUMPLE_DB = 1e-9;
+
+const dbTexto = (x: number) => (x === Infinity ? '∞' : formatearValor(x, 'decibeles'));
+const dbLatex = (x: number) => (x === Infinity ? '\\infty' : db(x));
+const numeroOInfinito = (x: number) => (x === Infinity ? '\\infty' : numero(x));
+
+// Dónde cae fs cuando Ωs ≤ 1, para el aviso.
+const ZONA_PASANTE: Record<TipoFiltro, string> = {
+  'pasa-bajos': 'en fc o por debajo',
+  'pasa-altos': 'en fc o por encima',
+  'pasa-banda': 'dentro de la banda',
+  'rechaza-banda': 'fuera de la banda rechazada',
+};
+
+// El n de la fórmula, sin redondear, y el primer entero que cumple de verdad. Se arranca uno antes
+// del redondeo hacia arriba para no depender de que la fórmula dé justo un entero, y se confirma con
+// la atenuación. Pasado ORDEN_MAXIMO ya no se sigue.
+function ordenMinimo(
+  aproximacion: 'butterworth' | 'chebyshev',
+  omegaS: number,
+  ripple: number | null,
+  as: number,
+): { nExacto: number; n: number } {
+  const exceso = 10 ** (as / 10) - 1;
+  const cociente = exceso / (10 ** ((ripple ?? 0) / 10) - 1);
+  // Butterworth (ec. 4.03-1) y Chebyshev (ec. 4.03-4), despejando n. Con As por debajo del ripple
+  // el despeje no existe y alcanza con un elemento.
+  const nExacto =
+    aproximacion === 'butterworth'
+      ? Math.log10(exceso) / (2 * Math.log10(omegaS))
+      : cociente <= 1
+        ? 0
+        : Math.acosh(Math.sqrt(cociente)) / Math.acosh(omegaS);
+  let n = Math.min(Math.max(1, Math.ceil(nExacto) - 1), ORDEN_MAXIMO + 1);
+  while (
+    n <= ORDEN_MAXIMO &&
+    atenuacionPrototipo(aproximacion, n, omegaS, ripple) < as - TOLERANCIA_CUMPLE_DB
+  ) {
+    n++;
+  }
+  return { nExacto, n };
+}
+
+// Ωs con los valores de este caso (spec §7.9: pasos intermedios).
+function pasoOmega(datos: DatosDeOrden, fs: number, omegaS: number): Paso {
+  const fuente = 'Matthaei, Young y Jones, ec. 8.04-1 y 12.02-1.';
+  const resultado = numeroOInfinito(omegaS);
+  if ('fc' in datos) {
+    const [simbolo, sustituida] =
+      datos.tipo === 'pasa-bajos'
+        ? ['\\dfrac{f_s}{f_c}', `\\dfrac{${hz(fs)}}{${hz(datos.fc)}}`]
+        : ['\\dfrac{f_c}{f_s}', `\\dfrac{${hz(datos.fc)}}{${hz(fs)}}`];
+    return {
+      texto: 'Ωs, la frecuencia fs en el prototipo',
+      latex: `\\Omega_s = ${simbolo} = ${sustituida} = ${resultado}`,
+      fuente,
+    };
+  }
+  const b = bandaDe(datos.banda);
+  const separacion = '\\left|\\dfrac{f_s}{f_0} - \\dfrac{f_0}{f_s}\\right|';
+  const separacionValor =
+    `\\left|\\dfrac{${hz(fs)}}{${hz(b.f0)}} - \\dfrac{${hz(b.f0)}}{${hz(fs)}}\\right|`;
+  const [simbolo, sustituida] =
+    datos.tipo === 'pasa-banda'
+      ? [`\\dfrac{${separacion}}{\\mathrm{FBW}}`, `\\dfrac{${separacionValor}}{${numero(b.fbw)}}`]
+      : [`\\dfrac{\\mathrm{FBW}}{${separacion}}`, `\\dfrac{${numero(b.fbw)}}{${separacionValor}}`];
+  return {
+    texto: 'Ωs, la frecuencia fs en el prototipo',
+    latex: `\\Omega_s = ${simbolo} = ${sustituida} = ${resultado}`,
+    fuente: `${fuente} f0 es la central geométrica √(f1·f2).`,
+  };
+}
+
+function pasoOrdenFormula(
+  aproximacion: 'butterworth' | 'chebyshev',
+  ripple: number | null,
+  as: number,
+  omegaS: number,
+  nExacto: number,
+): Paso {
+  const exceso = `10^{${numero(as)}/10} - 1`;
+  const omega = numeroOInfinito(omegaS);
+  if (aproximacion === 'butterworth') {
+    return {
+      texto: 'Orden mínimo de Butterworth',
+      latex:
+        `n \\ge \\dfrac{\\log_{10}\\left(10^{A_s/10} - 1\\right)}{2 \\log_{10} \\Omega_s} = ` +
+        `\\dfrac{\\log_{10}\\left(${exceso}\\right)}{2 \\log_{10}\\left(${omega}\\right)} = ` +
+        numero(nExacto),
+      fuente: 'Matthaei, Young y Jones, ec. 4.03-1.',
+    };
+  }
+  const fuente = 'Matthaei, Young y Jones, ec. 4.03-4.';
+  const epsilon = `10^{${numero(ripple!)}/10} - 1`;
+  if ((10 ** (as / 10) - 1) / (10 ** (ripple! / 10) - 1) <= 1) {
+    return {
+      texto: 'Orden mínimo de Chebyshev: la atenuación pedida no supera el ripple',
+      latex: `A_s = ${db(as)} \\le r = ${db(ripple!)} \\Rightarrow n \\ge 0`,
+      fuente,
+    };
+  }
+  return {
+    texto: 'Orden mínimo de Chebyshev',
+    latex:
+      `n \\ge \\dfrac{\\operatorname{arccosh}\\sqrt{\\dfrac{10^{A_s/10} - 1}{10^{r/10} - 1}}}` +
+      `{\\operatorname{arccosh} \\Omega_s} = ` +
+      `\\dfrac{\\operatorname{arccosh}\\sqrt{\\dfrac{${exceso}}{${epsilon}}}}` +
+      `{\\operatorname{arccosh}\\left(${omega}\\right)} = ${numero(nExacto)}`,
+    fuente,
+  };
+}
+
+const FORMULA_ATENUACION_BUTTERWORTH = 'A(\\Omega) = 10 \\log_{10}\\left(1 + \\Omega^{2n}\\right)';
+const FORMULA_ATENUACION_CHEBYSHEV =
+  'A(\\Omega) = 10 \\log_{10}\\left[1 + \\varepsilon^2 \\cosh^2\\left(n \\operatorname{arccosh} \\Omega\\right)\\right]';
+const FORMULA_ATENUACION_BESSEL =
+  'A_n(\\Omega) = 20 \\log_{10}\\left|\\dfrac{\\theta_n(j\\,\\omega_{3\\mathrm{dB}}\\Omega)}{\\theta_n(0)}\\right|';
+
+const FORMULA_OMEGA: Record<TipoFiltro, string> = {
+  'pasa-bajos': '\\Omega_s = \\dfrac{f_s}{f_c}',
+  'pasa-altos': '\\Omega_s = \\dfrac{f_c}{f_s}',
+  'pasa-banda':
+    '\\Omega_s = \\dfrac{\\left|f_s/f_0 - f_0/f_s\\right|}{\\mathrm{FBW}},\\; \\mathrm{FBW} = \\dfrac{f_2 - f_1}{f_0}',
+  'rechaza-banda':
+    '\\Omega_s = \\dfrac{\\mathrm{FBW}}{\\left|f_s/f_0 - f_0/f_s\\right|},\\; \\mathrm{FBW} = \\dfrac{f_2 - f_1}{f_0}',
+};
+
+const FORMULA_ORDEN: Record<'butterworth' | 'chebyshev', string> = {
+  butterworth: 'n \\ge \\dfrac{\\log_{10}\\left(10^{A_s/10} - 1\\right)}{2 \\log_{10} \\Omega_s}',
+  chebyshev:
+    'n \\ge \\dfrac{\\operatorname{arccosh}\\sqrt{\\dfrac{10^{A_s/10} - 1}{10^{r/10} - 1}}}{\\operatorname{arccosh} \\Omega_s}',
+};
+
+// Las fórmulas del Orden calculado, sin números, para el resultado principal.
+const formulasDeOrden = (tipo: TipoFiltro, aproximacion: Aproximacion): string[] =>
+  aproximacion === 'bessel'
+    ? [FORMULA_OMEGA[tipo], FORMULA_ATENUACION_BESSEL]
+    : [
+        FORMULA_OMEGA[tipo],
+        FORMULA_ORDEN[aproximacion],
+        aproximacion === 'butterworth'
+          ? FORMULA_ATENUACION_BUTTERWORTH
+          : FORMULA_ATENUACION_CHEBYSHEV,
+      ];
+
+function pasoAtenuacionReal(
+  aproximacion: Aproximacion,
+  ripple: number | null,
+  n: number,
+  omegaS: number,
+  atenuacion: number,
+): Paso {
+  const omega = numeroOInfinito(omegaS);
+  const sustituida =
+    aproximacion === 'butterworth'
+      ? `10 \\log_{10}\\left(1 + ${omega}^{2 \\cdot ${n}}\\right)`
+      : aproximacion === 'chebyshev'
+        ? `10 \\log_{10}\\left[1 + \\left(10^{${numero(ripple!)}/10} - 1\\right) ` +
+          `\\cosh^2\\left(${n} \\operatorname{arccosh}\\left(${omega}\\right)\\right)\\right]`
+        : `20 \\log_{10}\\left|\\dfrac{\\theta_{${n}}(j\\,\\omega_{3\\mathrm{dB}}\\Omega_s)}{\\theta_{${n}}(0)}\\right|`;
+  return {
+    texto: `Atenuación real en fs con Orden ${n}`,
+    latex: `A(\\Omega_s) = ${sustituida} = ${dbLatex(atenuacion)}`,
+  };
+}
+
+export function ordenDesdeAtenuacion(
+  datos: DatosDeOrden,
+  { as, fs }: PedidoAtenuacion,
+): ResultadoOrden {
+  const { aproximacion, ripple } = datos;
+  const omegaS = frecuenciaNormalizada(datos, fs);
+  if (!(omegaS > 1)) {
+    return {
+      estado: 'corte',
+      codigo: 'banda-pasante',
+      texto:
+        `fs = ${formatearValor(fs, 'frecuencia')} cae en la banda pasante del filtro ` +
+        `(${ZONA_PASANTE[datos.tipo]}, Ωs = ${numeroTexto(omegaS)} ≤ 1): ahí el filtro no ` +
+        'atenúa y ningún Orden alcanza la atenuación pedida. Pedí la atenuación a una frecuencia ' +
+        'que ya esté fuera de la banda pasante.',
+    };
+  }
+  const pasos = [pasoOmega(datos, fs, omegaS)];
+  if (aproximacion === 'bessel') return ordenBessel(omegaS, as, fs, pasos);
+
+  const { nExacto, n: minimo } = ordenMinimo(aproximacion, omegaS, ripple, as);
+  // Con terminaciones iguales Chebyshev se arma solo de Orden impar (spec §7.3 y §7.6).
+  const orden = ordenEfectivo(aproximacion, minimo);
+  if (orden > ORDEN_MAXIMO) {
+    const pide = Number.isFinite(nExacto) ? `n ≥ ${numeroTexto(nExacto)}` : 'un n enorme';
+    const par =
+      orden !== minimo ? ` Es par, y con Rs = RL Chebyshev pasa al Orden ${orden}.` : '';
+    return {
+      estado: 'corte',
+      codigo: 'orden-excedido',
+      texto:
+        `Alcanzar ${dbTexto(as)} a ${formatearValor(fs, 'frecuencia')} pide ${pide}, más que el ` +
+        `máximo de ${ORDEN_MAXIMO}.${par} Con esos datos no se calcula: probá con una atenuación ` +
+        'menor, con fs más lejos de la banda pasante o con otra Aproximación.',
+    };
+  }
+  const atenuacionReal = atenuacionPrototipo(aproximacion, orden, omegaS, ripple);
+  return {
+    estado: 'calculado',
+    as,
+    fs,
+    omegaS,
+    nExacto,
+    orden,
+    atenuacionReal,
+    pasos: [
+      ...pasos,
+      pasoOrdenFormula(aproximacion, ripple, as, omegaS, nExacto),
+      {
+        texto: `Orden ${minimo}: se redondea hacia arriba`,
+        latex: `n = \\lceil ${numero(nExacto)} \\rceil = ${minimo}`,
+      },
+      ...(minimo !== orden
+        ? [
+            {
+              texto: `Orden ${minimo} es par: con Rs = RL se arma el impar siguiente, Orden ${orden}`,
+              latex: `n = ${minimo} + 1 = ${orden}`,
+              fuente: 'Spec §7.3: Chebyshev par pide una carga de coth²(β/4)·R0.',
+            },
+          ]
+        : []),
+      pasoAtenuacionReal(aproximacion, ripple, orden, omegaS, atenuacionReal),
+    ],
+  };
+}
+
+// Bessel no tiene fórmula cerrada: se evalúa A(Ωs) de n = 1 a 10 y se toma el primero que cumple.
+function ordenBessel(omegaS: number, as: number, fs: number, pasos: Paso[]): ResultadoOrden {
+  const cumple = (atenuacion: number) => atenuacion >= as - TOLERANCIA_CUMPLE_DB;
+  const probados: { n: number; atenuacion: number }[] = [];
+  for (let n = 1; n <= ORDEN_MAXIMO; n++) {
+    probados.push({ n, atenuacion: atenuacionPrototipo('bessel', n, omegaS, null) });
+    if (cumple(probados[n - 1].atenuacion)) break;
+  }
+  const elegido = probados[probados.length - 1];
+  if (!cumple(elegido.atenuacion)) {
+    // Cerca del corte la atenuación deja de crecer con n: el máximo no está en n = 10.
+    const mejor = probados.reduce((a, b) => (b.atenuacion > a.atenuacion ? b : a));
+    return {
+      estado: 'corte',
+      codigo: 'bessel-sin-solucion',
+      texto:
+        `${dbTexto(as)} a ${formatearValor(fs, 'frecuencia')} no alcanzable con Bessel de Orden ≤ ` +
+        `${ORDEN_MAXIMO}: lo máximo que llega ahí es ${dbTexto(mejor.atenuacion)}, con Orden ` +
+        `${mejor.n}. Bessel prioriza el retardo y atenúa poco cerca del corte; probá con ` +
+        'Butterworth o Chebyshev.',
+    };
+  }
+  return {
+    estado: 'calculado',
+    as,
+    fs,
+    omegaS,
+    nExacto: null,
+    orden: elegido.n,
+    atenuacionReal: elegido.atenuacion,
+    pasos: [
+      ...pasos,
+      {
+        texto: 'Bessel no tiene fórmula del Orden: se evalúa A(Ωs) de n = 1 en adelante',
+        latex: FORMULA_ATENUACION_BESSEL,
+        fuente: FUENTE_BESSEL,
+      },
+      ...probados.map(({ n, atenuacion }) => ({
+        texto: `Bessel de Orden ${n}: ${cumple(atenuacion) ? 'cumple' : 'no llega'}`,
+        latex:
+          `A_{${n}}(\\Omega_s) = ${dbLatex(atenuacion)} ` +
+          `${cumple(atenuacion) ? '\\ge' : '<'} A_s = ${db(as)}`,
+      })),
+      pasoAtenuacionReal('bessel', null, elegido.n, omegaS, elegido.atenuacion),
+    ],
+  };
+}
+
 // --- Cálculo -------------------------------------------------------------------------------------
 
 const CORTE_INVALIDA =
   `Las frecuencias (fc, o f1 y f2, o f0 y BW), Rs, RL y el Q de las bobinas tienen que ser ` +
-  `mayores que cero y f2 mayor que f1; el Orden, un entero de 1 a ${ORDEN_MAXIMO}; y el ripple, de ` +
+  `mayores que cero y f2 mayor que f1; el Orden, un entero de 1 a ${ORDEN_MAXIMO}, o la atenuación ` +
+  `pedida y su frecuencia fs, mayores que cero; y el ripple, de ` +
   `${numeroTexto(RANGO_RIPPLE.min)} a ${numeroTexto(RANGO_RIPPLE.max)} dB.`;
+
+const esPositivoFinito = (x: number) => Number.isFinite(x) && x > 0;
+
+function ordenValido(orden: EntradaFiltro['orden']): boolean {
+  if (typeof orden === 'number') {
+    return Number.isInteger(orden) && orden >= 1 && orden <= ORDEN_MAXIMO;
+  }
+  return esPositivoFinito(orden.as) && esPositivoFinito(orden.fs);
+}
 
 function frecuenciasValidas(entrada: EntradaFiltro): boolean {
   if ('fc' in entrada) return entrada.fc > 0;
@@ -709,9 +1099,7 @@ export function calcularFiltro(entrada: EntradaFiltro): ResultadoFiltro {
   if (
     !frecuenciasValidas(entrada) ||
     !(rs > 0 && rl > 0 && qBobina > 0) ||
-    !Number.isInteger(orden) ||
-    orden < 1 ||
-    orden > ORDEN_MAXIMO ||
+    !ordenValido(orden) ||
     !rippleValido
   ) {
     return { estado: 'corte', codigo: 'entrada-invalida', texto: CORTE_INVALIDA };
@@ -727,14 +1115,22 @@ export function calcularFiltro(entrada: EntradaFiltro): ResultadoFiltro {
     };
   }
 
-  const n = ordenEfectivo(aproximacion, orden);
+  // El Orden calculado ya sale impar en Chebyshev: no hace falta el aviso de Orden par.
+  let ordenCalculado: OrdenCalculado | null = null;
+  if (typeof orden !== 'number') {
+    const o = ordenDesdeAtenuacion(entrada, orden);
+    if (o.estado === 'corte') return { estado: 'corte', codigo: o.codigo, texto: o.texto };
+    ordenCalculado = o;
+  }
+  const ordenPedido = typeof orden === 'number' ? orden : null;
+  const n = ordenCalculado ? ordenCalculado.orden : ordenEfectivo(aproximacion, ordenPedido!);
   const avisos: Aviso<CodigoAvisoFiltro>[] = [];
-  if (n !== orden) {
-    const { carga } = prototipo(aproximacion, orden, ripple);
+  if (ordenPedido !== null && n !== ordenPedido) {
+    const { carga } = prototipo(aproximacion, ordenPedido, ripple);
     avisos.push({
       codigo: 'chebyshev-par',
       texto:
-        `Chebyshev de Orden ${orden} no se puede armar con Rs = RL: pide una carga de ` +
+        `Chebyshev de Orden ${ordenPedido} no se puede armar con Rs = RL: pide una carga de ` +
         `${numeroTexto(carga)} veces la fuente. Se calcula con Orden ${n}.`,
     });
   }
@@ -758,8 +1154,9 @@ export function calcularFiltro(entrada: EntradaFiltro): ResultadoFiltro {
     tipo,
     aproximacion,
     topologia,
-    ordenPedido: orden,
+    ordenPedido,
     orden: n,
+    ordenCalculado,
     prototipo: p,
     banda,
     frecuenciaRevision,
@@ -768,11 +1165,19 @@ export function calcularFiltro(entrada: EntradaFiltro): ResultadoFiltro {
     perdidaCohn: cohn.perdida,
     retardoContinua: retardo.valor,
     formulas: [
+      ...(ordenCalculado ? formulasDeOrden(tipo, aproximacion) : []),
       ...formulasPrototipo(aproximacion),
       ...(esDeBanda(tipo) ? formulasBanda(tipo) : formulasEscala(tipo)),
       ...(cohn.formula ? [cohn.formula] : []),
     ],
-    pasos: [...p.pasos, ...pasosEscalera, ...cohn.pasos, ...retardo.pasos, ...revision.pasos],
+    pasos: [
+      ...(ordenCalculado?.pasos ?? []),
+      ...p.pasos,
+      ...pasosEscalera,
+      ...cohn.pasos,
+      ...retardo.pasos,
+      ...revision.pasos,
+    ],
     revision,
     referencias: REFERENCIAS_FILTROS,
     avisos,

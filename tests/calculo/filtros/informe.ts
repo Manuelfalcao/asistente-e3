@@ -1,10 +1,13 @@
 import {
   type EntradaFiltro,
   type ResultadoFiltro,
+  atenuacionPrototipo,
   calcularFiltro,
+  ordenDesdeAtenuacion,
   prototipo,
 } from '../../../src/calculo/filtros/filtros';
 import { formatearValor } from '../../../src/entrada/formato';
+import { MEDIA_UNIDAD } from '../../casos';
 import {
   type AporteInforme,
   type GrupoPasos,
@@ -16,10 +19,14 @@ import {
   CASOS_COHN,
   CASOS_COMPORTAMIENTO,
   CASOS_REFERENCIA_G,
+  CASOS_REFERENCIA_ORDEN,
   CASOS_VERIFICACION,
+  CASOS_VERIFICACION_ORDEN,
   type CasoComportamientoFiltro,
   TOLERANCIA_COHN,
   TOLERANCIA_DB,
+  TOLERANCIA_ORDEN_BESSEL_DB,
+  TOLERANCIA_ORDEN_DB,
   TOLERANCIA_VALORES,
   bordesDe,
   comoImpresos,
@@ -67,7 +74,9 @@ function entradasTexto(e: EntradaFiltro): string {
       ? `Chebyshev ${formatearValor(e.ripple!, 'decibeles')}`
       : APROXIMACION[e.aproximacion],
     e.topologia,
-    `Orden ${e.orden}`,
+    typeof e.orden === 'number'
+      ? `Orden ${e.orden}`
+      : `Orden desde As = ${formatearValor(e.orden.as, 'decibeles')} a fs = ${HZ(e.orden.fs)}`,
     frecuenciasTexto(e),
     `Rs = ${R(e.rs)}`,
     `RL = ${R(e.rl)}`,
@@ -161,6 +170,105 @@ const verificacion = () =>
     }),
   );
 
+const pedidoDe = (e: EntradaFiltro) => {
+  if (typeof e.orden === 'number') throw new Error('el caso trae un Orden ingresado');
+  return e.orden;
+};
+
+const referenciaOrden = () =>
+  CASOS_REFERENCIA_ORDEN.map((caso) =>
+    enCaso(caso, () => {
+      const o = ordenDesdeAtenuacion(caso.entradas, pedidoDe(caso.entradas));
+      if (o.estado !== 'calculado') throw new Error(`no calculó: ${o.codigo}`);
+      const r = calculado(caso.entradas);
+      return {
+        clase: 'referencia',
+        id: caso.id,
+        entradas: entradasTexto(caso.entradas),
+        referencia: caso.referencia,
+        medidas: [
+          medidaImpresa({
+            nombre: 'Ωs',
+            impreso: caso.omegaS,
+            obtenido: o.omegaS,
+            tolerancia: MEDIA_UNIDAD,
+          }),
+          medidaImpresa({
+            nombre: 'n sin redondear',
+            impreso: caso.nExacto,
+            obtenido: o.nExacto!,
+            tolerancia: MEDIA_UNIDAD,
+          }),
+          ...caso.atenuaciones.map(({ n, impreso }) =>
+            medidaImpresa({
+              nombre: `Atenuación en fs con n = ${n}`,
+              impreso,
+              obtenido: atenuacionPrototipo('chebyshev', n, o.omegaS, caso.entradas.ripple),
+              tolerancia: caso.tolerancia,
+              unidad: 'dB',
+            }),
+          ),
+        ],
+        pasos: pasosDe(caso.entradas, r),
+      };
+    }),
+  );
+
+const verificacionOrden = () =>
+  CASOS_VERIFICACION_ORDEN.map((caso) =>
+    enCaso(caso, () => {
+      const r = calculado(caso.entradas);
+      const { as, fs } = pedidoDe(caso.entradas);
+      const { rs, aproximacion } = caso.entradas;
+      const atenuacion = (x: typeof r, f: number) =>
+        x.resonadores.length > 0
+          ? atenuacionResonadores(x.resonadores, f, rs)
+          : atenuacionOraculo(x.elementos, f, rs);
+      return {
+        clase: 'verificacion',
+        id: caso.id,
+        entradas: entradasTexto(caso.entradas),
+        referencia: caso.referencia,
+        oraculo: caso.oraculo,
+        medidas: [
+          medidaNumerica({
+            nombre: 'Orden calculado',
+            esperado: caso.ordenEsperado,
+            obtenido: r.orden,
+            tolerancia: {
+              tipo: 'absoluta',
+              valor: 0,
+              motivo: 'Un entero: tiene que coincidir con el que salió de las cuentas a mano.',
+            },
+            decimales: 0,
+          }),
+          medidaNumerica({
+            nombre: `Atenuación en ${HZ(fs)} con la red armada, contra la que informa el Asistente`,
+            esperado: atenuacion(r, fs),
+            obtenido: r.ordenCalculado!.atenuacionReal,
+            tolerancia: aproximacion === 'bessel' ? TOLERANCIA_ORDEN_BESSEL_DB : TOLERANCIA_ORDEN_DB,
+            decimales: 4,
+            unidad: 'dB',
+          }),
+          // Alcanza As: el esperado es el piso, así que se compara con el margen sobre él.
+          medidaNumerica({
+            nombre: `Margen sobre As = ${formatearValor(as, 'decibeles')} en la red armada`,
+            esperado: 0,
+            obtenido: Math.max(0, as - atenuacion(r, fs)),
+            tolerancia: {
+              tipo: 'absoluta',
+              valor: 0,
+              motivo: 'La red tiene que atenuar al menos As en fs: no puede faltarle nada.',
+            },
+            decimales: 4,
+            unidad: 'dB',
+          }),
+        ],
+        pasos: pasosDe(caso.entradas, r),
+      };
+    }),
+  );
+
 const cohn = () =>
   CASOS_COHN.map((caso) =>
     enCaso(caso, () => {
@@ -238,5 +346,12 @@ const comportamiento = () =>
 
 export const INFORME: AporteInforme = {
   calculadora: 'filtros',
-  casos: () => [...referencia(), ...verificacion(), ...cohn(), ...comportamiento()],
+  casos: () => [
+    ...referencia(),
+    ...referenciaOrden(),
+    ...verificacion(),
+    ...verificacionOrden(),
+    ...cohn(),
+    ...comportamiento(),
+  ],
 };

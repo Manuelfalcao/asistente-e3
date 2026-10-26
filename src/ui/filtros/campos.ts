@@ -9,7 +9,7 @@ import type { EspecSinSelector } from '../../entrada/campo';
 import type { Opcion } from '../comun/BotonesSegmentados';
 
 // Los campos de la Calculadora de filtros y su rango válido (spec §7.1), con los valores por
-// defecto de §12.2. Bessel llega después.
+// defecto de §12.2.
 
 const MAYOR_QUE_CERO = { min: 0, minIncluido: false };
 
@@ -64,12 +64,29 @@ export const ORDEN: EspecSinSelector = {
   rango: { min: 1, max: ORDEN_MAXIMO },
 };
 
+// Cómo se da el Orden (spec §7.1): escrito, o calculado desde una atenuación mínima As a una fs.
+export type ModoOrden = 'ingresar' | 'calcular';
+export const MODOS_ORDEN: readonly Opcion<ModoOrden>[] = [
+  { valor: 'ingresar', texto: 'Ingresar' },
+  { valor: 'calcular', texto: 'Calcular desde una atenuación' },
+];
+
+// La atenuación mínima que se pide a fs, y esa frecuencia.
+export const AS: EspecSinSelector = {
+  nombre: 'As',
+  magnitud: 'decibeles',
+  obligatorio: true,
+  rango: { min: 0, minIncluido: false },
+};
+
 export const FC: EspecSinSelector = {
   nombre: 'fc',
   magnitud: 'frecuencia',
   obligatorio: true,
   rango: MAYOR_QUE_CERO,
 };
+
+export const FS: EspecSinSelector = { ...FC, nombre: 'fs' };
 
 // Los bordes, o la central y el ancho, de pasa banda y rechaza banda.
 export const F1: EspecSinSelector = { ...FC, nombre: 'f1' };

@@ -4,6 +4,7 @@ import type {
   CodigoAvisoFiltro,
   CodigoCorteFiltro,
   EntradaFiltro,
+  PedidoAtenuacion,
   Prototipo,
   TipoBajoAlto,
   TipoDeBanda,
@@ -24,6 +25,10 @@ const INVESTIGACION = 'research/sintesis-filtros-lc.md, §7';
 const ORACULO = 'tests/oraculos/abcd.ts (ABCD con complejos)';
 const Q_POR_DEFECTO = 100;
 
+// El Orden como lo da el Alumno: un entero, o la atenuación As (dB) pedida a fs (Hz) (spec §7.6).
+type OrdenEntrada = number | PedidoAtenuacion;
+export const pedido = (as: number, fs: number): PedidoAtenuacion => ({ as, fs });
+
 interface Opciones {
   ripple?: number | null;
   rs?: number;
@@ -34,7 +39,7 @@ export const entradaFiltro = (
   tipo: TipoBajoAlto,
   aproximacion: Aproximacion,
   topologia: TopologiaFiltro,
-  orden: number,
+  orden: OrdenEntrada,
   fc: number,
   { ripple = null, rs = 50, rl = 50 }: Opciones = {},
 ): Extract<EntradaFiltro, { fc: number }> => ({
@@ -54,7 +59,7 @@ export const entradaBanda = (
   tipo: TipoDeBanda,
   aproximacion: Aproximacion,
   topologia: TopologiaFiltro,
-  orden: number,
+  orden: OrdenEntrada,
   banda: BandaEntrada,
   { ripple = null, rs = 50, rl = 50 }: Opciones = {},
 ): Extract<EntradaFiltro, { banda: BandaEntrada }> => ({
@@ -690,6 +695,101 @@ export const CASOS_COMPORTAMIENTO: readonly CasoComportamientoFiltro[] = [
     esperado: { corte: 'entrada-invalida' },
     referencia: 'spec §7.1',
   },
+  {
+    clase: 'comportamiento',
+    id: 'Orden calculado: Bessel 20 dB a 2·fc no tiene solución (llega a ~14 dB)',
+    entradas: entradaFiltro('pasa-bajos', 'bessel', 'π', pedido(20, 200e6), 100e6),
+    esperado: { corte: 'bessel-sin-solucion' },
+    referencia: 'spec §7.6 y §7.10; research/sintesis-filtros-lc.md, §4 (O7)',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Orden calculado: Butterworth 100 dB a 1,2·fc pide más de 10 y no se calcula',
+    entradas: entradaFiltro('pasa-bajos', 'butterworth', 'π', pedido(100, 120e6), 100e6),
+    esperado: { corte: 'orden-excedido' },
+    referencia: 'spec §7.6 y §7.10',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Orden calculado: Chebyshev que sale en 10 pasa a 11 y no se calcula',
+    // 0,5 dB y Ωs = 1,3: n = 9 da 44,0 dB y n = 10 da 50,5 dB, así que 48 dB sale con n = 10, que
+    // es par y con Rs = RL pasa al 11.
+    entradas: entradaFiltro('pasa-bajos', 'chebyshev', 'π', pedido(48, 130e6), 100e6, {
+      ripple: 0.5,
+    }),
+    esperado: { corte: 'orden-excedido' },
+    referencia: 'spec §7.3 y §7.6',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Orden calculado: fs dentro de la banda pasante (pasa bajos) no tiene solución',
+    entradas: entradaFiltro('pasa-bajos', 'butterworth', 'π', pedido(40, 80e6), 100e6),
+    esperado: { corte: 'banda-pasante' },
+    referencia: 'spec §7.6 y §7.10',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Orden calculado: fs igual a fc (Ωs = 1) tampoco tiene solución',
+    entradas: entradaFiltro('pasa-altos', 'chebyshev', 'T', pedido(40, 50e6), 50e6, { ripple: 0.5 }),
+    esperado: { corte: 'banda-pasante' },
+    referencia: 'spec §7.6',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Orden calculado: fs dentro de la banda pasante de un pasa banda no tiene solución',
+    entradas: entradaBanda('pasa-banda', 'butterworth', 'π', pedido(30, 95e6), BANDA_FM),
+    esperado: { corte: 'banda-pasante' },
+    referencia: 'spec §7.6 y §7.10',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Orden calculado: fs fuera de la banda rechazada de un rechaza banda no tiene solución',
+    entradas: entradaBanda('rechaza-banda', 'butterworth', 'π', pedido(30, 70e6), BANDA_FM),
+    esperado: { corte: 'banda-pasante' },
+    referencia: 'spec §7.6 y §7.10',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Orden calculado: Chebyshev sale directamente impar, sin el aviso de Orden par',
+    entradas: entradaFiltro('pasa-bajos', 'chebyshev', 'π', pedido(40, 200e6), 100e6, {
+      ripple: 0.1,
+    }),
+    esperado: { orden: 7, avisos: [] },
+    referencia: 'spec §7.3 y §7.6',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Orden calculado: con f0 y BW sigue el aviso de la central geométrica',
+    entradas: entradaBanda('pasa-banda', 'butterworth', 'π', pedido(30, 70e6), {
+      f0: F0_FM,
+      bw: 20e6,
+    }),
+    esperado: { orden: 3, avisos: ['f0-geometrica'] },
+    referencia: 'spec §7.1 y §7.6',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Orden calculado: rechaza banda con fs en la central (atenuación infinita) da Orden 1',
+    entradas: entradaBanda('rechaza-banda', 'butterworth', 'T', pedido(60, F0_FM), BANDA_FM),
+    esperado: { orden: 1, avisos: [] },
+    referencia: 'spec §7.6 (Ωs infinito en el modelo ideal)',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Orden calculado: atenuación pedida menor que el ripple da Orden 1',
+    entradas: entradaFiltro('pasa-bajos', 'chebyshev', 'π', pedido(0.2, 200e6), 100e6, {
+      ripple: 0.5,
+    }),
+    esperado: { orden: 1, avisos: [] },
+    referencia: 'spec §7.6',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Orden calculado: una atenuación de 0 dB o negativa es entrada inválida',
+    entradas: entradaFiltro('pasa-bajos', 'butterworth', 'π', pedido(0, 200e6), 100e6),
+    esperado: { corte: 'entrada-invalida' },
+    referencia: 'spec §7.1',
+  },
 ];
 
 // La Topología por defecto: la que usa menos bobinas, y π cuando usan las mismas (spec §7.1 y
@@ -708,4 +808,160 @@ export const CASOS_TOPOLOGIA: readonly {
   { tipo: 'pasa-altos', aproximacion: 'chebyshev', orden: 4, sugerida: 'T' },
   { tipo: 'pasa-bajos', aproximacion: 'butterworth', orden: 1, sugerida: 'π' },
   { tipo: 'pasa-altos', aproximacion: 'butterworth', orden: 1, sugerida: 'T' },
+];
+
+// --- Orden calculado desde una atenuación (spec §7.6) --------------------------------------------
+
+// El ejemplo de Matthaei Sec. 8.04: Chebyshev de 1 dB, pasa banda de 2 a 4 kHz, al menos 50 dB a
+// 1,5 kHz. El libro lee las atenuaciones de un gráfico, no de una tabla.
+export interface CasoReferenciaOrden {
+  clase: 'referencia';
+  id: string;
+  entradas: Extract<EntradaFiltro, { banda: BandaEntrada }>;
+  // Ωs y el n sin redondear, como los imprime el libro.
+  omegaS: string;
+  nExacto: string;
+  // La atenuación del prototipo en Ωs con n = 5 y con n = 6, leída de su gráfico.
+  atenuaciones: readonly { n: number; impreso: string }[];
+  tolerancia: Extract<Tolerancia, { tipo: 'absoluta' }>;
+  referencia: string;
+}
+
+export const TOLERANCIA_GRAFICO: Extract<Tolerancia, { tipo: 'absoluta' }> = {
+  tipo: 'absoluta',
+  valor: 0.5,
+  motivo:
+    'Matthaei lee las atenuaciones de un gráfico, no las calcula: ±0,5 dB por la lectura (spec §13.3).',
+};
+
+export const CASOS_REFERENCIA_ORDEN: readonly CasoReferenciaOrden[] = [
+  {
+    clase: 'referencia',
+    id: 'Matthaei 8.04: Chebyshev 1 dB pasa banda de 2 a 4 kHz, 50 dB a 1,5 kHz',
+    entradas: entradaBanda(
+      'pasa-banda',
+      'chebyshev',
+      'π',
+      pedido(50, 1.5e3),
+      { f1: 2e3, f2: 4e3 },
+      { ripple: 1 },
+    ),
+    omegaS: '1,917',
+    nExacto: '5,622',
+    atenuaciones: [
+      { n: 5, impreso: '43' },
+      { n: 6, impreso: '54,5' },
+    ],
+    tolerancia: TOLERANCIA_GRAFICO,
+    referencia: `${MATTHAEI}, Sec. 8.04 y ec. 8.04-1; research/sintesis-filtros-lc.md, §4 y §7 (O4)`,
+  },
+];
+
+// El Orden calculado y la red real: el n que da el Asistente, la atenuación que informa y la que da
+// el oráculo ABCD con la escalera armada, en fs. El n anterior (el impar anterior en Chebyshev) no
+// llega a As, así que es el mínimo.
+export interface CasoVerificacionOrden {
+  clase: 'verificacion';
+  id: string;
+  entradas: EntradaFiltro;
+  // El Orden calculado, escrito a mano con las cuentas de la investigación.
+  ordenEsperado: number;
+  oraculo: string;
+  referencia: string;
+}
+
+const ordenVerificado = (
+  id: string,
+  entradas: EntradaFiltro,
+  ordenEsperado: number,
+  referencia = INVESTIGACION,
+): CasoVerificacionOrden => ({
+  clase: 'verificacion',
+  id,
+  entradas,
+  ordenEsperado,
+  oraculo: ORACULO,
+  referencia,
+});
+
+export const TOLERANCIA_ORDEN_DB: Extract<Tolerancia, { tipo: 'absoluta' }> = {
+  tipo: 'absoluta',
+  valor: 0.01,
+  motivo: 'La atenuación del prototipo contra la de la red simulada: ±0,01 dB (spec §13.2).',
+};
+
+// Bessel se guarda con 4 cifras (g y factor ω3dB): la red se aparta del polinomio por ~1e-3 dB.
+export const TOLERANCIA_ORDEN_BESSEL_DB: Extract<Tolerancia, { tipo: 'absoluta' }> = {
+  tipo: 'absoluta',
+  valor: 0.02,
+  motivo:
+    'Los g y el factor ω3dB de la tabla de Bessel tienen 4 cifras: la red se aparta del polinomio ' +
+    'unas milésimas de dB, y más cuanto más atenúa.',
+};
+
+const CUENTAS = 'spec §7.6, con las cuentas hechas a mano; research/sintesis-filtros-lc.md, §4';
+
+export const CASOS_VERIFICACION_ORDEN: readonly CasoVerificacionOrden[] = [
+  ordenVerificado(
+    'O1: Butterworth pasa bajos, 40 dB a 2·fc, fc = 100 MHz',
+    entradaFiltro('pasa-bajos', 'butterworth', 'π', pedido(40, 200e6), 100e6),
+    7,
+  ),
+  ordenVerificado(
+    'O2: Chebyshev 0,5 dB pasa bajos, 40 dB a 2·fc, fc = 100 MHz',
+    entradaFiltro('pasa-bajos', 'chebyshev', 'π', pedido(40, 200e6), 100e6, { ripple: 0.5 }),
+    5,
+  ),
+  ordenVerificado(
+    'O3: Chebyshev 0,1 dB pasa bajos, 40 dB a 2·fc: sale 6 y pasa a 7',
+    entradaFiltro('pasa-bajos', 'chebyshev', 'T', pedido(40, 200e6), 100e6, { ripple: 0.1 }),
+    7,
+  ),
+  ordenVerificado(
+    'O4: Chebyshev 1 dB pasa banda de 2 a 4 kHz, 50 dB a 1,5 kHz: sale 6 y pasa a 7',
+    entradaBanda(
+      'pasa-banda',
+      'chebyshev',
+      'π',
+      pedido(50, 1.5e3),
+      { f1: 2e3, f2: 4e3 },
+      { ripple: 1 },
+    ),
+    7,
+  ),
+  ordenVerificado(
+    'O5: Butterworth pasa banda de 88 a 108 MHz, 30 dB a 70 MHz',
+    entradaBanda('pasa-banda', 'butterworth', 'π', pedido(30, 70e6), BANDA_FM),
+    3,
+  ),
+  ordenVerificado(
+    'O6: Bessel pasa bajos, 30 dB a 4·fc, fc = 100 MHz',
+    entradaFiltro('pasa-bajos', 'bessel', 'π', pedido(30, 400e6), 100e6),
+    4,
+  ),
+  ordenVerificado(
+    'O8: Butterworth pasa altos, 30 dB a fc/2, fc = 50 MHz',
+    entradaFiltro('pasa-altos', 'butterworth', 'T', pedido(30, 25e6), 50e6),
+    5,
+    CUENTAS,
+  ),
+  ordenVerificado(
+    'O9: Chebyshev 0,5 dB pasa altos, 40 dB a 30 MHz, fc = 50 MHz: sale 6 y pasa a 7',
+    entradaFiltro('pasa-altos', 'chebyshev', 'π', pedido(40, 30e6), 50e6, { ripple: 0.5 }),
+    7,
+    CUENTAS,
+  ),
+  ordenVerificado(
+    'O10: Butterworth rechaza banda de 88 a 108 MHz, 30 dB a 92 MHz',
+    entradaBanda('rechaza-banda', 'butterworth', 'T', pedido(30, 92e6), BANDA_FM),
+    7,
+    CUENTAS,
+  ),
+  ordenVerificado(
+    'O11: Bessel pasa banda de 88 a 108 MHz, 20 dB a 70 MHz',
+    entradaBanda('pasa-banda', 'bessel', 'T', pedido(20, 70e6), BANDA_FM),
+    // Ωs = 3,289: Bessel de n = 3 da ~20,9 dB (tabla de la investigación, Ωs = 3).
+    3,
+    CUENTAS,
+  ),
 ];

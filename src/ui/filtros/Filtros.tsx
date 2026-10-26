@@ -1,12 +1,15 @@
 import { useEffect } from 'preact/hooks';
 import {
+  type DatosDeOrden,
   type ElementoFiltro,
   type EntradaFiltro,
+  type OrdenCalculado,
   type ResonadorFiltro,
   type ResultadoFiltro,
   DONDE,
   calcularFiltro,
   esDeBanda,
+  ordenDesdeAtenuacion,
   topologiaSugerida,
 } from '../../calculo/filtros/filtros';
 import { mensajeDeResultados } from '../../entrada/campo';
@@ -27,13 +30,16 @@ import { Rotulo } from '../comun/Rotulo';
 import { Desplegable, TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
 import {
   APROXIMACIONES,
+  AS,
   ATAJOS_RIPPLE,
   BW,
   F0,
   F1,
   F2,
   FC,
+  FS,
   MODOS_BANDA,
+  MODOS_ORDEN,
   ORDEN,
   Q_BOBINA,
   Q_BOBINA_POR_DEFECTO,
@@ -48,8 +54,9 @@ import {
 } from './campos';
 
 // La Calculadora de filtros (spec §7): por ahora escaleras π y T de los cuatro Tipos de filtro,
-// Butterworth y Chebyshev, con fuente y carga iguales. El resultado es el esquema con los valores en
-// orden desde la fuente y la pérdida de Cohn.
+// Butterworth, Chebyshev y Bessel, con fuente y carga iguales y el Orden escrito o calculado desde
+// una atenuación. El resultado es el esquema con los valores en orden desde la fuente y la pérdida de
+// Cohn.
 export function Filtros() {
   const guardado = (campo: string) => ({ calculadora: 'filtros', campo });
   const [tipo, setTipo] = useOpcionGuardada(TIPOS, 'pasa-bajos', guardado('tipo'));
@@ -64,7 +71,14 @@ export function Filtros() {
     guardado('topologia'),
   );
   const ripple = useCampoEntrada(RIPPLE, RIPPLE_POR_DEFECTO, guardado('ripple'));
+  const [modoOrden, setModoOrden] = useOpcionGuardada(
+    MODOS_ORDEN,
+    'ingresar',
+    guardado('modo-orden'),
+  );
   const orden = useCampoEntrada(ORDEN, '', guardado('orden'));
+  const atenuacion = useCampoEntrada(AS, '', guardado('as'));
+  const fs = useCampoEntrada(FS, '', guardado('fs'));
   const fc = useCampoEntrada(FC, '', guardado('fc'));
   const [modoBanda, setModoBanda] = useOpcionGuardada(MODOS_BANDA, 'f1-f2', guardado('modo-banda'));
   const f1 = useCampoEntrada(F1, '', guardado('f1'));
@@ -79,7 +93,15 @@ export function Filtros() {
   const deBanda = esDeBanda(tipo);
   // fc en pasa bajos y pasa altos; en pasa banda y rechaza banda, f1 y f2 o f0 y BW.
   const frecuencias = !deBanda ? [fc] : modoBanda === 'f1-f2' ? [f1, f2] : [f0, bw];
-  const campos = [...(esChebyshev ? [ripple] : []), orden, ...frecuencias, rs, rl, qBobina];
+  const camposOrden = modoOrden === 'ingresar' ? [orden] : [atenuacion, fs];
+  const campos = [
+    ...(esChebyshev ? [ripple] : []),
+    ...camposOrden,
+    ...frecuencias,
+    rs,
+    rl,
+    qBobina,
+  ];
   const mensaje = mensajeDeResultados(
     campos.map((c) => ({
       nombre: c.spec.nombre,
@@ -88,7 +110,16 @@ export function Filtros() {
     })),
   );
   const valor = (c: typeof fc) => (c.estado.estado === 'valido' ? c.estado.valor : null);
-  const [vRipple, vOrden, vFc, vRs, vRl, vQ] = [ripple, orden, fc, rs, rl, qBobina].map(valor);
+  const [vRipple, vOrden, vFc, vRs, vRl, vQ, vAs, vFs] = [
+    ripple,
+    orden,
+    fc,
+    rs,
+    rl,
+    qBobina,
+    atenuacion,
+    fs,
+  ].map(valor);
   const [vF1, vF2, vF0, vBw] = [f1, f2, f0, bw].map(valor);
   const banda =
     modoBanda === 'f1-f2'
@@ -99,8 +130,32 @@ export function Filtros() {
         ? { f0: vF0, bw: vBw }
         : null;
 
-  // Mientras el Alumno no elija, la Topología es la que usa menos bobinas con el Orden escrito.
-  const sugerida = topologiaSugerida(tipo, aproximacion, vOrden);
+  // El Orden pedido: el escrito, o la atenuación As a fs de la que se calcula.
+  const pedidoOrden =
+    modoOrden === 'ingresar' ? vOrden : vAs !== null && vFs !== null ? { as: vAs, fs: vFs } : null;
+
+  // Con el Orden calculado, la Topología por defecto se elige con el que salió (si salió uno).
+  const datosOrden: DatosDeOrden | null =
+    mensaje !== null || (esChebyshev && vRipple === null)
+      ? null
+      : deBanda
+        ? banda && { tipo, aproximacion, ripple: esChebyshev ? vRipple : null, banda }
+        : vFc !== null
+          ? { tipo, aproximacion, ripple: esChebyshev ? vRipple : null, fc: vFc }
+          : null;
+  const ordenCalculado =
+    typeof pedidoOrden === 'object' && pedidoOrden !== null && datosOrden
+      ? ordenDesdeAtenuacion(datosOrden, pedidoOrden)
+      : null;
+  const ordenParaTopologia =
+    typeof pedidoOrden === 'number'
+      ? pedidoOrden
+      : ordenCalculado?.estado === 'calculado'
+        ? ordenCalculado.orden
+        : null;
+
+  // Mientras el Alumno no elija, la Topología es la que usa menos bobinas con el Orden elegido.
+  const sugerida = topologiaSugerida(tipo, aproximacion, ordenParaTopologia);
   const topologia = elegida === 'sugerida' ? sugerida.topologia : elegida;
   // Una elegida que coincide con la que usa menos bobinas vuelve a seguirla.
   useEffect(() => {
@@ -108,12 +163,12 @@ export function Filtros() {
   }, [elegida, sugerida.topologia]);
 
   const comun =
-    mensaje === null && vOrden !== null && vRs !== null && vRl !== null && vQ !== null
+    mensaje === null && pedidoOrden !== null && vRs !== null && vRl !== null && vQ !== null
       ? {
           aproximacion,
           ripple: esChebyshev ? vRipple : null,
           topologia,
-          orden: vOrden,
+          orden: pedidoOrden,
           rs: vRs,
           rl: vRl,
           qBobina: vQ,
@@ -173,7 +228,21 @@ export function Filtros() {
           onCambio={setElegida}
         />
         <p class="nota-campo">{sugerida.nota}</p>
-        <CampoEntradaValor id="orden" etiqueta="Orden" campo={orden} />
+        <BotonesSegmentados
+          etiqueta="Orden"
+          nombre="modo-orden-filtro"
+          opciones={MODOS_ORDEN}
+          valor={modoOrden}
+          onCambio={setModoOrden}
+        />
+        {modoOrden === 'ingresar' ? (
+          <CampoEntradaValor id="orden" etiqueta="Orden" campo={orden} />
+        ) : (
+          <>
+            <CampoEntradaValor id="as" etiqueta="As (atenuación mínima)" campo={atenuacion} />
+            <CampoEntradaValor id="fs" etiqueta="fs (donde se pide)" campo={fs} />
+          </>
+        )}
         {!deBanda ? (
           <CampoEntradaValor id="fc" etiqueta="fc" campo={fc} />
         ) : (
@@ -257,6 +326,27 @@ function bandaTexto(entrada: EntradaFiltro, r: ResultadoCalculado): string {
   return `de ${frecuencia(r.banda!.f1)} a ${frecuencia(r.banda!.f2)}`;
 }
 
+// El Orden calculado: la atenuación que da el Orden elegido en fs, contra la pedida (spec §7.9).
+function AtenuacionReal({ orden }: { orden: OrdenCalculado }) {
+  const real =
+    orden.atenuacionReal === Infinity ? '∞' : formatearValor(orden.atenuacionReal, 'decibeles');
+  return (
+    <ValorResultado
+      nombre={`A(${frecuencia(orden.fs)})`}
+      valor={real}
+      detalle={
+        <>
+          atenuación real en fs con Orden {orden.orden}; pediste al menos{' '}
+          {formatearValor(orden.as, 'decibeles')}. Ω<sub>s</sub> = {omegaTexto(orden.omegaS)}
+          {orden.nExacto !== null && <>, n ≥ {formatearValor(orden.nExacto, 'numero')}</>}
+        </>
+      }
+    />
+  );
+}
+
+const omegaTexto = (x: number) => (x === Infinity ? '∞' : formatearValor(x, 'numero'));
+
 type ResultadoCalculado = Extract<ResultadoFiltro, { estado: 'calculado' }>;
 
 function Resultado({ resultado, entrada }: { resultado: ResultadoFiltro; entrada: EntradaFiltro }) {
@@ -315,6 +405,7 @@ function Resultado({ resultado, entrada }: { resultado: ResultadoFiltro; entrada
               />
             </>
           )}
+          {r.ordenCalculado && <AtenuacionReal orden={r.ordenCalculado} />}
           {r.elementos.map((e) => {
             const marca = nivel(e);
             const resonador = r.resonadores.find((x) => x.l === e || x.c === e);
