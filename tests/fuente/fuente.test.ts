@@ -169,6 +169,29 @@ function formulasDeFiltros(): string[] {
       }
     }
   }
+  // Pasa banda y rechaza banda, con f1 y f2 y con f0 y BW, y una banda angosta que marca valores.
+  for (const tipo of ['pasa-banda', 'rechaza-banda'] as const) {
+    for (const topologia of ['π', 'T'] as const) {
+      for (const banda of [
+        { f1: 88e6, f2: 108e6 },
+        { f0: 97.5e6, bw: 20e6 },
+        { f1: 144e6, f2: 148e6 },
+      ]) {
+        const r = calcularFiltro({
+          tipo,
+          aproximacion: 'chebyshev',
+          ripple: 0.5,
+          topologia,
+          orden: 4,
+          banda,
+          rs: 50,
+          rl: 50,
+          qBobina: 100,
+        });
+        if (r.estado === 'calculado') formulas.push(...r.formulas, ...r.pasos.map((p) => p.latex));
+      }
+    }
+  }
   return formulas;
 }
 

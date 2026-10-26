@@ -2,9 +2,11 @@ import { useEffect } from 'preact/hooks';
 import {
   type ElementoFiltro,
   type EntradaFiltro,
+  type ResonadorFiltro,
   type ResultadoFiltro,
   DONDE,
   calcularFiltro,
+  esDeBanda,
   topologiaSugerida,
 } from '../../calculo/filtros/filtros';
 import { mensajeDeResultados } from '../../entrada/campo';
@@ -26,7 +28,12 @@ import { Desplegable, TarjetaResultado, ValorResultado } from '../comun/Tarjeta'
 import {
   APROXIMACIONES,
   ATAJOS_RIPPLE,
+  BW,
+  F0,
+  F1,
+  F2,
   FC,
+  MODOS_BANDA,
   ORDEN,
   Q_BOBINA,
   Q_BOBINA_POR_DEFECTO,
@@ -40,7 +47,7 @@ import {
   TOPOLOGIAS_GUARDADAS,
 } from './campos';
 
-// La Calculadora de filtros (spec §7): por ahora escaleras π y T pasa bajos y pasa altos,
+// La Calculadora de filtros (spec §7): por ahora escaleras π y T de los cuatro Tipos de filtro,
 // Butterworth y Chebyshev, con fuente y carga iguales. El resultado es el esquema con los valores en
 // orden desde la fuente y la pérdida de Cohn.
 export function Filtros() {
@@ -59,12 +66,20 @@ export function Filtros() {
   const ripple = useCampoEntrada(RIPPLE, RIPPLE_POR_DEFECTO, guardado('ripple'));
   const orden = useCampoEntrada(ORDEN, '', guardado('orden'));
   const fc = useCampoEntrada(FC, '', guardado('fc'));
+  const [modoBanda, setModoBanda] = useOpcionGuardada(MODOS_BANDA, 'f1-f2', guardado('modo-banda'));
+  const f1 = useCampoEntrada(F1, '', guardado('f1'));
+  const f2 = useCampoEntrada(F2, '', guardado('f2'));
+  const f0 = useCampoEntrada(F0, '', guardado('f0'));
+  const bw = useCampoEntrada(BW, '', guardado('bw'));
   const rs = useCampoEntrada(RS, R_POR_DEFECTO, guardado('rs'));
   const rl = useCampoEntrada(RL, R_POR_DEFECTO, guardado('rl'));
   const qBobina = useCampoEntrada(Q_BOBINA, Q_BOBINA_POR_DEFECTO, guardado('q-bobina'));
 
   const esChebyshev = aproximacion === 'chebyshev';
-  const campos = [...(esChebyshev ? [ripple] : []), orden, fc, rs, rl, qBobina];
+  const deBanda = esDeBanda(tipo);
+  // fc en pasa bajos y pasa altos; en pasa banda y rechaza banda, f1 y f2 o f0 y BW.
+  const frecuencias = !deBanda ? [fc] : modoBanda === 'f1-f2' ? [f1, f2] : [f0, bw];
+  const campos = [...(esChebyshev ? [ripple] : []), orden, ...frecuencias, rs, rl, qBobina];
   const mensaje = mensajeDeResultados(
     campos.map((c) => ({
       nombre: c.spec.nombre,
@@ -74,6 +89,15 @@ export function Filtros() {
   );
   const valor = (c: typeof fc) => (c.estado.estado === 'valido' ? c.estado.valor : null);
   const [vRipple, vOrden, vFc, vRs, vRl, vQ] = [ripple, orden, fc, rs, rl, qBobina].map(valor);
+  const [vF1, vF2, vF0, vBw] = [f1, f2, f0, bw].map(valor);
+  const banda =
+    modoBanda === 'f1-f2'
+      ? vF1 !== null && vF2 !== null
+        ? { f1: vF1, f2: vF2 }
+        : null
+      : vF0 !== null && vBw !== null
+        ? { f0: vF0, bw: vBw }
+        : null;
 
   // Mientras el Alumno no elija, la Topología es la que usa menos bobinas con el Orden escrito.
   const sugerida = topologiaSugerida(tipo, aproximacion, vOrden);
@@ -83,25 +107,26 @@ export function Filtros() {
     if (elegida === sugerida.topologia) setElegida('sugerida');
   }, [elegida, sugerida.topologia]);
 
-  const entrada: EntradaFiltro | null =
-    mensaje === null &&
-    vOrden !== null &&
-    vFc !== null &&
-    vRs !== null &&
-    vRl !== null &&
-    vQ !== null
+  const comun =
+    mensaje === null && vOrden !== null && vRs !== null && vRl !== null && vQ !== null
       ? {
-          tipo,
           aproximacion,
           ripple: esChebyshev ? vRipple : null,
           topologia,
           orden: vOrden,
-          fc: vFc,
           rs: vRs,
           rl: vRl,
           qBobina: vQ,
         }
       : null;
+  let entrada: EntradaFiltro | null = null;
+  if (comun) {
+    if (esDeBanda(tipo)) {
+      if (banda) entrada = { ...comun, tipo, banda };
+    } else if (vFc !== null) {
+      entrada = { ...comun, tipo, fc: vFc };
+    }
+  }
 
   return (
     <div class="cuerpo-calculadora">
@@ -149,7 +174,30 @@ export function Filtros() {
         />
         <p class="nota-campo">{sugerida.nota}</p>
         <CampoEntradaValor id="orden" etiqueta="Orden" campo={orden} />
-        <CampoEntradaValor id="fc" etiqueta="fc" campo={fc} />
+        {!deBanda ? (
+          <CampoEntradaValor id="fc" etiqueta="fc" campo={fc} />
+        ) : (
+          <>
+            <BotonesSegmentados
+              etiqueta="Frecuencias de la banda"
+              nombre="modo-banda-filtro"
+              opciones={MODOS_BANDA}
+              valor={modoBanda}
+              onCambio={setModoBanda}
+            />
+            {modoBanda === 'f1-f2' ? (
+              <>
+                <CampoEntradaValor id="f1" etiqueta="f1 (borde bajo)" campo={f1} />
+                <CampoEntradaValor id="f2" etiqueta="f2 (borde alto)" campo={f2} />
+              </>
+            ) : (
+              <>
+                <CampoEntradaValor id="f0" etiqueta="f0 (central)" campo={f0} />
+                <CampoEntradaValor id="bw" etiqueta="BW (ancho de banda)" campo={bw} />
+              </>
+            )}
+          </>
+        )}
         <CampoEntradaValor id="rs" etiqueta="Rs (fuente)" campo={rs} />
         <div class="fila-intercambio">
           <button
@@ -176,17 +224,40 @@ export function Filtros() {
   );
 }
 
-function escalera(elementos: readonly ElementoFiltro[]): Escalera {
+// En pasa banda y rechaza banda cada g es un resonador LC, con los nombres de su L y su C.
+function escalera(
+  elementos: readonly ElementoFiltro[],
+  resonadores: readonly ResonadorFiltro[],
+): Escalera {
   return {
     fuente: 'R_s',
     carga: 'R_L',
-    elementos: elementos.map((e) => ({
-      tipo: e.componente,
-      posicion: e.posicion,
-      nombre: e.nombre,
-    })),
+    elementos:
+      resonadores.length > 0
+        ? resonadores.map((r) => ({
+            tipo: 'LC',
+            conexion: r.conexion,
+            posicion: r.posicion,
+            nombreL: r.l.nombre,
+            nombreC: r.c.nombre,
+          }))
+        : elementos.map((e) => ({
+            tipo: e.componente,
+            posicion: e.posicion,
+            nombre: e.nombre,
+          })),
   };
 }
+
+const frecuencia = (f: number) => formatearValor(f, 'frecuencia');
+
+// El final del título: "fc = 100 MHz" o "de 88 MHz a 108 MHz"
+function bandaTexto(entrada: EntradaFiltro, r: ResultadoCalculado): string {
+  if ('fc' in entrada) return `fc = ${frecuencia(entrada.fc)}`;
+  return `de ${frecuencia(r.banda!.f1)} a ${frecuencia(r.banda!.f2)}`;
+}
+
+type ResultadoCalculado = Extract<ResultadoFiltro, { estado: 'calculado' }>;
 
 function Resultado({ resultado, entrada }: { resultado: ResultadoFiltro; entrada: EntradaFiltro }) {
   if (resultado.estado === 'corte') {
@@ -205,7 +276,7 @@ function Resultado({ resultado, entrada }: { resultado: ResultadoFiltro; entrada
   // "Pasa bajos Butterworth de Orden 5 en π, fc = 100 MHz"
   const titulo =
     `${TIPOS.find((t) => t.valor === r.tipo)!.texto} ${aproximacion} de Orden ${r.orden} en ${r.topologia}, ` +
-    `fc = ${formatearValor(entrada.fc, 'frecuencia')}`;
+    bandaTexto(entrada, r);
   const nivel = (e: ElementoFiltro) =>
     r.revision.marcados.find((m) => m.nombre === e.nombre)?.nivel;
   return (
@@ -221,9 +292,30 @@ function Resultado({ resultado, entrada }: { resultado: ResultadoFiltro; entrada
           motivos={r.revision.marcados.map((m) => ({ nivel: m.nivel, texto: m.motivo }))}
           sugerencia={r.revision.sugerencia ?? undefined}
         >
-          <Esquema escalera={escalera(r.elementos)} />
+          <Esquema escalera={escalera(r.elementos, r.resonadores)} />
+          {r.banda && (
+            <>
+              <ValorResultado nombre="f1" valor={frecuencia(r.banda.f1)} detalle="borde bajo" />
+              <ValorResultado nombre="f2" valor={frecuencia(r.banda.f2)} detalle="borde alto" />
+              <ValorResultado
+                nombre="f0"
+                valor={frecuencia(r.banda.f0)}
+                detalle={
+                  <>
+                    central geométrica √(f<sub>1</sub>·f<sub>2</sub>)
+                  </>
+                }
+              />
+              <ValorResultado
+                nombre="BW"
+                valor={frecuencia(r.banda.bw)}
+                detalle={`ancho de banda; FBW = ${formatearValor(r.banda.fbw * 100, 'porcentaje')}`}
+              />
+            </>
+          )}
           {r.elementos.map((e) => {
             const marca = nivel(e);
+            const resonador = r.resonadores.find((x) => x.l === e || x.c === e);
             return (
               <ValorResultado
                 key={e.nombre}
@@ -232,18 +324,25 @@ function Resultado({ resultado, entrada }: { resultado: ResultadoFiltro; entrada
                 rotulos={marca && <Rotulo tipo={marca} />}
                 detalle={
                   <>
+                    {resonador && (
+                      <>
+                        resonador {resonador.nombre}, LC {resonador.conexion},{' '}
+                      </>
+                    )}
                     g<sub>{e.k}</sub> = {formatearValor(e.g, 'numero', 'paso')}, {DONDE[e.posicion]}
                   </>
                 }
               />
             );
           })}
-          <ValorResultado
-            nombre="Pérdida"
-            valor={formatearValor(r.perdidaCohn, 'decibeles')}
-            rotulos={<Rotulo tipo="estimacion" />}
-            detalle={`de Cohn en la banda pasante, con Qu = ${formatearValor(entrada.qBobina, 'numero')}`}
-          />
+          {r.perdidaCohn !== null && (
+            <ValorResultado
+              nombre="Pérdida"
+              valor={formatearValor(r.perdidaCohn, 'decibeles')}
+              rotulos={<Rotulo tipo="estimacion" />}
+              detalle={`de Cohn en la banda pasante, con Qu = ${formatearValor(entrada.qBobina, 'numero')}`}
+            />
+          )}
           {/* Cerradas, como los pasos: para no cargar la primera vista. */}
           <Desplegable titulo="Fórmulas">
             <div class="formulas">

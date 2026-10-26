@@ -1,5 +1,17 @@
-import type { ElementoFiltro, TipoFiltro } from '../../../src/calculo/filtros/filtros';
-import { type Elemento, atenuacionDb, c, cascada, derivacion, serie } from '../../oraculos/abcd';
+import type {
+  ElementoFiltro,
+  ResonadorFiltro,
+  TipoBajoAlto,
+} from '../../../src/calculo/filtros/filtros';
+import {
+  type Complejo,
+  type Elemento,
+  atenuacionDb,
+  c,
+  cascada,
+  derivacion,
+  serie,
+} from '../../oraculos/abcd';
 
 // La escalera que arma el cálculo de filtros, pasada al oráculo ABCD. Es el único lugar donde los
 // tests conocen la forma del resultado; el oráculo no sabe nada de él.
@@ -21,7 +33,7 @@ export function atenuacionOraculo(elementos: readonly ElementoFiltro[], f: numbe
 // en pasa altos una R de Qu·ωc·L en paralelo con cada L, vista muy por encima de fc (fc·10⁶).
 export function perdidaSimulada(
   elementos: readonly ElementoFiltro[],
-  tipo: TipoFiltro,
+  tipo: TipoBajoAlto,
   fc: number,
   r0: number,
   qu: number,
@@ -51,4 +63,49 @@ export function atenuacionTeorica(
   const eps2 = 10 ** (ripple! / 10) - 1;
   const t = omega <= 1 ? Math.cos(n * Math.acos(omega)) : Math.cosh(n * Math.acosh(omega));
   return 10 * Math.log10(1 + eps2 * t * t);
+}
+
+// 1/(a + jb)
+const inverso = (re: number, im: number): Complejo => {
+  const d = re * re + im * im;
+  return c(re / d, -im / d);
+};
+
+// Un resonador a la frecuencia f, en su rama. La L puede traer una R en serie (la pérdida de la
+// bobina); la C es ideal. Un LC serie en derivación o un LC paralelo en serie se arman como
+// admitancia o impedancia del resonador.
+function resonador(r: ResonadorFiltro, f: number, rBobina = 0): Elemento {
+  const omega = 2 * Math.PI * f;
+  const xL = omega * r.l.valor;
+  const xC = -1 / (omega * r.c.valor);
+  if (r.conexion === 'serie') {
+    const z = c(rBobina, xL + xC);
+    return r.posicion === 'serie' ? serie(z) : derivacion(inverso(z.re, z.im));
+  }
+  // La rama de L (con su R) en paralelo con la de C.
+  const yL = inverso(rBobina, xL);
+  const y = c(yL.re, yL.im + omega * r.c.valor);
+  return r.posicion === 'derivacion' ? derivacion(y) : serie(inverso(y.re, y.im));
+}
+
+// La atenuación de transductor de la escalera de resonadores, ideal, entre R0 y R0, en dB.
+export function atenuacionResonadores(
+  resonadores: readonly ResonadorFiltro[],
+  f: number,
+  r0: number,
+): number {
+  return atenuacionDb(cascada(resonadores.map((r) => resonador(r, f))), r0, r0);
+}
+
+// La pérdida en el centro de la banda del pasa banda con la pérdida de cada bobina: una R en serie
+// de ω0·L/Qu a ω0, que es el Q constante del modelo de Matthaei (Sec. 4.13).
+export function perdidaSimuladaBanda(
+  resonadores: readonly ResonadorFiltro[],
+  f0: number,
+  r0: number,
+  qu: number,
+): number {
+  const omega0 = 2 * Math.PI * f0;
+  const escalera = resonadores.map((r) => resonador(r, f0, (omega0 * r.l.valor) / qu));
+  return atenuacionDb(cascada(escalera), r0, r0);
 }

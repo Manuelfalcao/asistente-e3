@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   type EntradaFiltro,
+  type ResultadoFiltro,
   REFERENCIAS_FILTROS,
   SUGERENCIA_FILTROS,
+  SUGERENCIA_RECHAZA_BANDA,
+  bandaDe,
   calcularFiltro,
   prototipo,
   topologiaSugerida,
@@ -18,9 +21,17 @@ import {
   TOLERANCIA_DB,
   TOLERANCIA_ORACULO,
   TOLERANCIA_VALORES,
+  bordesDe,
+  entradaBanda,
   entradaFiltro,
 } from './casos';
-import { atenuacionOraculo, atenuacionTeorica, perdidaSimulada } from './elementos';
+import {
+  atenuacionOraculo,
+  atenuacionResonadores,
+  atenuacionTeorica,
+  perdidaSimulada,
+  perdidaSimuladaBanda,
+} from './elementos';
 
 // La Calculadora de filtros, pasa bajos y pasa altos en π y T (spec §7 y §13.3).
 
@@ -28,6 +39,13 @@ function calculado(e: EntradaFiltro) {
   const r = calcularFiltro(e);
   if (r.estado !== 'calculado') throw new Error(`no calculó: ${r.codigo}`);
   return r;
+}
+
+// La atenuación de un resultado a la frecuencia f, con el oráculo de su forma.
+function atenuacion(r: Extract<ResultadoFiltro, { estado: 'calculado' }>, f: number, r0: number) {
+  return r.resonadores.length > 0
+    ? atenuacionResonadores(r.resonadores, f, r0)
+    : atenuacionOraculo(r.elementos, f, r0);
 }
 
 const ESCALA = { nH: 1e9, pF: 1e12 } as const;
@@ -48,7 +66,7 @@ describe('casos de referencia: los g de Matthaei', () => {
   }
 });
 
-describe('casos de verificación: C1, C2 y C4 contra el oráculo ABCD', () => {
+describe('casos de verificación: C1, C2, C4, C5, C6 y C7 contra el oráculo ABCD', () => {
   for (const caso of CASOS_VERIFICACION) {
     it(caso.id, () => {
       const r = calculado(caso.entradas);
@@ -60,15 +78,17 @@ describe('casos de verificación: C1, C2 y C4 contra el oráculo ABCD', () => {
           `${nombre}: ${obtenido} contra ${impreso}`,
         ).toBe(true);
       });
-      const { rs, fc, aproximacion, ripple } = caso.entradas;
+      const { rs, aproximacion, ripple } = caso.entradas;
       for (const { f, impreso } of caso.atenuaciones) {
-        const a = atenuacionOraculo(r.elementos, f, rs);
+        const a = atenuacion(r, f, rs);
         expect(dentroDeTolerancia(a, impreso, TOLERANCIA_DB), `${f} Hz: ${a} dB`).toBe(true);
       }
-      // En fc, la de la Aproximación: 3,01 dB en Butterworth y el ripple en Chebyshev.
-      const enFc = atenuacionOraculo(r.elementos, fc, rs);
-      const teorica = atenuacionTeorica(aproximacion, r.orden, 1, ripple);
-      expect(Math.abs(enFc / teorica - 1)).toBeLessThan(TOLERANCIA_ORACULO.valor);
+      // En fc (o en f1 y f2), la de la Aproximación: 3,01 dB en Butterworth y el ripple en Chebyshev.
+      for (const borde of bordesDe(caso.entradas)) {
+        const enBorde = atenuacion(r, borde, rs);
+        const teorica = atenuacionTeorica(aproximacion, r.orden, 1, ripple);
+        expect(Math.abs(enBorde / teorica - 1)).toBeLessThan(TOLERANCIA_ORACULO.valor);
+      }
     });
   }
 });
@@ -77,10 +97,13 @@ describe('casos de verificación: la pérdida de Cohn contra la simulación', ()
   for (const caso of CASOS_COHN) {
     it(caso.id, () => {
       const r = calculado(caso.entradas);
-      const { tipo, fc, rs, qBobina } = caso.entradas;
-      const simulada = perdidaSimulada(r.elementos, tipo, fc, rs, qBobina);
+      const { rs, qBobina } = caso.entradas;
+      const simulada =
+        'fc' in caso.entradas
+          ? perdidaSimulada(r.elementos, caso.entradas.tipo, caso.entradas.fc, rs, qBobina)
+          : perdidaSimuladaBanda(r.resonadores, r.banda!.f0, rs, qBobina);
       const esperada = simulada * (1 + caso.diferencia.relativa);
-      expect(Math.abs(r.perdidaCohn - esperada)).toBeLessThanOrEqual(
+      expect(Math.abs(r.perdidaCohn! - esperada)).toBeLessThanOrEqual(
         TOLERANCIA_COHN.valor * simulada,
       );
     });

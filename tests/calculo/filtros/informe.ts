@@ -22,8 +22,15 @@ import {
   TOLERANCIA_DB,
   TOLERANCIA_ORACULO,
   TOLERANCIA_VALORES,
+  bordesDe,
 } from './casos';
-import { atenuacionOraculo, atenuacionTeorica, perdidaSimulada } from './elementos';
+import {
+  atenuacionOraculo,
+  atenuacionResonadores,
+  atenuacionTeorica,
+  perdidaSimulada,
+  perdidaSimuladaBanda,
+} from './elementos';
 
 // El adaptador de las tablas de Casos de prueba de filtros para el Informe de casos (spec §13.6):
 // corre el cálculo con las entradas de cada caso y deja el obtenido, el error y los pasos
@@ -32,9 +39,21 @@ import { atenuacionOraculo, atenuacionTeorica, perdidaSimulada } from './element
 const HZ = (f: number) => formatearValor(f, 'frecuencia');
 const R = (ohms: number) => formatearValor(ohms, 'resistencia');
 
-const TIPO = { 'pasa-bajos': 'pasa bajos', 'pasa-altos': 'pasa altos' } as const;
+const TIPO = {
+  'pasa-bajos': 'pasa bajos',
+  'pasa-altos': 'pasa altos',
+  'pasa-banda': 'pasa banda',
+  'rechaza-banda': 'rechaza banda',
+} as const;
 const APROXIMACION = { butterworth: 'Butterworth', chebyshev: 'Chebyshev' } as const;
 const ESCALA = { nH: 1e9, pF: 1e12 } as const;
+
+function frecuenciasTexto(e: EntradaFiltro): string {
+  if ('fc' in e) return `fc = ${HZ(e.fc)}`;
+  return 'f1' in e.banda
+    ? `f1 = ${HZ(e.banda.f1)} · f2 = ${HZ(e.banda.f2)}`
+    : `f0 = ${HZ(e.banda.f0)} · BW = ${HZ(e.banda.bw)}`;
+}
 
 function entradasTexto(e: EntradaFiltro): string {
   return [
@@ -44,7 +63,7 @@ function entradasTexto(e: EntradaFiltro): string {
       : APROXIMACION[e.aproximacion],
     e.topologia,
     `Orden ${e.orden}`,
-    `fc = ${HZ(e.fc)}`,
+    frecuenciasTexto(e),
     `Rs = ${R(e.rs)}`,
     `RL = ${R(e.rl)}`,
     `Qu = ${formatearValor(e.qBobina, 'numero')}`,
@@ -90,8 +109,12 @@ const verificacion = () =>
   CASOS_VERIFICACION.map((caso) =>
     enCaso(caso, () => {
       const r = calculado(caso.entradas);
-      const { rs, fc, aproximacion, ripple } = caso.entradas;
+      const { rs, aproximacion, ripple } = caso.entradas;
       const teorica = atenuacionTeorica(aproximacion, r.orden, 1, ripple);
+      const atenuacion = (f: number) =>
+        r.resonadores.length > 0
+          ? atenuacionResonadores(r.resonadores, f, rs)
+          : atenuacionOraculo(r.elementos, f, rs);
       return {
         clase: 'verificacion',
         id: caso.id,
@@ -112,19 +135,21 @@ const verificacion = () =>
             medidaImpresa({
               nombre: `Atenuación en ${HZ(f)}`,
               impreso,
-              obtenido: atenuacionOraculo(r.elementos, f, rs),
+              obtenido: atenuacion(f),
               tolerancia: TOLERANCIA_DB,
               unidad: 'dB',
             }),
           ),
-          medidaNumerica({
-            nombre: `Atenuación en fc, contra la de ${APROXIMACION[aproximacion]}`,
-            esperado: teorica,
-            obtenido: atenuacionOraculo(r.elementos, fc, rs),
-            tolerancia: TOLERANCIA_ORACULO,
-            decimales: 9,
-            unidad: 'dB',
-          }),
+          ...bordesDe(caso.entradas).map((borde) =>
+            medidaNumerica({
+              nombre: `Atenuación en ${HZ(borde)}, contra la de ${APROXIMACION[aproximacion]}`,
+              esperado: teorica,
+              obtenido: atenuacion(borde),
+              tolerancia: TOLERANCIA_ORACULO,
+              decimales: 9,
+              unidad: 'dB',
+            }),
+          ),
         ],
         pasos: pasosDe(caso.entradas, r),
       };
@@ -135,7 +160,11 @@ const cohn = () =>
   CASOS_COHN.map((caso) =>
     enCaso(caso, () => {
       const r = calculado(caso.entradas);
-      const { tipo, fc, rs, qBobina } = caso.entradas;
+      const { rs, qBobina } = caso.entradas;
+      const simulada =
+        'fc' in caso.entradas
+          ? perdidaSimulada(r.elementos, caso.entradas.tipo, caso.entradas.fc, rs, qBobina)
+          : perdidaSimuladaBanda(r.resonadores, r.banda!.f0, rs, qBobina);
       return {
         clase: 'verificacion',
         id: caso.id,
@@ -145,8 +174,8 @@ const cohn = () =>
         medidas: [
           medidaNumerica({
             nombre: 'Pérdida de Cohn contra la simulada',
-            esperado: perdidaSimulada(r.elementos, tipo, fc, rs, qBobina),
-            obtenido: r.perdidaCohn,
+            esperado: simulada,
+            obtenido: r.perdidaCohn!,
             tolerancia: TOLERANCIA_COHN,
             diferencia: caso.diferencia,
             decimales: 5,

@@ -19,7 +19,7 @@ export const CALCULADORAS: readonly Calculadora[] = [
     id: 'filtros',
     nombre: 'Calculadora de filtros',
     nombreCorto: 'Filtros',
-    descripcion: 'Filtros LC escalera: pasa bajos, pasa altos y pasa banda.',
+    descripcion: 'Filtros LC escalera: pasa bajos, pasa altos, pasa banda y rechaza banda.',
   },
   {
     id: 'arreglos',

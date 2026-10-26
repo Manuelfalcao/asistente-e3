@@ -1,8 +1,11 @@
 import type {
   Aproximacion,
+  BandaEntrada,
   CodigoAvisoFiltro,
   CodigoCorteFiltro,
   EntradaFiltro,
+  TipoBajoAlto,
+  TipoDeBanda,
   TipoFiltro,
   TopologiaFiltro,
 } from '../../../src/calculo/filtros/filtros';
@@ -20,14 +23,20 @@ const INVESTIGACION = 'research/sintesis-filtros-lc.md, §7';
 const ORACULO = 'tests/oraculos/abcd.ts (ABCD con complejos)';
 const Q_POR_DEFECTO = 100;
 
+interface Opciones {
+  ripple?: number | null;
+  rs?: number;
+  rl?: number;
+}
+
 export const entradaFiltro = (
-  tipo: TipoFiltro,
+  tipo: TipoBajoAlto,
   aproximacion: Aproximacion,
   topologia: TopologiaFiltro,
   orden: number,
   fc: number,
-  { ripple = null, rs = 50, rl = 50 }: { ripple?: number | null; rs?: number; rl?: number } = {},
-): EntradaFiltro => ({
+  { ripple = null, rs = 50, rl = 50 }: Opciones = {},
+): Extract<EntradaFiltro, { fc: number }> => ({
   tipo,
   aproximacion,
   ripple,
@@ -38,6 +47,30 @@ export const entradaFiltro = (
   rl,
   qBobina: Q_POR_DEFECTO,
 });
+
+// Pasa banda y rechaza banda: la banda como f1 y f2, o como f0 y BW.
+export const entradaBanda = (
+  tipo: TipoDeBanda,
+  aproximacion: Aproximacion,
+  topologia: TopologiaFiltro,
+  orden: number,
+  banda: BandaEntrada,
+  { ripple = null, rs = 50, rl = 50 }: Opciones = {},
+): Extract<EntradaFiltro, { banda: BandaEntrada }> => ({
+  tipo,
+  aproximacion,
+  ripple,
+  topologia,
+  orden,
+  banda,
+  rs,
+  rl,
+  qBobina: Q_POR_DEFECTO,
+});
+
+// Los bordes de banda (Ω = 1 del prototipo) de una entrada: fc, o f1 y f2.
+export const bordesDe = (e: EntradaFiltro): number[] =>
+  'fc' in e ? [e.fc] : 'f1' in e.banda ? [e.banda.f1, e.banda.f2] : [];
 
 // --- Referencia ----------------------------------------------------------------------------------
 
@@ -229,6 +262,30 @@ const ATENUACION_C4 = [
   { f: 100e6, impreso: '0,067' },
 ];
 
+const BANDA_FM = { f1: 88e6, f2: 108e6 };
+const F0_FM = Math.sqrt(BANDA_FM.f1 * BANDA_FM.f2);
+
+const ATENUACION_C5 = [
+  { f: 70e6, impreso: '31,02' },
+  { f: 88e6, impreso: '3,010' },
+  { f: F0_FM, impreso: '0,000' },
+  { f: 108e6, impreso: '3,010' },
+  { f: 130e6, impreso: '27,25' },
+];
+const ATENUACION_C6 = [
+  { f: 70e6, impreso: '33,30' },
+  { f: 88e6, impreso: '0,500' },
+  { f: 108e6, impreso: '0,500' },
+  { f: 130e6, impreso: '29,31' },
+];
+// En f0 la atenuación es infinita en el modelo ideal; afuera de la banda rechazada no hay pérdida.
+const ATENUACION_C7 = [
+  { f: 50e6, impreso: '0,000' },
+  { f: 88e6, impreso: '3,010' },
+  { f: 108e6, impreso: '3,010' },
+  { f: 200e6, impreso: '0,000' },
+];
+
 const verificacion = (
   id: string,
   entradas: EntradaFiltro,
@@ -281,6 +338,36 @@ export const CASOS_VERIFICACION: readonly CasoVerificacionFiltro[] = [
     'L1 159,2 nH · C2 31,83 pF · L3 159,2 nH',
     ATENUACION_C4,
   ),
+  verificacion(
+    'C5 π: Butterworth pasa banda, n = 3, 88 a 108 MHz',
+    entradaBanda('pasa-banda', 'butterworth', 'π', 3, BANDA_FM),
+    'L1 16,75 nH · C1 159,2 pF · L2 795,8 nH · C2 3,349 pF · L3 16,75 nH · C3 159,2 pF',
+    ATENUACION_C5,
+  ),
+  verificacion(
+    'C5 T: Butterworth pasa banda, n = 3, 88 a 108 MHz',
+    entradaBanda('pasa-banda', 'butterworth', 'T', 3, BANDA_FM),
+    'L1 397,9 nH · C1 6,698 pF · L2 8,373 nH · C2 318,3 pF · L3 397,9 nH · C3 6,698 pF',
+    ATENUACION_C5,
+  ),
+  verificacion(
+    'C6 π: Chebyshev 0,5 dB pasa banda, n = 3, 88 a 108 MHz',
+    entradaBanda('pasa-banda', 'chebyshev', 'π', 3, BANDA_FM, { ripple: 0.5 }),
+    'L1 10,49 nH · C1 254,1 pF · L2 436,4 nH · C2 6,108 pF · L3 10,49 nH · C3 254,1 pF',
+    ATENUACION_C6,
+  ),
+  verificacion(
+    'C7 T: Butterworth rechaza banda, n = 3, 88 a 108 MHz',
+    entradaBanda('rechaza-banda', 'butterworth', 'T', 3, BANDA_FM),
+    'L1 16,75 nH · C1 159,2 pF · L2 198,9 nH · C2 13,40 pF · L3 16,75 nH · C3 159,2 pF',
+    ATENUACION_C7,
+  ),
+  verificacion(
+    'C7 π: Butterworth rechaza banda, n = 3, 88 a 108 MHz',
+    entradaBanda('rechaza-banda', 'butterworth', 'π', 3, BANDA_FM),
+    'L1 397,9 nH · C1 6,698 pF · L2 33,49 nH · C2 79,58 pF · L3 397,9 nH · C3 6,698 pF',
+    ATENUACION_C7,
+  ),
 ];
 
 // La pérdida de Cohn contra la escalera simulada con la pérdida de cada bobina: en pasa bajos una R
@@ -304,6 +391,20 @@ export const TOLERANCIA_COHN: Extract<Tolerancia, { tipo: 'relativa' }> = {
   valor: 1e-3,
   motivo: 'Alrededor de la Diferencia esperada, que está escrita con 3 cifras: ±0,1 %.',
 };
+
+// En pasa banda la simulación pone una R en serie de ω0·L/Qu en cada bobina y mide en f0 (Q
+// constante de Matthaei, Sec. 4.13). Cohn queda apenas por encima, y más cuanto más angosta la
+// banda y mayor la pérdida, porque es de primer orden en 1/Qu.
+const MOTIVO_COHN_BANDA =
+  'Cohn es de primer orden en 1/Qk: suma la pérdida de cada resonador como si no interactuaran, ' +
+  'y queda por encima de la simulada, más cuanto más pierde el filtro. La diferencia se midió con ' +
+  'esta misma simulación.';
+
+const cohnBanda = (id: string, entradas: EntradaFiltro, relativa: number): CasoCohn => ({
+  ...cohn(id, entradas, relativa),
+  diferencia: { relativa, motivo: MOTIVO_COHN_BANDA },
+  referencia: 'Matthaei, Young y Jones (1964), ec. 4.13-2 y 4.13-11; spec §7.8',
+});
 
 const cohn = (id: string, entradas: EntradaFiltro, relativa: number): CasoCohn => ({
   clase: 'verificacion',
@@ -334,6 +435,31 @@ export const CASOS_COHN: readonly CasoCohn[] = [
     'Cohn C4 T: Butterworth pasa altos, n = 3, Qu = 100',
     entradaFiltro('pasa-altos', 'butterworth', 'T', 3, 50e6),
     0.00499,
+  ),
+  cohnBanda(
+    'Cohn C5 π: Butterworth pasa banda, n = 3, 88 a 108 MHz, Qu = 100',
+    entradaBanda('pasa-banda', 'butterworth', 'π', 3, BANDA_FM),
+    0.000444,
+  ),
+  cohnBanda(
+    'Cohn C5 T: Butterworth pasa banda, n = 3, 88 a 108 MHz, Qu = 100',
+    entradaBanda('pasa-banda', 'butterworth', 'T', 3, BANDA_FM),
+    0.000444,
+  ),
+  cohnBanda(
+    'Cohn C6 π: Chebyshev 0,5 dB pasa banda, n = 3, 88 a 108 MHz, Qu = 100',
+    entradaBanda('pasa-banda', 'chebyshev', 'π', 3, BANDA_FM, { ripple: 0.5 }),
+    0.0117,
+  ),
+  cohnBanda(
+    'Cohn C6 T: Chebyshev 0,5 dB pasa banda, n = 3, 88 a 108 MHz, Qu = 100',
+    entradaBanda('pasa-banda', 'chebyshev', 'T', 3, BANDA_FM, { ripple: 0.5 }),
+    0.0117,
+  ),
+  cohnBanda(
+    'Cohn C8 π: Butterworth pasa banda angosto, n = 3, 144 a 148 MHz, Qu = 100',
+    entradaBanda('pasa-banda', 'butterworth', 'π', 3, { f1: 144e6, f2: 148e6 }),
+    0.0204,
   ),
 ];
 
@@ -402,6 +528,79 @@ export const CASOS_COMPORTAMIENTO: readonly CasoComportamientoFiltro[] = [
     entradas: entradaFiltro('pasa-bajos', 'chebyshev', 'T', 5, 300e6, { ripple: 2 }),
     esperado: { orden: 5, avisos: [], marcados: {} },
     referencia: 'spec §5.6 y §7.10',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'C8: pasa banda angosto de 144 a 148 MHz marca casi todos sus valores',
+    // Cuentas a mano con los umbrales de §5.6 a f2 = 148 MHz: L1 de 1,494 nH (200 %), C1 de 795,8 pF
+    // (por encima de su autorresonancia de 106,6 MHz) y C2 de 0,2987 pF (167 %) son impracticables;
+    // L2 de 3979 nH no se marca.
+    entradas: entradaBanda('pasa-banda', 'butterworth', 'π', 3, { f1: 144e6, f2: 148e6 }),
+    esperado: {
+      orden: 3,
+      avisos: [],
+      marcados: {
+        L1: 'impracticable',
+        C1: 'impracticable',
+        C2: 'impracticable',
+        L3: 'impracticable',
+        C3: 'impracticable',
+      },
+    },
+    referencia: 'research/sintesis-filtros-lc.md, §6 y §7 (C8); spec §5.6 y §7.10',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Rechaza banda angosto de 144 a 148 MHz: Valor impracticable, evaluado en f2',
+    // C1 de 0,5974 pF (84 %), L2 de 2,987 nH (100 %) y C2 de 397,9 pF (por encima de su
+    // autorresonancia de 150,8 MHz, que a 148 MHz da 2600 %) son impracticables; L1 de 1,989 µH no.
+    entradas: entradaBanda('rechaza-banda', 'butterworth', 'π', 3, { f1: 144e6, f2: 148e6 }),
+    esperado: {
+      orden: 3,
+      avisos: [],
+      marcados: {
+        C1: 'impracticable',
+        L2: 'impracticable',
+        C2: 'impracticable',
+        C3: 'impracticable',
+      },
+    },
+    referencia: 'spec §5.6 y §7.10',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Con f0 y BW avisa que f0 es la central geométrica',
+    entradas: entradaBanda('pasa-banda', 'butterworth', 'π', 3, { f0: F0_FM, bw: 20e6 }),
+    esperado: { orden: 3, avisos: ['f0-geometrica'] },
+    referencia: 'spec §7.1',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Con f1 y f2 no hay aviso de f0',
+    entradas: entradaBanda('rechaza-banda', 'butterworth', 'T', 3, BANDA_FM),
+    esperado: { orden: 3, avisos: [] },
+    referencia: 'spec §7.1',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Chebyshev 0,5 dB pasa banda de Orden 4 sube a 5 y avisa',
+    entradas: entradaBanda('pasa-banda', 'chebyshev', 'π', 4, BANDA_FM, { ripple: 0.5 }),
+    esperado: { orden: 5, avisos: ['chebyshev-par'] },
+    referencia: 'spec §7.3 y §7.10',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'f2 menor que f1 es entrada inválida',
+    entradas: entradaBanda('pasa-banda', 'butterworth', 'π', 3, { f1: 108e6, f2: 88e6 }),
+    esperado: { corte: 'entrada-invalida' },
+    referencia: 'spec §7.1',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'BW igual a cero es entrada inválida',
+    entradas: entradaBanda('rechaza-banda', 'butterworth', 'π', 3, { f0: 98e6, bw: 0 }),
+    esperado: { corte: 'entrada-invalida' },
+    referencia: 'spec §7.1',
   },
   {
     clase: 'comportamiento',

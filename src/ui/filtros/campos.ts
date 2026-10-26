@@ -9,13 +9,22 @@ import type { EspecSinSelector } from '../../entrada/campo';
 import type { Opcion } from '../comun/BotonesSegmentados';
 
 // Los campos de la Calculadora de filtros y su rango válido (spec §7.1), con los valores por
-// defecto de §12.2. Pasa banda, rechaza banda y Bessel llegan después.
+// defecto de §12.2. Bessel llega después.
 
 const MAYOR_QUE_CERO = { min: 0, minIncluido: false };
 
 export const TIPOS: readonly Opcion<TipoFiltro>[] = [
   { valor: 'pasa-bajos', texto: 'Pasa bajos' },
   { valor: 'pasa-altos', texto: 'Pasa altos' },
+  { valor: 'pasa-banda', texto: 'Pasa banda' },
+  { valor: 'rechaza-banda', texto: 'Rechaza banda' },
+];
+
+// Cómo da la banda el Alumno en pasa banda y rechaza banda (spec §7.1).
+export type ModoBanda = 'f1-f2' | 'f0-bw';
+export const MODOS_BANDA: readonly Opcion<ModoBanda>[] = [
+  { valor: 'f1-f2', texto: 'f1 y f2' },
+  { valor: 'f0-bw', texto: 'f0 y BW' },
 ];
 
 export const APROXIMACIONES: readonly Opcion<Aproximacion>[] = [
@@ -60,6 +69,12 @@ export const FC: EspecSinSelector = {
   obligatorio: true,
   rango: MAYOR_QUE_CERO,
 };
+
+// Los bordes, o la central y el ancho, de pasa banda y rechaza banda.
+export const F1: EspecSinSelector = { ...FC, nombre: 'f1' };
+export const F2: EspecSinSelector = { ...FC, nombre: 'f2' };
+export const F0: EspecSinSelector = { ...FC, nombre: 'f0' };
+export const BW: EspecSinSelector = { ...FC, nombre: 'BW' };
 
 export const RS: EspecSinSelector = {
   nombre: 'Rs',

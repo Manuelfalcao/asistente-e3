@@ -4,27 +4,67 @@ import type { Aviso, Paso, Referencia } from '../comun/resultado';
 import { type Revision, revisarValores } from '../comun/valor-impracticable';
 
 // La Calculadora de filtros (spec §7): escaleras LC π y T con fuente y carga iguales. Por ahora
-// pasa bajos y pasa altos, Butterworth y Chebyshev. Prototipo pasa bajos normalizado (g0 = 1, corte
-// en 1 rad/s), transformación de frecuencia según el Tipo de filtro y escala de impedancia por R0.
-// Puro: recibe Hz, ohms, dB y el Q de las bobinas.
+// los cuatro Tipos de filtro, Butterworth y Chebyshev. Prototipo pasa bajos normalizado (g0 = 1,
+// corte en 1 rad/s), transformación de frecuencia según el Tipo de filtro y escala de impedancia por
+// R0. Puro: recibe Hz, ohms, dB y el Q de las bobinas.
 
-export type TipoFiltro = 'pasa-bajos' | 'pasa-altos';
+export type TipoBajoAlto = 'pasa-bajos' | 'pasa-altos';
+export type TipoDeBanda = 'pasa-banda' | 'rechaza-banda';
+export type TipoFiltro = TipoBajoAlto | TipoDeBanda;
 export type Aproximacion = 'butterworth' | 'chebyshev';
 export type TopologiaFiltro = 'π' | 'T';
 
-export interface EntradaFiltro {
-  tipo: TipoFiltro;
+export const esDeBanda = (tipo: TipoFiltro): tipo is TipoDeBanda =>
+  tipo === 'pasa-banda' || tipo === 'rechaza-banda';
+
+// La banda como la escribe el Alumno: sus dos bordes, o la central y el ancho (spec §7.1). En Hz.
+export type BandaEntrada = { f1: number; f2: number } | { f0: number; bw: number };
+
+// Las cuatro, siempre: f0 es la central geométrica √(f1·f2).
+export interface Banda {
+  f1: number;
+  f2: number;
+  f0: number;
+  bw: number;
+  // BW / f0
+  fbw: number;
+}
+
+interface EntradaComun {
   aproximacion: Aproximacion;
   // En dB; solo en Chebyshev.
   ripple: number | null;
   topologia: TopologiaFiltro;
   orden: number;
-  // En Hz: −3 dB en Butterworth, el borde del ripple en Chebyshev.
-  fc: number;
   rs: number;
   rl: number;
   // Qu, para la pérdida de Cohn.
   qBobina: number;
+}
+
+export type EntradaFiltro =
+  | (EntradaComun & {
+      tipo: TipoBajoAlto;
+      // En Hz: −3 dB en Butterworth, el borde del ripple en Chebyshev.
+      fc: number;
+    })
+  | (EntradaComun & {
+      tipo: TipoDeBanda;
+      // f1 y f2 son los bordes de banda que corresponden a Ω = 1 del prototipo.
+      banda: BandaEntrada;
+    });
+
+// Con f1 y f2: f0 = √(f1·f2) y BW = f2 − f1. Con f0 y BW: f1,2 = √(f0² + (BW/2)²) ∓ BW/2, que
+// respeta f1·f2 = f0² y f2 − f1 = BW (spec §7.1).
+export function bandaDe(banda: BandaEntrada): Banda {
+  if ('f1' in banda) {
+    const { f1, f2 } = banda;
+    const f0 = Math.sqrt(f1 * f2);
+    return { f1, f2, f0, bw: f2 - f1, fbw: (f2 - f1) / f0 };
+  }
+  const { f0, bw } = banda;
+  const centro = Math.sqrt(f0 * f0 + (bw / 2) ** 2);
+  return { f1: centro - bw / 2, f2: centro + bw / 2, f0, bw, fbw: bw / f0 };
 }
 
 export interface Prototipo {
@@ -45,7 +85,8 @@ export type Posicion = 'serie' | 'derivacion';
 
 export const DONDE: Record<Posicion, string> = { serie: 'en serie', derivacion: 'en derivación' };
 
-// Un L o C de la escalera. Se nombra por su posición desde la fuente: "C1", "L2".
+// Un L o C de la escalera. Se nombra por su posición desde la fuente: "C1", "L2". En pasa banda y
+// rechaza banda, por el resonador al que pertenece: el "L2" y el "C2" del segundo.
 export interface ElementoFiltro {
   componente: 'L' | 'C';
   nombre: string;
@@ -57,9 +98,22 @@ export interface ElementoFiltro {
   g: number;
 }
 
+// Un resonador LC de pasa banda o rechaza banda: el L y el C de un elemento g del prototipo, juntos
+// en serie o en paralelo, en el brazo en serie o en derivación de la escalera. Sintoniza en ω0.
+export interface ResonadorFiltro {
+  nombre: string;
+  k: number;
+  g: number;
+  posicion: Posicion;
+  conexion: 'serie' | 'paralelo';
+  // Los mismos objetos que están en `elementos`.
+  l: ElementoFiltro;
+  c: ElementoFiltro;
+}
+
 export type CodigoCorteFiltro = 'entrada-invalida' | 'terminaciones-distintas';
 
-export type CodigoAvisoFiltro = 'chebyshev-par';
+export type CodigoAvisoFiltro = 'chebyshev-par' | 'f0-geometrica';
 
 export type ResultadoFiltro =
   | { estado: 'corte'; codigo: CodigoCorteFiltro; texto: string }
@@ -72,14 +126,22 @@ export type ResultadoFiltro =
       ordenPedido: number;
       orden: number;
       prototipo: Prototipo;
-      // De la fuente a la carga.
+      // La banda de pasa banda y rechaza banda; null en pasa bajos y pasa altos.
+      banda: Banda | null;
+      // La frecuencia a la que se evalúa el Valor impracticable: fc, o f2 en pasa banda y rechaza
+      // banda (spec §7.10).
+      frecuenciaRevision: number;
+      // De la fuente a la carga. En pasa banda y rechaza banda, los L y C de los resonadores.
       elementos: readonly ElementoFiltro[];
-      // Estimación de Cohn, en dB.
-      perdidaCohn: number;
+      // Solo en pasa banda y rechaza banda.
+      resonadores: readonly ResonadorFiltro[];
+      // Estimación de Cohn, en dB. Null en rechaza banda (spec §12.1, P1).
+      perdidaCohn: number | null;
       // Las fórmulas del resultado principal, sin números.
       formulas: readonly string[];
       pasos: readonly Paso[];
-      // Valor dudoso o impracticable de cada L y C en fc. Su cuenta está al final de pasos.
+      // Valor dudoso o impracticable de cada L y C en frecuenciaRevision. Su cuenta está al final de
+      // pasos.
       revision: Revision;
       referencias: readonly Referencia[];
       avisos: readonly Aviso<CodigoAvisoFiltro>[];
@@ -93,7 +155,8 @@ export const REFERENCIAS_FILTROS: readonly Referencia[] = [
     edicion: '1.ª',
     editor: 'McGraw-Hill',
     anio: 1964,
-    ubicacion: 'ec. 4.04-2 a 4.04-4, 4.05-1, 4.05-2 y 4.13-11, tablas 4.05-1 y 4.05-2',
+    ubicacion:
+      'ec. 4.04-2 a 4.04-4, 4.05-1, 4.05-2, 4.13-2 y 4.13-11, Sec. 12.02, tablas 4.05-1 y 4.05-2',
   },
   {
     autor: 'D. M. Pozar',
@@ -117,11 +180,13 @@ export const REFERENCIAS_FILTROS: readonly Referencia[] = [
     edicion: '4.ª',
     editor: 'McGraw-Hill',
     anio: 2006,
-    ubicacion: 'filtros pasa bajos y pasa altos LC',
+    ubicacion: 'filtros LC pasa bajos, pasa altos, pasa banda y rechaza banda',
   },
 ];
 
 export const SUGERENCIA_FILTROS = 'Cambiá de Topología π ↔ T.';
+// En el rechaza banda angosto esta es la única respuesta de esta Versión (spec §7.10).
+export const SUGERENCIA_RECHAZA_BANDA = 'Cambiá de Topología π ↔ T, o ensanchá la banda.';
 
 export const ORDEN_MAXIMO = 10;
 export const RANGO_RIPPLE = { min: 0.01, max: 3 } as const;
@@ -151,7 +216,7 @@ interface Escala {
   sustituida: (g: string, fc: string, r0: string) => string;
 }
 
-const ESCALA: Record<TipoFiltro, Record<Posicion, Escala>> = {
+const ESCALA: Record<TipoBajoAlto, Record<Posicion, Escala>> = {
   'pasa-bajos': {
     serie: {
       componente: 'L',
@@ -182,8 +247,87 @@ const ESCALA: Record<TipoFiltro, Record<Posicion, Escala>> = {
   },
 };
 
-// Las bobinas son las series en pasa bajos y las derivaciones en pasa altos.
+// Matthaei ec. 4.04-2 a 4.04-4 y Sec. 12.02, y Pozar, Tabla 8.6, con ω0 = √(ω1·ω2) y BWω = ω2 − ω1:
+// cada g de pasa banda y rechaza banda es un resonador LC. Las fórmulas se escriben una vez, con
+// los símbolos o con los números sustituidos.
+interface Simbolos {
+  g: string;
+  r0: string;
+  // BWω
+  bw: string;
+  // ω0²
+  w02: string;
+  // El signo de producto: un espacio fino en la fórmula y un punto con los números.
+  por: string;
+}
+
+interface EscalaBanda {
+  conexion: 'serie' | 'paralelo';
+  l: {
+    valor: (g: number, r0: number, w0: number, bw: number) => number;
+    formula: (s: Simbolos) => string;
+  };
+  c: {
+    valor: (g: number, r0: number, w0: number, bw: number) => number;
+    formula: (s: Simbolos) => string;
+  };
+}
+
+const ESCALA_BANDA: Record<TipoDeBanda, Record<Posicion, EscalaBanda>> = {
+  'pasa-banda': {
+    serie: {
+      conexion: 'serie',
+      l: {
+        valor: (g, r0, _w0, bw) => (g * r0) / bw,
+        formula: ({ g, r0, bw, por }) => `\\dfrac{${g}${por}${r0}}{${bw}}`,
+      },
+      c: {
+        valor: (g, r0, w0, bw) => bw / (w0 * w0 * g * r0),
+        formula: ({ g, r0, bw, w02, por }) => `\\dfrac{${bw}}{${w02}${por}${g}${por}${r0}}`,
+      },
+    },
+    derivacion: {
+      conexion: 'paralelo',
+      l: {
+        valor: (g, r0, w0, bw) => (r0 * bw) / (w0 * w0 * g),
+        formula: ({ g, r0, bw, w02, por }) => `\\dfrac{${r0}${por}${bw}}{${w02}${por}${g}}`,
+      },
+      c: {
+        valor: (g, r0, _w0, bw) => g / (r0 * bw),
+        formula: ({ g, r0, bw, por }) => `\\dfrac{${g}}{${r0}${por}${bw}}`,
+      },
+    },
+  },
+  'rechaza-banda': {
+    serie: {
+      conexion: 'paralelo',
+      l: {
+        valor: (g, r0, w0, bw) => (g * r0 * bw) / (w0 * w0),
+        formula: ({ g, r0, bw, w02, por }) => `\\dfrac{${g}${por}${r0}${por}${bw}}{${w02}}`,
+      },
+      c: {
+        valor: (g, r0, _w0, bw) => 1 / (g * r0 * bw),
+        formula: ({ g, r0, bw, por }) => `\\dfrac{1}{${g}${por}${r0}${por}${bw}}`,
+      },
+    },
+    derivacion: {
+      conexion: 'serie',
+      l: {
+        valor: (g, r0, _w0, bw) => r0 / (g * bw),
+        formula: ({ g, r0, bw, por }) => `\\dfrac{${r0}}{${g}${por}${bw}}`,
+      },
+      c: {
+        valor: (g, r0, w0, bw) => (g * bw) / (w0 * w0 * r0),
+        formula: ({ g, r0, bw, w02, por }) => `\\dfrac{${g}${por}${bw}}{${w02}${por}${r0}}`,
+      },
+    },
+  },
+};
+
+// Las bobinas son las series en pasa bajos y las derivaciones en pasa altos; en pasa banda y
+// rechaza banda, la de cada resonador.
 export function contarBobinas(tipo: TipoFiltro, topologia: TopologiaFiltro, n: number): number {
+  if (esDeBanda(tipo)) return n;
   let cuenta = 0;
   for (let k = 1; k <= n; k++) {
     if (ESCALA[tipo][posicionDe(topologia, k)].componente === 'L') cuenta++;
@@ -329,16 +473,38 @@ function chebyshev(n: number, ripple: number): Prototipo {
 
 // --- Escalera ------------------------------------------------------------------------------------
 
-const formulasEscala = (tipo: TipoFiltro) =>
+const formulasEscala = (tipo: TipoBajoAlto) =>
   (['serie', 'derivacion'] as const).map((posicion) => {
     const { componente, formula } = ESCALA[tipo][posicion];
     return `${componente}_k = ${formula('g_k')}\\;\\text{(${DONDE[posicion]})}`;
   });
 
+const SIMBOLOS_BANDA: Simbolos = {
+  g: 'g_k',
+  r0: 'R_0',
+  bw: '\\mathrm{BW}_\\omega',
+  w02: '\\omega_0^2',
+  por: '\\,',
+};
+
+const formulasBanda = (tipo: TipoDeBanda) => [
+  'f_0 = \\sqrt{f_1 f_2},\\; \\mathrm{BW} = f_2 - f_1,\\; ' +
+    '\\omega_0 = 2\\pi f_0,\\; \\mathrm{BW}_\\omega = 2\\pi\\,\\mathrm{BW}',
+  ...(['serie', 'derivacion'] as const).map((posicion) => {
+    const { conexion, l, c } = ESCALA_BANDA[tipo][posicion];
+    return (
+      `L_k = ${l.formula(SIMBOLOS_BANDA)},\\; C_k = ${c.formula(SIMBOLOS_BANDA)}` +
+      `\\;\\text{(LC ${conexion} ${DONDE[posicion]})}`
+    );
+  }),
+];
+
 const FORMULA_COHN = '\\Delta L_0 \\approx 4{,}343 \\sum \\dfrac{g_k}{Q_u}\\;\\text{(bobinas)}';
+const FORMULA_COHN_BANDA =
+  '\\Delta L_0 \\approx 4{,}343 \\sum \\dfrac{g_k}{Q_k},\\; Q_k = \\mathrm{FBW} \\cdot Q_u';
 
 function elementoDe(
-  tipo: TipoFiltro,
+  tipo: TipoBajoAlto,
   topologia: TopologiaFiltro,
   k: number,
   g: number,
@@ -362,19 +528,112 @@ function elementoDe(
   };
 }
 
+// El g de lugar k hecho resonador (spec §7.5): su L y su C, y el chequeo de que sintoniza en ω0.
+function resonadorDe(
+  tipo: TipoDeBanda,
+  topologia: TopologiaFiltro,
+  k: number,
+  g: number,
+  banda: Banda,
+  r0: number,
+): { resonador: ResonadorFiltro; pasos: Paso[] } {
+  const posicion = posicionDe(topologia, k);
+  const escala = ESCALA_BANDA[tipo][posicion];
+  const w0 = 2 * Math.PI * banda.f0;
+  const bw = 2 * Math.PI * banda.bw;
+  const simbolos: Simbolos = { ...SIMBOLOS_BANDA, g: `g_{${k}}` };
+  const sustituidos: Simbolos = {
+    g: numero(g),
+    r0: ohms(r0),
+    bw: `2\\pi \\cdot ${hz(banda.bw)}`,
+    w02: `\\left(2\\pi \\cdot ${hz(banda.f0)}\\right)^2`,
+    por: ' \\cdot ',
+  };
+
+  const armar = (componente: 'L' | 'C'): ElementoFiltro => {
+    const { valor } = componente === 'L' ? escala.l : escala.c;
+    return { componente, nombre: `${componente}${k}`, valor: valor(g, r0, w0, bw), posicion, k, g };
+  };
+  const l = armar('L');
+  const c = armar('C');
+  const nombre = `R${k}`;
+  const paso = (e: ElementoFiltro, formula: (s: Simbolos) => string): Paso => ({
+    texto: `${e.nombre} del resonador ${nombre}: LC ${escala.conexion} ${DONDE[posicion]}`,
+    latex:
+      `${e.componente}_{${k}} = ${formula(simbolos)} = ${formula(sustituidos)} = ` +
+      valorLatex(e.valor, e.componente === 'L' ? 'inductancia' : 'capacidad'),
+  });
+  const sintonia = 1 / (2 * Math.PI * Math.sqrt(l.valor * c.valor));
+  return {
+    resonador: { nombre, k, g, posicion, conexion: escala.conexion, l, c },
+    pasos: [
+      paso(l, escala.l.formula),
+      paso(c, escala.c.formula),
+      {
+        texto: `Sintonía de ${nombre}: tiene que dar f0`,
+        latex:
+          `\\dfrac{1}{2\\pi\\sqrt{L_{${k}} C_{${k}}}} = ` +
+          `\\dfrac{1}{2\\pi\\sqrt{${valorLatex(l.valor, 'inductancia')} \\cdot ` +
+          `${valorLatex(c.valor, 'capacidad')}}} = ${hz(sintonia)}`,
+      },
+    ],
+  };
+}
+
+// Los pasos de la banda: los cuatro valores y cómo salen de los que dio el Alumno.
+function pasosDeBanda(entrada: BandaEntrada, b: Banda): Paso[] {
+  const fuente = 'Matthaei, Young y Jones, ec. 8.04-1 y Sec. 12.02: f0 es la central geométrica.';
+  const fbw = {
+    texto: 'Ancho de banda relativo',
+    latex: `\\mathrm{FBW} = \\dfrac{\\mathrm{BW}}{f_0} = \\dfrac{${hz(b.bw)}}{${hz(b.f0)}} = ${numero(b.fbw)}`,
+  };
+  if ('f1' in entrada) {
+    return [
+      {
+        texto: 'Central geométrica y ancho de banda',
+        latex:
+          `f_0 = \\sqrt{f_1 f_2} = \\sqrt{${hz(b.f1)} \\cdot ${hz(b.f2)}} = ${hz(b.f0)},\\; ` +
+          `\\mathrm{BW} = f_2 - f_1 = ${hz(b.bw)}`,
+        fuente,
+      },
+      fbw,
+    ];
+  }
+  const raiz = `\\sqrt{f_0^2 + (\\mathrm{BW}/2)^2}`;
+  const raizValor = `\\sqrt{${hz(b.f0)}^2 + (${hz(b.bw)}/2)^2}`;
+  return [
+    {
+      texto: 'Bordes de la banda, a partir de f0 y BW',
+      latex:
+        `f_1 = ${raiz} - \\dfrac{\\mathrm{BW}}{2} = ${raizValor} - \\dfrac{${hz(b.bw)}}{2} = ` +
+        `${hz(b.f1)},\\; f_2 = ${raiz} + \\dfrac{\\mathrm{BW}}{2} = ${hz(b.f2)}`,
+      fuente,
+    },
+    fbw,
+  ];
+}
+
 // --- Cálculo -------------------------------------------------------------------------------------
 
 const CORTE_INVALIDA =
-  `fc, Rs, RL y el Q de las bobinas tienen que ser mayores que cero; el Orden, un entero de 1 a ` +
-  `${ORDEN_MAXIMO}; y el ripple, de ${numeroTexto(RANGO_RIPPLE.min)} a ${numeroTexto(RANGO_RIPPLE.max)} dB.`;
+  `Las frecuencias (fc, o f1 y f2, o f0 y BW), Rs, RL y el Q de las bobinas tienen que ser ` +
+  `mayores que cero y f2 mayor que f1; el Orden, un entero de 1 a ${ORDEN_MAXIMO}; y el ripple, de ` +
+  `${numeroTexto(RANGO_RIPPLE.min)} a ${numeroTexto(RANGO_RIPPLE.max)} dB.`;
+
+function frecuenciasValidas(entrada: EntradaFiltro): boolean {
+  if ('fc' in entrada) return entrada.fc > 0;
+  const { banda } = entrada;
+  return 'f1' in banda ? banda.f1 > 0 && banda.f2 > banda.f1 : banda.f0 > 0 && banda.bw > 0;
+}
 
 export function calcularFiltro(entrada: EntradaFiltro): ResultadoFiltro {
-  const { tipo, aproximacion, ripple, topologia, orden, fc, rs, rl, qBobina } = entrada;
+  const { tipo, aproximacion, ripple, topologia, orden, rs, rl, qBobina } = entrada;
   const rippleValido =
     aproximacion !== 'chebyshev' ||
     (ripple !== null && ripple >= RANGO_RIPPLE.min && ripple <= RANGO_RIPPLE.max);
   if (
-    !(fc > 0 && rs > 0 && rl > 0 && qBobina > 0) ||
+    !frecuenciasValidas(entrada) ||
+    !(rs > 0 && rl > 0 && qBobina > 0) ||
     !Number.isInteger(orden) ||
     orden < 1 ||
     orden > ORDEN_MAXIMO ||
@@ -407,19 +666,16 @@ export function calcularFiltro(entrada: EntradaFiltro): ResultadoFiltro {
 
   const p = prototipo(aproximacion, n, ripple);
   const r0 = rs;
-  const armados = p.g.map((g, i) => elementoDe(tipo, topologia, i + 1, g, fc, r0));
-  const elementos = armados.map((x) => x.elemento);
+  const resultado =
+    'fc' in entrada
+      ? escaleraBajoAlto(entrada, entrada.tipo, p, r0)
+      : escaleraDeBanda(entrada, entrada.tipo, p, r0, avisos);
+  const { elementos, resonadores, banda, frecuenciaRevision, pasosEscalera } = resultado;
 
-  const bobinasDelFiltro = elementos.filter((e) => e.componente === 'L');
-  const perdidaCohn = (DB_POR_NEPER * bobinasDelFiltro.reduce((s, e) => s + e.g, 0)) / qBobina;
-  const revision = revisarValores(elementos, fc, { sugerencia: SUGERENCIA_FILTROS });
-
-  const pasos: Paso[] = [
-    ...p.pasos,
-    ...armados.map((x) => x.paso),
-    pasoCohn(bobinasDelFiltro, qBobina, perdidaCohn),
-    ...revision.pasos,
-  ];
+  const revision = revisarValores(elementos, frecuenciaRevision, {
+    sugerencia: tipo === 'rechaza-banda' ? SUGERENCIA_RECHAZA_BANDA : SUGERENCIA_FILTROS,
+  });
+  const cohn = perdidaDeCohn(tipo, elementos, p, banda, qBobina);
 
   return {
     estado: 'calculado',
@@ -429,19 +685,107 @@ export function calcularFiltro(entrada: EntradaFiltro): ResultadoFiltro {
     ordenPedido: orden,
     orden: n,
     prototipo: p,
+    banda,
+    frecuenciaRevision,
     elementos,
-    perdidaCohn,
+    resonadores,
+    perdidaCohn: cohn.perdida,
     formulas: [
       ...(aproximacion === 'butterworth' ? [FORMULA_BUTTERWORTH] : FORMULAS_CHEBYSHEV),
-      ...formulasEscala(tipo),
-      FORMULA_COHN,
+      ...(esDeBanda(tipo) ? formulasBanda(tipo) : formulasEscala(tipo)),
+      ...(cohn.formula ? [cohn.formula] : []),
     ],
-    pasos,
+    pasos: [...p.pasos, ...pasosEscalera, ...cohn.pasos, ...revision.pasos],
     revision,
     referencias: REFERENCIAS_FILTROS,
     avisos,
     notas: notasDe(tipo, aproximacion),
   };
+}
+
+interface Escalera {
+  elementos: ElementoFiltro[];
+  resonadores: ResonadorFiltro[];
+  banda: Banda | null;
+  frecuenciaRevision: number;
+  // Los pasos de la banda (si hay) y de cada elemento.
+  pasosEscalera: Paso[];
+}
+
+function escaleraBajoAlto(
+  entrada: Extract<EntradaFiltro, { fc: number }>,
+  tipo: TipoBajoAlto,
+  p: Prototipo,
+  r0: number,
+): Escalera {
+  const armados = p.g.map((g, i) => elementoDe(tipo, entrada.topologia, i + 1, g, entrada.fc, r0));
+  return {
+    elementos: armados.map((x) => x.elemento),
+    resonadores: [],
+    banda: null,
+    frecuenciaRevision: entrada.fc,
+    pasosEscalera: armados.map((x) => x.paso),
+  };
+}
+
+// f2 es la frecuencia más alta de la banda, donde los parásitos del montaje pesan más.
+function escaleraDeBanda(
+  entrada: Extract<EntradaFiltro, { banda: BandaEntrada }>,
+  tipo: TipoDeBanda,
+  p: Prototipo,
+  r0: number,
+  avisos: Aviso<CodigoAvisoFiltro>[],
+): Escalera {
+  const banda = bandaDe(entrada.banda);
+  if ('f0' in entrada.banda) {
+    avisos.push({
+      codigo: 'f0-geometrica',
+      texto:
+        `Con f0 y BW, f0 se toma como la central geométrica √(f1·f2), no como el promedio de ` +
+        `f1 y f2: la banda va de ${formatearValor(banda.f1, 'frecuencia')} a ` +
+        `${formatearValor(banda.f2, 'frecuencia')}.`,
+    });
+  }
+  const armados = p.g.map((g, i) => resonadorDe(tipo, entrada.topologia, i + 1, g, banda, r0));
+  const resonadores = armados.map((x) => x.resonador);
+  return {
+    elementos: resonadores.flatMap((r) => [r.l, r.c]),
+    resonadores,
+    banda,
+    frecuenciaRevision: banda.f2,
+    pasosEscalera: [...pasosDeBanda(entrada.banda, banda), ...armados.flatMap((x) => x.pasos)],
+  };
+}
+
+interface Cohn {
+  perdida: number | null;
+  pasos: Paso[];
+  formula: string | null;
+}
+
+// Estimación de Cohn (Matthaei ec. 4.13-11). Pasa bajos y pasa altos suman las bobinas, con
+// Qk = Qu; pasa banda suma todos los g, cada uno un resonador con Qk = FBW·Qu (ec. 4.13-2);
+// rechaza banda no la muestra (spec §7.8 y §12.1, P1).
+function perdidaDeCohn(
+  tipo: TipoFiltro,
+  elementos: readonly ElementoFiltro[],
+  p: Prototipo,
+  banda: Banda | null,
+  qu: number,
+): Cohn {
+  if (tipo === 'rechaza-banda') return { perdida: null, pasos: [], formula: null };
+  if (tipo === 'pasa-banda') {
+    const q = banda!.fbw * qu;
+    const perdida = (DB_POR_NEPER * p.g.reduce((s, g) => s + g, 0)) / q;
+    return {
+      perdida,
+      pasos: [pasoCohnBanda(p.g, banda!, qu, perdida)],
+      formula: FORMULA_COHN_BANDA,
+    };
+  }
+  const bobinas = elementos.filter((e) => e.componente === 'L');
+  const perdida = (DB_POR_NEPER * bobinas.reduce((s, e) => s + e.g, 0)) / qu;
+  return { perdida, pasos: [pasoCohn(bobinas, qu, perdida)], formula: FORMULA_COHN };
 }
 
 function pasoCohn(bobinas: readonly ElementoFiltro[], qu: number, perdida: number): Paso {
@@ -466,20 +810,79 @@ function pasoCohn(bobinas: readonly ElementoFiltro[], qu: number, perdida: numbe
   };
 }
 
+function pasoCohnBanda(g: readonly number[], banda: Banda, qu: number, perdida: number): Paso {
+  const indices = g.map((_, i) => `g_{${i + 1}}`).join(' + ');
+  const valores = g.map((x) => numero(x)).join(' + ');
+  return {
+    texto: `Pérdida de Cohn en el centro de la banda, con Qu = ${numeroTexto(qu)}`,
+    latex:
+      `\\Delta L_0 \\approx 4{,}343 \\cdot \\dfrac{${indices}}{\\mathrm{FBW} \\cdot Q_u} = ` +
+      `4{,}343 \\cdot \\dfrac{${valores}}{${numero(banda.fbw)} \\cdot ${numero(qu)}} = ${db(perdida)}`,
+    fuente:
+      'Matthaei, Young y Jones, ec. 4.13-11 y 4.13-2: cada elemento del prototipo es un resonador ' +
+      'con Qk = FBW·Qu. Solo pierden las bobinas; los capacitores se toman ideales. Estimación.',
+  };
+}
+
 function notasDe(tipo: TipoFiltro, aproximacion: Aproximacion): string[] {
+  const borde = aproximacion === 'butterworth' ? 'los puntos de −3 dB' : 'los bordes del ripple';
   return [
-    aproximacion === 'butterworth'
-      ? 'En Butterworth, fc es el punto de −3 dB.'
-      : 'En Chebyshev, fc es el borde del ripple: ahí la atenuación vale el ripple, no 3 dB.',
+    ...notasDeFrecuencia(tipo, aproximacion, borde),
     'π y T dan la misma respuesta con los mismos g: la diferencia es cuántas bobinas llevan.',
     'Los valores no se redondean a una serie E.',
-    'La pérdida es la estimación de Cohn en el centro de la banda pasante: solo pierden las ' +
-      'bobinas, con el Q que ingresaste; los capacitores se toman ideales.',
+    ...notasDePerdida(tipo),
     ...(tipo === 'pasa-altos'
       ? [
           'Los valores se revisan en fc, pero un pasa altos trabaja por encima de fc: ahí el ' +
             'desvío por el montaje y las parásitas crece.',
         ]
       : []),
+    ...(esDeBanda(tipo)
+      ? [
+          'Los valores se revisan en f2, el borde alto de la banda: ahí el desvío por el montaje ' +
+            'y las parásitas es el mayor.',
+        ]
+      : []),
   ];
+}
+
+function notasDeFrecuencia(tipo: TipoFiltro, aproximacion: Aproximacion, borde: string): string[] {
+  if (tipo === 'pasa-banda') {
+    return [
+      `f1 y f2 son ${borde}, los bordes de la banda pasante; f0 = √(f1·f2) es la central ` +
+        'geométrica y BW = f2 − f1.',
+    ];
+  }
+  if (tipo === 'rechaza-banda') {
+    return [
+      `f1 y f2 son ${borde}, los bordes de la banda rechazada: fuera de ellos el filtro pasa y ` +
+        'adentro atenúa. f0 = √(f1·f2) es la central geométrica y BW = f2 − f1.',
+    ];
+  }
+  return [
+    aproximacion === 'butterworth'
+      ? 'En Butterworth, fc es el punto de −3 dB.'
+      : 'En Chebyshev, fc es el borde del ripple: ahí la atenuación vale el ripple, no 3 dB.',
+  ];
+}
+
+function notasDePerdida(tipo: TipoFiltro): string[] {
+  switch (tipo) {
+    case 'pasa-banda':
+      return [
+        'La pérdida es la estimación de Cohn en el centro de la banda: cada elemento del prototipo ' +
+          'es un resonador con Qk = FBW·Qu, solo pierden las bobinas con el Q que ingresaste y los ' +
+          'capacitores se toman ideales. Cuanto más angosta la banda, más pierde.',
+      ];
+    case 'rechaza-banda':
+      return [
+        'La pérdida de Cohn no se muestra en el rechaza banda: todavía no se investigó cómo se ' +
+          'aplica ahí.',
+      ];
+    default:
+      return [
+        'La pérdida es la estimación de Cohn en el centro de la banda pasante: solo pierden las ' +
+          'bobinas, con el Q que ingresaste; los capacitores se toman ideales.',
+      ];
+  }
 }
