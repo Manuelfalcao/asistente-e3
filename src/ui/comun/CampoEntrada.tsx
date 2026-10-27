@@ -7,6 +7,7 @@ import {
   type EspecSinSelector,
   type EstadoCampo,
 } from '../../entrada/campo';
+import { type Precarga, conValorCompleto } from '../pases';
 import type { Opcion } from './BotonesSegmentados';
 import { CampoValor, type Lectura } from './CampoValor';
 
@@ -22,19 +23,34 @@ export interface CampoEntrada {
 }
 
 // `guardado` ubica el campo en el almacén (Calculadora e id del campo): lo escrito vuelve al
-// reabrir el Asistente (spec §4.4).
+// reabrir el Asistente (spec §4.4). `llegada` es el valor que trae un pase desde otra Calculadora
+// (spec §4.2): manda sobre lo guardado al abrir, y mientras no se edite el campo vale completo.
 export function useCampoEntrada(
   spec: EspecSinSelector,
   textoInicial = '',
   guardado?: { calculadora: string; campo: string },
+  llegada?: Precarga,
 ): CampoEntrada {
   const opciones = opcionesDelSelector(spec.magnitud, spec.dbm);
   const previa = guardado && almacen.entrada(guardado.calculadora, guardado.campo);
+  const [completo, setCompleto] = useState<Precarga | null>(llegada ?? null);
+  const unidadInicial = llegada ? llegada.unidad : previa?.unidad;
   // El Selector de unidad arranca en la primera opción de la magnitud (spec §5.1).
-  const [unidad, setUnidad] = useState<string | undefined>(
-    previa?.unidad !== undefined && opciones.includes(previa.unidad) ? previa.unidad : opciones[0],
+  const [unidad, setUnidadElegida] = useState<string | undefined>(
+    unidadInicial !== undefined && opciones.includes(unidadInicial) ? unidadInicial : opciones[0],
   );
-  const [texto, setTexto] = useState(previa ? previa.texto : textoInicial);
+  const [texto, setTextoEscrito] = useState(
+    llegada ? llegada.texto : previa ? previa.texto : textoInicial,
+  );
+  // Editar el texto o el Selector de unidad suelta el valor completo del pase.
+  const setTexto = (t: string) => {
+    setCompleto(null);
+    setTextoEscrito(t);
+  };
+  const setUnidad = (u: string) => {
+    setCompleto(null);
+    setUnidadElegida(u);
+  };
   useEffect(() => {
     if (guardado) {
       almacen.guardarEntrada(guardado.calculadora, guardado.campo, {
@@ -44,7 +60,10 @@ export function useCampoEntrada(
     }
   }, [texto, unidad]);
   const completa: EspecCampo = useMemo(() => ({ ...spec, unidad }), [spec, unidad]);
-  const estado = useMemo(() => leerCampo(texto, completa), [texto, completa]);
+  const estado = useMemo(
+    () => conValorCompleto(leerCampo(texto, completa), completo, texto, unidad),
+    [texto, completa, completo, unidad],
+  );
   return { spec: completa, texto, setTexto, unidad, setUnidad, estado };
 }
 
@@ -110,14 +129,16 @@ export function intercambiar(a: CampoEntrada, b: CampoEntrada) {
 
 // La opción elegida, guardada como el texto de un campo: vuelve al reabrir el Asistente (spec §4.4).
 // Si lo guardado ya no es una opción, vale la opción por defecto.
+// `llegada` es la opción que deja elegida un pase (spec §4.2) y manda sobre lo guardado.
 export function useOpcionGuardada<V extends string>(
   opciones: readonly Opcion<V>[],
   porDefecto: V,
   guardado: { calculadora: string; campo: string },
+  llegada?: V,
 ): [V, (valor: V) => void] {
   const previa = almacen.entrada(guardado.calculadora, guardado.campo)?.texto;
   const [valor, setValor] = useState<V>(
-    opciones.find((o) => o.valor === previa)?.valor ?? porDefecto,
+    llegada ?? opciones.find((o) => o.valor === previa)?.valor ?? porDefecto,
   );
   useEffect(() => {
     almacen.guardarEntrada(guardado.calculadora, guardado.campo, { texto: valor });

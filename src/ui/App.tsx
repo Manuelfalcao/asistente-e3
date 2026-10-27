@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { almacen } from '../almacen/almacen';
 import { Arreglos } from './arreglos/Arreglos';
 import { Atenuadores } from './atenuadores/Atenuadores';
@@ -10,12 +10,23 @@ import {
   calculadora,
   esIdCalculadora,
 } from './calculadoras';
-import { Aviso } from './comun/Franjas';
+import { Aviso, FranjaLlegada } from './comun/Franjas';
+import { vaciarSesion } from './comun/sesion';
 import { Filtros } from './filtros/Filtros';
 import { IconoCalculadora } from './comun/Icono';
 import { FranjaVersionNueva } from './FranjaVersionNueva';
 import { Redes } from './redes/Redes';
 import { svgIconoAsistente } from './iconos';
+import {
+  type EstadoNavegacion,
+  type Pase,
+  franjaVisible,
+  irA,
+  pasar,
+  quitar,
+  textoDeFranja,
+  volver,
+} from './pases';
 import { VERSION } from './version';
 
 const LOGO = svgIconoAsistente({ redondeado: true });
@@ -40,11 +51,35 @@ function calculadoraInicial(): IdCalculadora {
 }
 
 export function App() {
-  const [activaId, setActivaId] = useState(calculadoraInicial);
+  const [navegacion, setNavegacion] = useState<EstadoNavegacion>(() => ({
+    activa: calculadoraInicial(),
+    pila: [],
+  }));
+  const activaId = navegacion.activa;
   useEffect(() => {
     almacen.guardarUltima(activaId);
   }, [activaId]);
   const activa = calculadora(activaId);
+  const franja = franjaVisible(navegacion);
+
+  // Cambiar de Calculadora desde las pestañas o el menú vacía la pila de pases y lo que las
+  // Calculadoras recuerdan de la sesión (spec §4.2).
+  const ir = (id: IdCalculadora) => {
+    if (id !== activaId) vaciarSesion();
+    setNavegacion((n) => irA(n, id));
+  };
+  // El destino carga el valor de un pase una sola vez, al abrirse por él. Si el Alumno vuelve a una
+  // Calculadora intermedia de una cadena, esta recupera lo que él había editado.
+  const entregados = useRef(new WeakSet<Pase>());
+  useEffect(() => {
+    if (franja) entregados.current.add(franja);
+  }, [franja]);
+  const llegada = franja && !entregados.current.has(franja) ? franja : undefined;
+  // Un pase abre otra Calculadora desde un resultado: la franja de llegada tiene que verse.
+  const onPasar = (pase: Pase) => {
+    setNavegacion((n) => pasar(n, pase));
+    window.scrollTo(0, 0);
+  };
 
   return (
     <div class="armazon">
@@ -60,7 +95,7 @@ export function App() {
                 type="button"
                 class={c.id === activaId ? 'activa' : ''}
                 aria-current={c.id === activaId ? 'page' : undefined}
-                onClick={() => setActivaId(c.id)}
+                onClick={() => ir(c.id)}
               >
                 <span class="icono">
                   <IconoCalculadora id={c.id} />
@@ -93,17 +128,28 @@ export function App() {
             pueden no guardarse. Abrí el Asistente desde el link del sitio para que se guarden.
           </Aviso>
         )}
+        {franja && (
+          <FranjaLlegada
+            origen={franja.origen}
+            valor={textoDeFranja(franja)}
+            nivel={franja.nivel}
+            motivo={franja.motivo}
+            nota={franja.nota}
+            onVolver={() => setNavegacion(volver)}
+            onQuitar={() => setNavegacion(quitar)}
+          />
+        )}
         <main class="calculadora">
           {activa.id === 'bobinas' ? (
-            <Bobinas />
+            <Bobinas pase={llegada} />
           ) : activa.id === 'filtros' ? (
             <Filtros />
           ) : activa.id === 'arreglos' ? (
-            <Arreglos />
+            <Arreglos pase={llegada} />
           ) : activa.id === 'redes' ? (
-            <Redes onIr={setActivaId} />
+            <Redes onIr={ir} onPasar={onPasar} />
           ) : activa.id === 'atenuadores' ? (
-            <Atenuadores />
+            <Atenuadores onPasar={onPasar} />
           ) : (
             <p class="vacia">Esta Calculadora todavía está vacía.</p>
           )}
@@ -117,7 +163,7 @@ export function App() {
             type="button"
             class={c.id === activaId ? 'activa' : ''}
             aria-current={c.id === activaId ? 'page' : undefined}
-            onClick={() => setActivaId(c.id)}
+            onClick={() => ir(c.id)}
           >
             <span class="icono">
               <IconoCalculadora id={c.id} />

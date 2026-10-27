@@ -15,6 +15,7 @@ import { Aviso } from '../comun/Franjas';
 import { Cita, FormaResultado, Pasos } from '../comun/Resultado';
 import { Rotulo } from '../comun/Rotulo';
 import { TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
+import { type Pase, precargaDe } from '../pases';
 import {
   CABLE,
   CARRETE,
@@ -27,13 +28,24 @@ import {
 // La Calculadora de bobinas (spec §6): las vueltas de una bobina solenoidal de aire de una y de dos
 // capas, cada una en su tarjeta con los dos vecinos en pasos de media vuelta, la SRF estimada, la
 // fórmula, la referencia y los pasos intermedios. Dos capas fuera de rango muestra solo el motivo.
-export function Bobinas() {
+export function Bobinas({ pase }: { pase?: Pase }) {
   const guardado = (campo: string) => ({ calculadora: 'bobinas', campo });
-  const inductancia = useCampoEntrada(INDUCTANCIA, '', guardado('inductancia'));
+  // Un pase trae la L y, si la tiene, la frecuencia de evaluación del origen (spec §4.2).
+  const inductancia = useCampoEntrada(
+    INDUCTANCIA,
+    '',
+    guardado('inductancia'),
+    pase && precargaDe(pase.valor, 'inductancia'),
+  );
   const carrete = useCampoEntrada(CARRETE, '', guardado('carrete'));
   const cable = useCampoEntrada(CABLE, '', guardado('cable'));
   const separacion = useCampoEntrada(SEPARACION, SEPARACION_POR_DEFECTO, guardado('separacion'));
-  const frecuencia = useCampoEntrada(FRECUENCIA, '', guardado('frecuencia'));
+  const frecuencia = useCampoEntrada(
+    FRECUENCIA,
+    '',
+    guardado('frecuencia'),
+    pase?.frecuencia === undefined ? undefined : precargaDe(pase.frecuencia, 'frecuencia'),
+  );
 
   const mensaje = mensajeDeResultados(
     [inductancia, carrete, cable, separacion, frecuencia].map((c) => ({

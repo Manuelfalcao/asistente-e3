@@ -461,6 +461,9 @@
 .franja-llegada .motivo {
   color: var(--texto);
 }
+.franja-llegada .nota {
+  color: var(--texto-suave);
+}
 .franja-llegada .acciones {
   display: flex;
   align-items: center;

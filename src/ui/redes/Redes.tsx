@@ -21,6 +21,7 @@ import { formatearValor } from '../../entrada/formato';
 import type { Escalera } from '../esquema';
 import type { IdCalculadora } from '../calculadoras';
 import { BotonesSegmentados } from '../comun/BotonesSegmentados';
+import { BotonPaseDe } from '../comun/BotonPase';
 import {
   CampoEntradaValor,
   intercambiar,
@@ -33,6 +34,7 @@ import { Aviso } from '../comun/Franjas';
 import { Cita, FormaResultado, Pasos } from '../comun/Resultado';
 import { Rotulo } from '../comun/Rotulo';
 import { Desplegable, TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
+import { type Pase, paseDeComponente } from '../pases';
 import {
   F0,
   Q_BOBINA,
@@ -47,7 +49,13 @@ import {
 // La Calculadora de redes de adaptación (spec §9): la red L, con el Q que fijan las dos
 // resistencias, y la π y la T, con el Q de diseño que elige el Alumno. De cada una salen todas las
 // variantes con solución, cada una con su esquema, sus valores y lo que hace fuera de f₀.
-export function Redes({ onIr }: { onIr?: (id: IdCalculadora) => void }) {
+export function Redes({
+  onIr,
+  onPasar,
+}: {
+  onIr?: (id: IdCalculadora) => void;
+  onPasar?: (pase: Pase) => void;
+}) {
   const guardado = (campo: string) => ({ calculadora: 'redes', campo });
   const [topologia, setTopologia] = useOpcionGuardada(TOPOLOGIAS, 'L', guardado('topologia'));
   const f0 = useCampoEntrada(F0, '', guardado('f0'));
@@ -118,7 +126,7 @@ export function Redes({ onIr }: { onIr?: (id: IdCalculadora) => void }) {
         {!entrada ? (
           <p class="sin-resultado corregir">{mensaje}</p>
         ) : esL ? (
-          <Resultado resultado={calcularRedL(entrada)} entrada={entrada} />
+          <Resultado resultado={calcularRedL(entrada)} entrada={entrada} onPasar={onPasar} />
         ) : (
           <ResultadoPiT
             resultado={calcularRedPiT({
@@ -130,6 +138,7 @@ export function Redes({ onIr }: { onIr?: (id: IdCalculadora) => void }) {
             topologia={topologia}
             onUsarL={() => setTopologia('L')}
             onIr={onIr}
+            onPasar={onPasar}
           />
         )}
       </section>
@@ -150,7 +159,15 @@ function R({ lado }: { lado: 'R_s' | 'R_L' }) {
   );
 }
 
-function Resultado({ resultado, entrada }: { resultado: ResultadoRedL; entrada: EntradaRedL }) {
+function Resultado({
+  resultado,
+  entrada,
+  onPasar,
+}: {
+  resultado: ResultadoRedL;
+  entrada: EntradaRedL;
+  onPasar?: (pase: Pase) => void;
+}) {
   if (resultado.estado === 'corte') {
     return (
       <FormaResultado
@@ -171,6 +188,8 @@ function Resultado({ resultado, entrada }: { resultado: ResultadoRedL; entrada: 
               key={v.filtrado}
               titulo={TITULO_L[v.filtrado]}
               variante={v}
+              f0={entrada.f0}
+              onPasar={onPasar}
               q={<ValorResultado nombre="Q" valor={formatearValor(v.q, 'numero')} />}
             />
           ))}
@@ -216,12 +235,14 @@ function ResultadoPiT({
   topologia,
   onUsarL,
   onIr,
+  onPasar,
 }: {
   resultado: ResultadoRedPiT;
   entrada: EntradaRedL;
   topologia: 'π' | 'T';
   onUsarL: () => void;
   onIr?: (id: IdCalculadora) => void;
+  onPasar?: (pase: Pase) => void;
 }) {
   switch (resultado.estado) {
     case 'corte':
@@ -252,7 +273,7 @@ function ResultadoPiT({
       return (
         <>
           <Aviso>{resultado.texto}</Aviso>
-          <Resultado resultado={resultado.redL} entrada={entrada} />
+          <Resultado resultado={resultado.redL} entrada={entrada} onPasar={onPasar} />
         </>
       );
     case 'calculado': {
@@ -271,6 +292,8 @@ function ResultadoPiT({
                   key={v.tipo}
                   titulo={TITULO_PI_T[v.tipo]}
                   variante={v}
+                  f0={entrada.f0}
+                  onPasar={onPasar}
                   q={
                     <>
                       {v.secciones.map((s, i) => (
@@ -363,10 +386,15 @@ function escalera(v: VarianteRed): Escalera {
 function TarjetaVariante({
   titulo,
   variante: v,
+  f0,
+  onPasar,
   q,
 }: {
   titulo: string;
   variante: VarianteL | VariantePiT;
+  // La frecuencia de evaluación: las L pasan a bobinas con ella como frecuencia de trabajo.
+  f0: number;
+  onPasar?: (pase: Pase) => void;
   q: ComponentChildren;
 }) {
   const { revision } = v;
@@ -386,12 +414,19 @@ function TarjetaVariante({
       </ul>
       {v.componentes.map((c) => {
         const marca = nivel(c);
+        const pase = paseDeComponente(
+          'redes',
+          c,
+          revision.marcados,
+          c.componente === 'L' ? { frecuencia: f0 } : {},
+        );
         return (
           <ValorResultado
             key={c.nombre}
             nombre={c.nombre}
             valor={formatearValor(c.valor, c.componente === 'L' ? 'inductancia' : 'capacidad')}
             rotulos={marca && <Rotulo tipo={marca} />}
+            pase={<BotonPaseDe pase={pase} onPasar={onPasar} />}
             detalle={
               <>
                 X = {formatearValor(c.reactancia, 'resistencia')},{' '}

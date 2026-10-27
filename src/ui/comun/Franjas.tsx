@@ -8,6 +8,7 @@ export function FranjaLlegada({
   valor,
   nivel,
   motivo,
+  nota,
   onVolver,
   onQuitar,
 }: {
@@ -16,6 +17,8 @@ export function FranjaLlegada({
   valor: string;
   nivel?: Nivel;
   motivo?: string;
+  // Una nota del pase, como la de la potencia al pasar una resistencia a Arreglos equivalentes.
+  nota?: string;
   onVolver?: () => void;
   onQuitar?: () => void;
 }) {
@@ -32,6 +35,7 @@ export function FranjaLlegada({
         )}
       </p>
       {motivo && <p class="motivo">{motivo}</p>}
+      {nota && <p class="nota">{nota}</p>}
       <div class="acciones">
         <button type="button" class="volver" onClick={onVolver}>
           ‹ Volver a {nombre}

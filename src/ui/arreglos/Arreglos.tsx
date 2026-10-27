@@ -26,6 +26,7 @@ import { Formula } from '../comun/Formula';
 import { Cita, FormaResultado, Pasos } from '../comun/Resultado';
 import { Rotulo } from '../comun/Rotulo';
 import { TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
+import { type Pase, componenteDelPase, precargaDe } from '../pases';
 import { useBusquedaArreglos } from './buscador';
 import { EditorInventario } from './EditorInventario';
 import { useInventario } from './inventario';
@@ -55,16 +56,29 @@ const SERIES: readonly Opcion<SerieE>[] = [
 // La Calculadora de Arreglos equivalentes (spec §8): los 10 mejores Arreglos de hasta 4 componentes
 // para el valor buscado, con la conexión, el Error del arreglo y la Tolerancia del arreglo. La
 // búsqueda corre en un Web Worker.
-export function Arreglos() {
+export function Arreglos({ pase }: { pase?: Pase }) {
   const guardado = (campo: string) => ({ calculadora: 'arreglos', campo });
   const [componente, setComponente] = useOpcionGuardada(
     COMPONENTES,
     'capacitor',
     guardado('componente'),
+    pase && componenteDelPase(pase),
   );
   const [serie, setSerie] = useOpcionGuardada(SERIES, POR_DEFECTO.serie, guardado('serie'));
-  const capacidad = useCampoEntrada(CAPACIDAD_BUSCADA, '', guardado('capacidad'));
-  const resistencia = useCampoEntrada(RESISTENCIA_BUSCADA, '', guardado('resistencia'));
+  // Un pase deja elegido el tipo de componente y carga el valor buscado (spec §4.2).
+  const llegada = pase && precargaDe(pase.valor, pase.magnitud);
+  const capacidad = useCampoEntrada(
+    CAPACIDAD_BUSCADA,
+    '',
+    guardado('capacidad'),
+    pase?.magnitud === 'capacidad' ? llegada : undefined,
+  );
+  const resistencia = useCampoEntrada(
+    RESISTENCIA_BUSCADA,
+    '',
+    guardado('resistencia'),
+    pase?.magnitud === 'resistencia' ? llegada : undefined,
+  );
   const umbral = useCampoEntrada(UMBRAL, UMBRAL_POR_DEFECTO, guardado('umbral'));
   const toleranciaR = useCampoEntrada(TOLERANCIA, TOLERANCIA_POR_DEFECTO, guardado('tolerancia-r'));
   const toleranciaC = useCampoEntrada(

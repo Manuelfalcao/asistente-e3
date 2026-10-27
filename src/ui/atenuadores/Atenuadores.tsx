@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect } from 'preact/hooks';
 import {
   type Atenuador,
   type EntradaAtenuador,
@@ -12,6 +12,7 @@ import {
   calcularAtenuadores,
   calcularMinimaPerdida,
 } from '../../calculo/atenuadores/atenuadores';
+import type { Revision } from '../../calculo/comun/valor-impracticable';
 import { mensajeDeResultados } from '../../entrada/campo';
 import { formatearDbm, formatearValor, vatiosADbm } from '../../entrada/formato';
 import type { Escalera } from '../esquema';
@@ -21,17 +22,20 @@ import {
   intercambiar,
   useCampoEntrada,
 } from '../comun/CampoEntrada';
+import { BotonPaseDe } from '../comun/BotonPase';
 import { Esquema } from '../comun/Esquema';
 import { Formula } from '../comun/Formula';
 import { Aviso } from '../comun/Franjas';
 import { Cita, FormaResultado, Pasos } from '../comun/Resultado';
 import { Rotulo } from '../comun/Rotulo';
+import { useEstadoDeSesion } from '../comun/sesion';
 import { TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
+import { type Pase, paseDeComponente } from '../pases';
 import { ATENUACION, FRECUENCIA, POTENCIA, Z1, Z2, Z_POR_DEFECTO } from './campos';
 
 // La Calculadora de atenuadores (spec §10): el T y el π juntos, cada uno con su esquema, sus
 // resistencias, sus fórmulas, la referencia y los pasos intermedios.
-export function Atenuadores() {
+export function Atenuadores({ onPasar }: { onPasar?: (pase: Pase) => void }) {
   const guardado = (campo: string) => ({ calculadora: 'atenuadores', campo });
   const a = useCampoEntrada(ATENUACION, '', guardado('atenuacion'));
   const z1 = useCampoEntrada(Z1, Z_POR_DEFECTO, guardado('z1'));
@@ -39,7 +43,8 @@ export function Atenuadores() {
   const potencia = useCampoEntrada(POTENCIA, '', guardado('potencia'));
   const frecuencia = useCampoEntrada(FRECUENCIA, '', guardado('frecuencia'));
   // El botón "Mínima pérdida" (spec §10.1): fija la atenuación en A_min y muestra la red L.
-  const [minima, setMinima] = useState(false);
+  // Se recuerda en la sesión para que, al volver de un pase, siga el pad de mínima pérdida.
+  const [minima, setMinima] = useEstadoDeSesion('atenuadores:minima', false);
 
   const impedancias =
     z1.estado.estado === 'valido' && z2.estado.estado === 'valido'
@@ -129,12 +134,13 @@ export function Atenuadores() {
       </section>
       <section class="resultados" aria-label="Resultados" aria-live="polite">
         {entradaMinima ? (
-          <ResultadoMinima entrada={entradaMinima} />
+          <ResultadoMinima entrada={entradaMinima} onPasar={onPasar} />
         ) : entrada ? (
           <Resultado
             resultado={calcularAtenuadores(entrada)}
             entrada={entrada}
             onMinima={() => setMinima(true)}
+            onPasar={onPasar}
           />
         ) : (
           <p class="sin-resultado corregir">{mensaje}</p>
@@ -148,10 +154,12 @@ function Resultado({
   resultado,
   entrada,
   onMinima,
+  onPasar,
 }: {
   resultado: ResultadoAtenuadores;
   entrada: EntradaAtenuador;
   onMinima: () => void;
+  onPasar?: (pase: Pase) => void;
 }) {
   if (resultado.estado === 'corte') {
     return (
@@ -191,6 +199,7 @@ function Resultado({
               red={red}
               titulo={`Atenuador ${red.topologia} de ${titulo}`}
               resultado={resultado}
+              onPasar={onPasar}
             />
           ))}
         </div>
@@ -198,6 +207,13 @@ function Resultado({
       notas={resultado.notas}
     />
   );
+}
+
+// Al pasar una resistencia a Arreglos equivalentes (spec §5.5).
+const NOTA_POTENCIA = 'En un Arreglo equivalente la potencia se reparte entre los componentes.';
+
+function paseDeResistencia(r: Resistencia, revision: Revision): Pase {
+  return paseDeComponente('atenuadores', r, revision.marcados, { nota: NOTA_POTENCIA });
 }
 
 const ohms = (r: number) => formatearValor(r, 'resistencia');
@@ -220,10 +236,12 @@ function TarjetaAtenuador({
   red,
   titulo,
   resultado,
+  onPasar,
 }: {
   red: Atenuador;
   titulo: string;
   resultado: Extract<ResultadoAtenuadores, { estado: 'calculado' }>;
+  onPasar?: (pase: Pase) => void;
 }) {
   const { revision } = red;
   const nivel = (clave: 'r1' | 'r2' | 'r3') =>
@@ -246,6 +264,7 @@ function TarjetaAtenuador({
             valor={ohms(red[clave].valor)}
             rotulos={marca && <Rotulo tipo={marca} />}
             detalle={donde(red[clave])}
+            pase={<BotonPaseDe pase={paseDeResistencia(red[clave], revision)} onPasar={onPasar} />}
           />
         );
       })}
@@ -292,7 +311,13 @@ function escaleraPad(pad: PadMinimaPerdida): Escalera {
   return { fuente: 'Z_1', carga: 'Z_2', elementos: orden.map(elemento) };
 }
 
-function ResultadoMinima({ entrada }: { entrada: EntradaMinimaPerdida }) {
+function ResultadoMinima({
+  entrada,
+  onPasar,
+}: {
+  entrada: EntradaMinimaPerdida;
+  onPasar?: (pase: Pase) => void;
+}) {
   const resultado = calcularMinimaPerdida(entrada);
   if (resultado.estado === 'corte') {
     return (
@@ -334,6 +359,7 @@ function ResultadoMinima({ entrada }: { entrada: EntradaMinimaPerdida }) {
                 valor={ohms(r.valor)}
                 rotulos={marca && <Rotulo tipo={marca} />}
                 detalle={donde(r)}
+                pase={<BotonPaseDe pase={paseDeResistencia(r, pad.revision)} onPasar={onPasar} />}
               />
             );
           })}
