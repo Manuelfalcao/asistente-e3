@@ -124,6 +124,7 @@ describe('casos de comportamiento', () => {
       if (r.estado !== 'calculado') throw new Error(`no calculó: ${r.codigo}`);
       expect(r.orden).toBe(esperado.orden);
       expect(r.avisos.map((a) => a.codigo)).toEqual(esperado.avisos);
+      if (esperado.topologia) expect(r.topologia).toBe(esperado.topologia);
       if (esperado.marcados) {
         expect(Object.fromEntries(r.revision.marcados.map((m) => [m.nombre, m.nivel]))).toEqual(
           esperado.marcados,
@@ -320,12 +321,12 @@ describe('el resultado', () => {
     expect(r.avisos[0].texto).toContain('Orden 5');
   });
 
-  it('Rs ≠ RL: el aviso dice que todavía no se calcula', () => {
-    const r = calcularFiltro(
+  it('Rs ≠ RL se calcula con Takahasi, con el aviso de pérdida plana', () => {
+    const r = calculado(
       entradaFiltro('pasa-altos', 'butterworth', 'T', 3, 100e6, { rs: 50, rl: 300 }),
     );
-    expect(r.estado).toBe('corte');
-    if (r.estado === 'corte') expect(r.texto).toMatch(/todavía no/);
+    expect(r.avisos.map((a) => a.codigo)).toEqual(['perdida-plana']);
+    expect(r.prototipo.takahasi).not.toBeNull();
   });
 
   it('cada valor se revisa en fc con la sugerencia de cambiar de Topología', () => {

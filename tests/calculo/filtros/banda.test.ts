@@ -239,11 +239,13 @@ describe('la Topología por defecto en pasa banda y rechaza banda', () => {
 });
 
 describe('el resultado de banda', () => {
-  it('Rs ≠ RL todavía no se calcula, también en pasa banda', () => {
-    const r = calcularFiltro(
-      entradaBanda('pasa-banda', 'butterworth', 'π', 3, FM, { rs: 50, rl: 75 }),
+  it('Rs ≠ RL se calcula también en pasa banda, con la pérdida plana en f0', () => {
+    const r = calculado(entradaBanda('pasa-banda', 'butterworth', 'π', 3, FM, { rs: 50, rl: 75 }));
+    expect(r.avisos.map((a) => a.codigo)).toEqual(['perdida-plana']);
+    expect(atenuacionResonadores(r.resonadores, r.banda!.f0, 50, 75)).toBeCloseTo(
+      -10 * Math.log10((4 * 50 * 75) / 125 ** 2),
+      9,
     );
-    expect(r.estado).toBe('corte');
   });
 
   it('las fórmulas del pasa banda llevan ω0 y BW', () => {

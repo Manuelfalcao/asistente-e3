@@ -311,9 +311,10 @@ describe('el resultado con Orden calculado', () => {
     expect(probados.map((p) => p.texto.match(/\d+/)![0])).toEqual(['1', '2', '3', '4']);
   });
 
-  it('con Rs ≠ RL sigue sin calcular', () => {
-    const r = calcularFiltro({ ...entrada, rl: 75 });
-    expect(r.estado === 'corte' && r.codigo).toBe('terminaciones-distintas');
+  it('con Rs ≠ RL, Butterworth sale con el mismo Orden: no depende de las terminaciones', () => {
+    const r = calculado({ ...entrada, rl: 75 });
+    expect(r.orden).toBe(7);
+    expect(r.ordenCalculado!.atenuacionReal).toBeCloseTo(42.14, 2);
   });
 
   it('un pedido inválido corta como entrada inválida', () => {

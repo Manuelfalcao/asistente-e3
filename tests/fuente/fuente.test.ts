@@ -192,6 +192,42 @@ function formulasDeFiltros(): string[] {
       }
     }
   }
+  // Rs ≠ RL (Takahasi): Orden impar y par, desde la R menor y desde la mayor, con la alternativa.
+  for (const [tipo, aproximacion, ripple, orden, rs, rl] of [
+    ['pasa-bajos', 'butterworth', null, 3, 50, 300],
+    ['pasa-altos', 'butterworth', null, 4, 300, 50],
+    ['pasa-bajos', 'chebyshev', 0.1, 4, 50, 300],
+    ['pasa-altos', 'chebyshev', 0.5, 5, 50, 75],
+  ] as const) {
+    for (const topologia of ['π', 'T'] as const) {
+      const r = calcularFiltro({
+        tipo,
+        aproximacion,
+        ripple,
+        topologia,
+        orden,
+        fc: 100e6,
+        rs,
+        rl,
+        qBobina: 100,
+      });
+      if (r.estado === 'calculado') formulas.push(...r.formulas, ...r.pasos.map((p) => p.latex));
+    }
+  }
+  for (const tipo of ['pasa-banda', 'rechaza-banda'] as const) {
+    const r = calcularFiltro({
+      tipo,
+      aproximacion: 'chebyshev',
+      ripple: 0.1,
+      topologia: 'π',
+      orden: 4,
+      banda: { f1: 88e6, f2: 108e6 },
+      rs: 300,
+      rl: 50,
+      qBobina: 100,
+    });
+    if (r.estado === 'calculado') formulas.push(...r.formulas, ...r.pasos.map((p) => p.latex));
+  }
   return formulas;
 }
 

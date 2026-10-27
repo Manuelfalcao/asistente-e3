@@ -6,6 +6,7 @@ import {
   ordenDesdeAtenuacion,
   prototipo,
 } from '../../../src/calculo/filtros/filtros';
+import { relacionMinima, takahasi } from '../../../src/calculo/filtros/takahasi';
 import { formatearValor } from '../../../src/entrada/formato';
 import { MEDIA_UNIDAD } from '../../casos';
 import {
@@ -33,6 +34,18 @@ import {
   toleranciaBorde,
 } from './casos';
 import {
+  CASOS_REFERENCIA_TAKAHASI,
+  CASOS_RELACION_MINIMA,
+  CASOS_VERIFICACION_TAKAHASI,
+  TOLERANCIA_ORACULO_TAKAHASI,
+  TOLERANCIA_VALORES_TAKAHASI,
+  atenuacionEnBorde,
+  centroDe,
+  comoEnLaTabla,
+  perdidaPlanaTeorica,
+} from './casos-takahasi';
+import {
+  atenuacionEntre,
   atenuacionOraculo,
   atenuacionResonadores,
   atenuacionTeorica,
@@ -306,12 +319,14 @@ const listaMarcados = (marcados: readonly (readonly [string, string])[]) =>
     .map(([nombre, nivel]) => `${nombre} ${nivel}`)
     .join(', ') || 'ninguno';
 
-// Los marcados solo entran si el caso los fija.
-function describir(r: ResultadoFiltro, conMarcados: boolean): string {
+// La Topología y los marcados solo entran si el caso los fija.
+function describir(r: ResultadoFiltro, conTopologia: boolean, conMarcados: boolean): string {
   if (r.estado === 'corte') return `corte: ${r.codigo}`;
   const marcados = listaMarcados(r.revision.marcados.map((m) => [m.nombre, m.nivel] as const));
   return (
-    `Orden ${r.orden} · avisos: ${r.avisos.map((a) => a.codigo).join(', ') || 'ninguno'}` +
+    `Orden ${r.orden}` +
+    (conTopologia ? ` en ${r.topologia}` : '') +
+    ` · avisos: ${r.avisos.map((a) => a.codigo).join(', ') || 'ninguno'}` +
     (conMarcados ? ` · marcados: ${marcados}` : '')
   );
 }
@@ -319,7 +334,9 @@ function describir(r: ResultadoFiltro, conMarcados: boolean): string {
 function textoEsperado({ esperado }: CasoComportamientoFiltro): string {
   if ('corte' in esperado) return `corte: ${esperado.corte}`;
   return (
-    `Orden ${esperado.orden} · avisos: ${esperado.avisos.join(', ') || 'ninguno'}` +
+    `Orden ${esperado.orden}` +
+    (esperado.topologia ? ` en ${esperado.topologia}` : '') +
+    ` · avisos: ${esperado.avisos.join(', ') || 'ninguno'}` +
     (esperado.marcados ? ` · marcados: ${listaMarcados(Object.entries(esperado.marcados))}` : '')
   );
 }
@@ -330,6 +347,7 @@ const comportamiento = () =>
       const esperado = textoEsperado(caso);
       const obtenido = describir(
         calcularFiltro(caso.entradas),
+        'topologia' in caso.esperado && caso.esperado.topologia !== undefined,
         'marcados' in caso.esperado && caso.esperado.marcados !== undefined,
       );
       return {
@@ -344,12 +362,151 @@ const comportamiento = () =>
     }),
   );
 
+// Takahasi contra Zverev, Williams y Matthaei (spec §13.3): los g de las fórmulas, llevados al orden
+// y a la normalización de cada tabla.
+const referenciaTakahasi = () =>
+  CASOS_REFERENCIA_TAKAHASI.map((caso) =>
+    enCaso(caso, () => {
+      const p = takahasi(caso.aproximacion, caso.orden, caso.ripple, caso.r);
+      const obtenidos = comoEnLaTabla(caso, p);
+      const n = caso.orden;
+      return {
+        clase: 'referencia',
+        id: caso.id,
+        entradas:
+          `${APROXIMACION[caso.aproximacion]}` +
+          (caso.ripple === null ? '' : ` ${formatearValor(caso.ripple, 'decibeles')}`) +
+          `, n = ${n}, r = ${formatearValor(caso.r, 'numero', 'paso')}` +
+          (caso.invertida ? ' · la tabla va de gn a g1' : '') +
+          (caso.normalizacion
+            ? ` · ${caso.normalizacion.motivo} ` +
+              `(× ${formatearValor(caso.normalizacion.factor, 'numero', 'paso')})`
+            : ''),
+        referencia: caso.referencia,
+        medidas: [
+          ...caso.impresos.map((impreso, i) =>
+            medidaImpresa({
+              nombre: `g${caso.invertida ? n - i : i + 1}`,
+              impreso,
+              obtenido: obtenidos[i],
+              tolerancia: caso.tolerancia,
+            }),
+          ),
+          ...(caso.carga
+            ? [
+                medidaImpresa({
+                  nombre: `g${n + 1}`,
+                  impreso: caso.carga,
+                  obtenido: p.carga,
+                  tolerancia: caso.tolerancia,
+                }),
+              ]
+            : []),
+        ],
+        pasos: [{ titulo: 'Prototipo de Takahasi', pasos: p.pasos }],
+      };
+    }),
+  );
+
+const relacionesMinimas = () =>
+  CASOS_RELACION_MINIMA.map((caso) =>
+    enCaso(caso, () => ({
+      clase: 'referencia',
+      id: caso.id,
+      entradas: `Chebyshev ${formatearValor(caso.ripple, 'decibeles')}, cualquier Orden par`,
+      referencia: caso.referencia,
+      medidas: [
+        medidaImpresa({
+          nombre: 'r_min = coth²(β/4)',
+          impreso: caso.impreso,
+          obtenido: relacionMinima(caso.ripple),
+          tolerancia: caso.tolerancia,
+        }),
+      ],
+      // La carga del Chebyshev par de terminaciones iguales es r_min: sus pasos muestran la cuenta.
+      pasos: [
+        { titulo: 'Prototipo de Orden 4', pasos: prototipo('chebyshev', 4, caso.ripple).pasos },
+      ],
+    })),
+  );
+
+type Calculado = Extract<ResultadoFiltro, { estado: 'calculado' }>;
+
+const verificacionTakahasi = () =>
+  CASOS_VERIFICACION_TAKAHASI.map((caso) =>
+    enCaso(caso, () => {
+      const e = caso.entradas;
+      const r = calculado(e);
+      const alternativa = r.terminaciones!.alternativa;
+      const atenuacion = (x: Pick<Calculado, 'elementos' | 'resonadores'>, f: number) =>
+        atenuacionEntre(x, f, e.rs, e.rl);
+      const valores = (
+        de: Pick<Calculado, 'elementos'>,
+        lista: typeof caso.valores,
+        prefijo: string,
+      ) =>
+        lista.map(({ nombre, impreso, unidad }) =>
+          medidaImpresa({
+            nombre: `${prefijo}${nombre}`,
+            impreso,
+            obtenido: de.elementos.find((x) => x.nombre === nombre)!.valor * ESCALA[unidad],
+            tolerancia: TOLERANCIA_VALORES_TAKAHASI,
+            unidad,
+          }),
+        );
+      const respuesta = (x: Pick<Calculado, 'elementos' | 'resonadores'>, prefijo: string) => [
+        medidaNumerica({
+          nombre: `${prefijo}Pérdida plana en ${HZ(centroDe(e))}, contra 4r/(1+r)²`,
+          esperado: perdidaPlanaTeorica(e.rs, e.rl),
+          obtenido: atenuacion(x, centroDe(e)),
+          tolerancia: TOLERANCIA_ORACULO_TAKAHASI,
+          decimales: 9,
+          unidad: 'dB',
+        }),
+        ...bordesDe(e).map((borde) =>
+          medidaNumerica({
+            nombre:
+              `${prefijo}Atenuación en ${HZ(borde)}, contra la de ` +
+              `${APROXIMACION[e.aproximacion]} sobre K`,
+            esperado: atenuacionEnBorde(e, r.orden),
+            obtenido: atenuacion(x, borde),
+            tolerancia: TOLERANCIA_ORACULO_TAKAHASI,
+            decimales: 9,
+            unidad: 'dB',
+          }),
+        ),
+      ];
+      const prefijoAlternativa = alternativa && `Alternativa (${alternativa.variante}): `;
+      return {
+        clase: 'verificacion',
+        id: caso.id,
+        entradas: entradasTexto(e),
+        referencia: caso.referencia,
+        oraculo: caso.oraculo,
+        medidas: [
+          ...valores(r, caso.valores, ''),
+          ...respuesta(r, ''),
+          ...(alternativa && prefijoAlternativa
+            ? [
+                ...valores(alternativa, caso.alternativa, prefijoAlternativa),
+                ...respuesta(alternativa, prefijoAlternativa),
+              ]
+            : []),
+        ],
+        pasos: pasosDe(e, r),
+      };
+    }),
+  );
+
 export const INFORME: AporteInforme = {
   calculadora: 'filtros',
   casos: () => [
     ...referencia(),
+    ...referenciaTakahasi(),
+    ...relacionesMinimas(),
     ...referenciaOrden(),
     ...verificacion(),
+    ...verificacionTakahasi(),
     ...verificacionOrden(),
     ...cohn(),
     ...comportamiento(),

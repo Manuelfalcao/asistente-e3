@@ -24,9 +24,14 @@ function elemento(e: ElementoFiltro, f: number): Elemento {
   return e.posicion === 'serie' ? serie(z) : derivacion(c(0, -1 / z.im));
 }
 
-// La atenuación de transductor de la escalera ideal entre R0 y R0, en dB.
-export function atenuacionOraculo(elementos: readonly ElementoFiltro[], f: number, r0: number) {
-  return atenuacionDb(cascada(elementos.map((e) => elemento(e, f))), r0, r0);
+// La atenuación de transductor de la escalera ideal entre Rs y RL (por defecto iguales), en dB.
+export function atenuacionOraculo(
+  elementos: readonly ElementoFiltro[],
+  f: number,
+  rs: number,
+  rl = rs,
+) {
+  return atenuacionDb(cascada(elementos.map((e) => elemento(e, f))), rs, rl);
 }
 
 // La pérdida con el modelo de Matthaei (Sec. 4.13), dk = 1/Qu en cada bobina y transformado al
@@ -94,13 +99,27 @@ function resonador(r: ResonadorFiltro, f: number, rBobina = 0): Elemento {
   return r.posicion === 'derivacion' ? derivacion(y) : serie(inverso(y.re, y.im));
 }
 
-// La atenuación de transductor de la escalera de resonadores, ideal, entre R0 y R0, en dB.
+// La atenuación de transductor de la escalera de resonadores, ideal, entre Rs y RL (por defecto
+// iguales), en dB.
 export function atenuacionResonadores(
   resonadores: readonly ResonadorFiltro[],
   f: number,
-  r0: number,
+  rs: number,
+  rl = rs,
 ): number {
-  return atenuacionDb(cascada(resonadores.map((r) => resonador(r, f))), r0, r0);
+  return atenuacionDb(cascada(resonadores.map((r) => resonador(r, f))), rs, rl);
+}
+
+// La atenuación entre Rs y RL de una escalera del resultado, de L y C sueltos o de resonadores.
+export function atenuacionEntre(
+  escalera: { elementos: readonly ElementoFiltro[]; resonadores: readonly ResonadorFiltro[] },
+  f: number,
+  rs: number,
+  rl: number,
+): number {
+  return escalera.resonadores.length > 0
+    ? atenuacionResonadores(escalera.resonadores, f, rs, rl)
+    : atenuacionOraculo(escalera.elementos, f, rs, rl);
 }
 
 // La pérdida en el centro de la banda del pasa banda con la pérdida de cada bobina: una R en serie

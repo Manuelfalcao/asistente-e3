@@ -271,6 +271,15 @@ function chequeos(c: Componente, f: number | null): Chequeo[] {
   }
 }
 
+// El peor de los chequeos del valor; null si no tiene ninguno (una R sin f).
+const peorChequeo = (c: Componente, f: number | null): Chequeo | null =>
+  chequeos(c, f).reduce<Chequeo | null>((p, ch) => (!p || ch.error > p.error ? ch : p), null);
+
+// El error relativo de un valor con el montaje, sin el nivel: sirve para comparar dos resultados
+// que no llegan a marcarse. 0 si no tiene chequeos.
+export const errorDeMontaje = (c: Componente, frecuencia: number | null): number =>
+  peorChequeo(c, frecuencia)?.error ?? 0;
+
 // Revisa cada L, C y R del resultado, a la frecuencia de evaluación que declara la Calculadora
 // (null si no la conoce: solo quedan los mínimos de L y C).
 export function revisarValores(
@@ -281,11 +290,7 @@ export function revisarValores(
   const marcados: ValorMarcado[] = [];
   const pasos: Paso[] = [];
   for (const c of componentesDe(resultado)) {
-    // El peor de los chequeos del valor.
-    const peor = chequeos(c, frecuencia).reduce<Chequeo | null>(
-      (p, ch) => (!p || ch.error > p.error ? ch : p),
-      null,
-    );
+    const peor = peorChequeo(c, frecuencia);
     const nivel = peor && nivelDe(peor.error);
     if (!peor || !nivel) continue;
     marcados.push({

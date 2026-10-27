@@ -10,6 +10,7 @@ import {
   calcularFiltro,
   esDeBanda,
   ordenDesdeAtenuacion,
+  relacionDe,
   topologiaSugerida,
 } from '../../calculo/filtros/filtros';
 import { mensajeDeResultados } from '../../entrada/campo';
@@ -54,9 +55,9 @@ import {
 } from './campos';
 
 // La Calculadora de filtros (spec §7): por ahora escaleras π y T de los cuatro Tipos de filtro,
-// Butterworth, Chebyshev y Bessel, con fuente y carga iguales y el Orden escrito o calculado desde
-// una atenuación. El resultado es el esquema con los valores en orden desde la fuente y la pérdida de
-// Cohn.
+// Butterworth, Chebyshev y Bessel, con el Orden escrito o calculado desde una atenuación, y con Rs ≠
+// RL por Takahasi (Bessel no). El resultado es el esquema con los valores en orden desde la fuente y
+// la pérdida de Cohn.
 export function Filtros() {
   const guardado = (campo: string) => ({ calculadora: 'filtros', campo });
   const [tipo, setTipo] = useOpcionGuardada(TIPOS, 'pasa-bajos', guardado('tipo'));
@@ -143,9 +144,18 @@ export function Filtros() {
         : vFc !== null
           ? { tipo, aproximacion, ripple: esChebyshev ? vRipple : null, fc: vFc }
           : null;
+  // Con Rs ≠ RL, Chebyshev par se arma si r ≥ r_min: el Orden y la Topología dependen de r.
+  const terminaciones =
+    vRs !== null && vRl !== null
+      ? { ripple: esChebyshev ? vRipple : null, rs: vRs, rl: vRl }
+      : undefined;
   const ordenCalculado =
-    typeof pedidoOrden === 'object' && pedidoOrden !== null && datosOrden
-      ? ordenDesdeAtenuacion(datosOrden, pedidoOrden)
+    typeof pedidoOrden === 'object' && pedidoOrden !== null && datosOrden && terminaciones
+      ? ordenDesdeAtenuacion(
+          datosOrden,
+          pedidoOrden,
+          relacionDe(terminaciones.rs, terminaciones.rl),
+        )
       : null;
   const ordenParaTopologia =
     typeof pedidoOrden === 'number'
@@ -155,7 +165,7 @@ export function Filtros() {
         : null;
 
   // Mientras el Alumno no elija, la Topología es la que usa menos bobinas con el Orden elegido.
-  const sugerida = topologiaSugerida(tipo, aproximacion, ordenParaTopologia);
+  const sugerida = topologiaSugerida(tipo, aproximacion, ordenParaTopologia, terminaciones);
   const topologia = elegida === 'sugerida' ? sugerida.topologia : elegida;
   // Una elegida que coincide con la que usa menos bobinas vuelve a seguirla.
   useEffect(() => {
@@ -284,7 +294,11 @@ export function Filtros() {
       </section>
       <section class="resultados" aria-label="Resultados" aria-live="polite">
         {entrada ? (
-          <Resultado resultado={calcularFiltro(entrada)} entrada={entrada} />
+          <Resultado
+            resultado={calcularFiltro(entrada)}
+            entrada={entrada}
+            onButterworth={() => setAproximacion('butterworth')}
+          />
         ) : (
           <p class="sin-resultado corregir">{mensaje}</p>
         )}
@@ -349,11 +363,32 @@ const omegaTexto = (x: number) => (x === Infinity ? '∞' : formatearValor(x, 'n
 
 type ResultadoCalculado = Extract<ResultadoFiltro, { estado: 'calculado' }>;
 
-function Resultado({ resultado, entrada }: { resultado: ResultadoFiltro; entrada: EntradaFiltro }) {
+function Resultado({
+  resultado,
+  entrada,
+  onButterworth,
+}: {
+  resultado: ResultadoFiltro;
+  entrada: EntradaFiltro;
+  // Bessel con Rs ≠ RL ofrece pasar a Butterworth (spec §7.4).
+  onButterworth: () => void;
+}) {
   if (resultado.estado === 'corte') {
     return (
       <FormaResultado
-        avisos={<Aviso fuerte={resultado.codigo === 'entrada-invalida'}>{resultado.texto}</Aviso>}
+        avisos={
+          <Aviso fuerte={resultado.codigo === 'entrada-invalida'}>
+            {resultado.texto}
+            {resultado.codigo === 'bessel-terminaciones-distintas' && (
+              <>
+                {' '}
+                <button type="button" class="boton-minima en-aviso" onClick={onButterworth}>
+                  Pasar a Butterworth
+                </button>
+              </>
+            )}
+          </Aviso>
+        }
         principal={null}
       />
     );
@@ -422,7 +457,8 @@ function Resultado({ resultado, entrada }: { resultado: ResultadoFiltro; entrada
                         resonador {resonador.nombre}, LC {resonador.conexion},{' '}
                       </>
                     )}
-                    g<sub>{e.k}</sub> = {formatearValor(e.g, 'numero', 'paso')}, {DONDE[e.posicion]}
+                    g<sub>{e.indiceG}</sub> = {formatearValor(e.g, 'numero', 'paso')},{' '}
+                    {DONDE[e.posicion]}
                   </>
                 }
               />

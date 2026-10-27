@@ -292,11 +292,14 @@ export interface CasoVerificacionFiltro {
   referencia: string;
 }
 
-const valores = (lista: string) =>
-  lista.split(' · ').map((v) => {
-    const [nombre, impreso, unidad] = v.split(' ') as [string, string, 'nH' | 'pF'];
-    return { nombre, impreso, unidad };
-  });
+// "L1 16,75 nH · C1 159,2 pF" como valores impresos; vacía si no hay.
+export const valores = (lista: string) =>
+  lista === ''
+    ? []
+    : lista.split(' · ').map((v) => {
+        const [nombre, impreso, unidad] = v.split(' ') as [string, string, 'nH' | 'pF'];
+        return { nombre, impreso, unidad };
+      });
 
 const ATENUACION_C1 = [
   { f: 50e6, impreso: '0,004' },
@@ -539,6 +542,8 @@ export interface CasoComportamientoFiltro {
     | {
         orden: number;
         avisos: readonly CodigoAvisoFiltro[];
+        // La Topología con la que se calcula, si el caso la fija.
+        topologia?: TopologiaFiltro;
         // Los valores marcados, con su nivel; los que no están no se marcan.
         marcados?: Readonly<Record<string, Nivel>>;
       };
@@ -576,17 +581,101 @@ export const CASOS_COMPORTAMIENTO: readonly CasoComportamientoFiltro[] = [
   },
   {
     clase: 'comportamiento',
-    id: 'Bessel con Rs ≠ RL todavía no se calcula',
+    id: 'Bessel con Rs ≠ RL no se calcula en π ni en T',
     entradas: entradaFiltro('pasa-bajos', 'bessel', 'π', 5, 100e6, { rs: 50, rl: 75 }),
-    esperado: { corte: 'terminaciones-distintas' },
+    esperado: { corte: 'bessel-terminaciones-distintas' },
+    referencia: 'spec §7.4 y §7.10',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Bessel con Rs ≠ RL tampoco en pasa banda, ni con el Orden calculado',
+    entradas: entradaBanda('pasa-banda', 'bessel', 'T', pedido(20, 70e6), BANDA_FM, {
+      rs: 300,
+      rl: 50,
+    }),
+    esperado: { corte: 'bessel-terminaciones-distintas' },
+    referencia: 'spec §7.4 y §7.10',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Rs ≠ RL: Butterworth de 50 a 75 Ω se calcula con el aviso de pérdida plana',
+    entradas: entradaFiltro('pasa-bajos', 'butterworth', 'π', 5, 100e6, { rs: 50, rl: 75 }),
+    esperado: { orden: 5, avisos: ['perdida-plana'], topologia: 'π' },
+    referencia: 'spec §7.4 y §7.10',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'R10: Chebyshev 0,1 dB de Orden 4 con r = 1,3 no tiene diseño y sube a 5',
+    entradas: entradaFiltro('pasa-bajos', 'chebyshev', 'T', 4, 100e6, {
+      ripple: 0.1,
+      rs: 50,
+      rl: 65,
+    }),
+    esperado: { orden: 5, avisos: ['perdida-plana', 'chebyshev-par'], topologia: 'T' },
+    referencia: 'spec §7.4 y §7.10; research/filtros-terminaciones-desiguales.md, §6.1 (R10)',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Chebyshev 0,5 dB de Orden 4 de 50 a 75 Ω (r = 1,5 < r_min = 1,98) sube a 5',
+    entradas: entradaBanda('pasa-banda', 'chebyshev', 'π', 4, BANDA_FM, {
+      ripple: 0.5,
+      rs: 50,
+      rl: 75,
+    }),
+    esperado: { orden: 5, avisos: ['perdida-plana', 'chebyshev-par'], topologia: 'π' },
+    referencia: 'spec §7.4 y §7.10',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Chebyshev 0,1 dB de Orden 4 de 50 a 300 Ω (r = 6 ≥ r_min) se arma par',
+    entradas: entradaFiltro('pasa-altos', 'chebyshev', 'T', 4, 100e6, {
+      ripple: 0.1,
+      rs: 50,
+      rl: 300,
+    }),
+    esperado: { orden: 4, avisos: ['perdida-plana'], topologia: 'T' },
     referencia: 'spec §7.4',
   },
   {
     clase: 'comportamiento',
-    id: 'Rs ≠ RL todavía no se calcula',
-    entradas: entradaFiltro('pasa-bajos', 'butterworth', 'π', 5, 100e6, { rs: 50, rl: 75 }),
-    esperado: { corte: 'terminaciones-distintas' },
-    referencia: 'spec §7.4',
+    id: 'Topología imposible: Butterworth de Orden 4 desde 50 Ω hacia 300 Ω en π pasa a T',
+    entradas: entradaFiltro('pasa-bajos', 'butterworth', 'π', 4, 100e6, { rs: 50, rl: 300 }),
+    esperado: { orden: 4, avisos: ['perdida-plana', 'topologia-orden-par'], topologia: 'T' },
+    referencia: 'spec §7.4 y §7.10',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Topología imposible: Chebyshev 0,1 dB de Orden 4 desde 300 Ω hacia 50 Ω en T pasa a π',
+    entradas: entradaBanda('rechaza-banda', 'chebyshev', 'T', 4, BANDA_FM, {
+      ripple: 0.1,
+      rs: 300,
+      rl: 50,
+    }),
+    esperado: { orden: 4, avisos: ['perdida-plana', 'topologia-orden-par'], topologia: 'π' },
+    referencia: 'spec §7.4 y §7.10',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Orden calculado con Rs ≠ RL: Chebyshev 0,1 dB de 50 a 300 Ω sale par (6)',
+    // El mismo pedido que O3: con Rs = RL sale 6 y pasa a 7; con r = 6 ≥ r_min el 6 se arma.
+    entradas: entradaFiltro('pasa-bajos', 'chebyshev', 'T', pedido(40, 200e6), 100e6, {
+      ripple: 0.1,
+      rs: 50,
+      rl: 300,
+    }),
+    esperado: { orden: 6, avisos: ['perdida-plana'], topologia: 'T' },
+    referencia: 'spec §7.4 y §7.6',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Orden calculado con Rs ≠ RL: Chebyshev 0,1 dB de 50 a 60 Ω (r = 1,2 < r_min) sale 7',
+    entradas: entradaFiltro('pasa-bajos', 'chebyshev', 'T', pedido(40, 200e6), 100e6, {
+      ripple: 0.1,
+      rs: 50,
+      rl: 60,
+    }),
+    esperado: { orden: 7, avisos: ['perdida-plana'], topologia: 'T' },
+    referencia: 'spec §7.4 y §7.6',
   },
   {
     clase: 'comportamiento',

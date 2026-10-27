@@ -1,13 +1,22 @@
 import { formatearValor } from '../../entrada/formato';
-import { numeroLatex as numero, valorLatex } from '../comun/latex';
+import { numeroLatex as numero, porcentajeLatex, valorLatex } from '../comun/latex';
 import type { Aviso, Paso, Referencia } from '../comun/resultado';
-import { type Revision, revisarValores } from '../comun/valor-impracticable';
+import { type Revision, errorDeMontaje, revisarValores } from '../comun/valor-impracticable';
+import {
+  FORMULAS_TAKAHASI_BUTTERWORTH,
+  FORMULAS_TAKAHASI_CHEBYSHEV,
+  type ParametrosTakahasi,
+  admiteOrdenPar,
+  desadaptacionDirecta,
+  relacionMinima,
+  takahasi,
+} from './takahasi';
 
-// La Calculadora de filtros (spec §7): escaleras LC π y T con fuente y carga iguales. Por ahora
-// los cuatro Tipos de filtro, Butterworth, Chebyshev y Bessel, con el Orden ingresado o calculado
-// desde una atenuación (spec §7.6). Prototipo pasa bajos normalizado (g0 = 1,
-// corte en 1 rad/s), transformación de frecuencia según el Tipo de filtro y escala de impedancia por
-// R0. Puro: recibe Hz, ohms, dB y el Q de las bobinas.
+// La Calculadora de filtros (spec §7): escaleras LC π y T. Por ahora los cuatro Tipos de filtro,
+// Butterworth, Chebyshev y Bessel, con el Orden ingresado o calculado desde una atenuación (spec
+// §7.6), y con Rs ≠ RL por las fórmulas de Takahasi (spec §7.4; Bessel no). Prototipo pasa bajos
+// normalizado (g0 = 1, corte en 1 rad/s), transformación de frecuencia según el Tipo de filtro y
+// escala de impedancia por R0. Puro: recibe Hz, ohms, dB y el Q de las bobinas.
 
 export type TipoBajoAlto = 'pasa-bajos' | 'pasa-altos';
 export type TipoDeBanda = 'pasa-banda' | 'rechaza-banda';
@@ -89,6 +98,8 @@ export interface Prototipo {
   gamma: number | null;
   // Solo en Bessel: el ω3dB del Orden, por el que se multiplicó la tabla de retardo de 1 s.
   factorRetardo: number | null;
+  // Solo con Rs ≠ RL (spec §7.4): a, â o α, K y ρ0 de Takahasi.
+  takahasi: ParametrosTakahasi | null;
   pasos: readonly Paso[];
 }
 
@@ -104,8 +115,10 @@ export interface ElementoFiltro {
   // En H o F.
   valor: number;
   posicion: Posicion;
-  // Su lugar desde la fuente y el g del prototipo del que sale: g1 es el primero.
+  // Su lugar desde la fuente, y el índice y el valor del g del prototipo del que sale. El índice es
+  // k salvo en las escaleras de Takahasi armadas de la carga a la fuente, que empiezan por gn.
   k: number;
+  indiceG: number;
   g: number;
 }
 
@@ -124,14 +137,50 @@ export interface ResonadorFiltro {
 
 export type CodigoCorteFiltro =
   | 'entrada-invalida'
-  | 'terminaciones-distintas'
+  // Bessel no tiene fórmulas de Takahasi (spec §7.4).
+  | 'bessel-terminaciones-distintas'
   // Orden calculado (spec §7.6 y §7.10): fs cae en la banda pasante, haría falta más de 10, o
   // Bessel no llega a la atenuación con ningún Orden hasta 10.
   | 'banda-pasante'
   | 'orden-excedido'
   | 'bessel-sin-solucion';
 
-export type CodigoAvisoFiltro = 'chebyshev-par' | 'f0-geometrica';
+export type CodigoAvisoFiltro =
+  'perdida-plana' | 'chebyshev-par' | 'topologia-orden-par' | 'f0-geometrica';
+
+// Las cuatro escaleras de Takahasi, con la misma respuesta (spec §7.4; research/filtros-
+// terminaciones-desiguales.md §3). (a) es la de las fórmulas: g1 en serie, la fuente en la R menor y
+// la carga en la mayor. (b) es su dual, vista desde la R mayor; (c) y (d) son las mismas dos armadas
+// de la carga a la fuente, de gn a g1.
+export type VarianteTakahasi = 'a' | 'b' | 'c' | 'd';
+
+// Una escalera de Takahasi armada: la que se muestra o su alternativa.
+export interface EscaleraTakahasi {
+  variante: VarianteTakahasi;
+  // La R con la que se escala: la menor en (a) y (c), la mayor en (b) y (d).
+  r0: number;
+  elementos: readonly ElementoFiltro[];
+  resonadores: readonly ResonadorFiltro[];
+  // El mayor de los cocientes máximo/mínimo entre sus L y entre sus C.
+  dispersion: number;
+  // El peor error relativo del montaje entre sus valores (spec §5.6), como fracción.
+  peorError: number;
+}
+
+// Lo que agrega un filtro con Rs ≠ RL (spec §7.4 y §7.9).
+export interface Terminaciones extends Omit<EscaleraTakahasi, 'elementos' | 'resonadores'> {
+  // R mayor sobre R menor.
+  r: number;
+  // La transmisión máxima de la banda pasante.
+  k: number;
+  // La desadaptación directa, −10·log10(4r/(1+r)²), en dB: la pérdida plana del aviso.
+  perdidaPlana: number;
+  // −10·log10 K, en dB: la menor pérdida de la banda pasante, donde más transmite. Es la plana,
+  // salvo en Chebyshev par, que en los picos del ripple pierde el ripple menos.
+  perdidaMinima: number;
+  // La otra escalera de la misma Topología, si hay (Orden par). Va en los pasos intermedios.
+  alternativa: EscaleraTakahasi | null;
+}
 
 // El Orden calculado desde una atenuación y lo que muestra el resultado (spec §7.6 y §7.9).
 export interface OrdenCalculado {
@@ -163,7 +212,9 @@ export type ResultadoFiltro =
       estado: 'calculado';
       tipo: TipoFiltro;
       aproximacion: Aproximacion;
+      // La que se usa y la que pidió el Alumno: con Orden par y Rs ≠ RL solo existe una.
       topologia: TopologiaFiltro;
+      topologiaPedida: TopologiaFiltro;
       // El que escribió el Alumno (null si lo pidió desde una atenuación) y el que se usa: Chebyshev
       // par sube al impar.
       ordenPedido: number | null;
@@ -180,7 +231,10 @@ export type ResultadoFiltro =
       elementos: readonly ElementoFiltro[];
       // Solo en pasa banda y rechaza banda.
       resonadores: readonly ResonadorFiltro[];
-      // Estimación de Cohn, en dB. Null en rechaza banda (spec §12.1, P1).
+      // Solo con Rs ≠ RL.
+      terminaciones: Terminaciones | null;
+      // Estimación de Cohn, en dB. Null en rechaza banda (spec §12.1, P1) y con Rs ≠ RL, porque
+      // Matthaei ec. 4.13-11 supone terminaciones iguales.
       perdidaCohn: number | null;
       // Solo en Bessel pasa bajos: τ0 = factor/ωc, en s. Sin curva de retardo (spec §7.3).
       retardoContinua: number | null;
@@ -231,6 +285,26 @@ export const REFERENCIAS_FILTROS: readonly Referencia[] = [
   },
 ];
 
+// Con Rs ≠ RL (spec §7.11). El original de Takahasi no se leyó (spec §12.3).
+export const REFERENCIAS_TAKAHASI: readonly Referencia[] = [
+  {
+    autor: 'H. Takahasi',
+    obra: 'Journal of the Institute of Electrical Communication Engineers of Japan',
+    volumen: '34(2)',
+    anio: 1951,
+    ubicacion:
+      'págs. 65-74, a través de Matthaei, Young y Jones, Sec. 4.10, ec. 4.10-2 a 4.10-4, y de ' +
+      'Weinberg y Slepian (1960)',
+  },
+  {
+    autor: 'L. Weinberg y P. Slepian',
+    obra: 'IRE Transactions on Circuit Theory',
+    volumen: 'CT-7(2)',
+    anio: 1960,
+    ubicacion: 'págs. 88-101',
+  },
+];
+
 export const SUGERENCIA_FILTROS = 'Cambiá de Topología π ↔ T.';
 // En el rechaza banda angosto esta es la única respuesta de esta Versión (spec §7.10).
 export const SUGERENCIA_RECHAZA_BANDA = 'Cambiá de Topología π ↔ T, o ensanchá la banda.';
@@ -246,13 +320,28 @@ const hz = (f: number) => valorLatex(f, 'frecuencia');
 const db = (x: number) => valorLatex(x, 'decibeles');
 const numeroTexto = (x: number) => formatearValor(x, 'numero');
 
-// Chebyshev de Orden par no se puede armar con R_s = R_L: se usa el impar siguiente (spec §7.3).
-export const ordenEfectivo = (aproximacion: Aproximacion, n: number) =>
-  aproximacion === 'chebyshev' && n % 2 === 0 ? n + 1 : n;
+// R mayor sobre R menor: 1 con terminaciones iguales.
+export const relacionDe = (rs: number, rl: number) => Math.max(rs, rl) / Math.min(rs, rl);
+
+// Chebyshev de Orden par se arma solo entre R distintas con r ≥ r_min; con Rs = RL nunca (spec §7.3
+// y §7.4). Si no, se usa el impar siguiente.
+const parSeArma = (ripple: number | null, r: number) =>
+  r !== 1 && ripple !== null && admiteOrdenPar(ripple, r);
+
+export const ordenEfectivo = (
+  aproximacion: Aproximacion,
+  n: number,
+  ripple: number | null,
+  r: number,
+) => (aproximacion === 'chebyshev' && n % 2 === 0 && !parSeArma(ripple, r) ? n + 1 : n);
 
 // En π g1 va en derivación junto a la fuente; en T, en serie. Después alternan.
 const posicionDe = (topologia: TopologiaFiltro, k: number): Posicion =>
   (topologia === 'T') === (k % 2 === 1) ? 'serie' : 'derivacion';
+
+// Con Orden par y Rs ≠ RL el elemento en serie va del lado de la R menor y el de derivación del de
+// la mayor: desde la R menor solo hay T, y desde la mayor solo π (spec §7.4).
+const topologiaDeOrdenPar = (rs: number, rl: number): TopologiaFiltro => (rs < rl ? 'T' : 'π');
 
 // Matthaei ec. 4.04-2 a 4.04-4 y Pozar, Tabla 8.6, con ωc = 2π·fc: qué es cada g según el Tipo de
 // filtro y su posición, y su fórmula sin números y con ellos.
@@ -382,18 +471,37 @@ export function contarBobinas(tipo: TipoFiltro, topologia: TopologiaFiltro, n: n
   return cuenta;
 }
 
+// Lo que la Topología por defecto necesita además del Orden, porque con Rs ≠ RL cambia cuál se
+// arma: sin esto, Rs = RL.
+export interface DatosDeTopologia {
+  ripple: number | null;
+  rs: number;
+  rl: number;
+}
+
 // La Topología por defecto: la que usa menos bobinas, que en VHF son las de menor Q y más
-// dispersión; π cuando las dos usan las mismas (spec §7.1 y §12.2). La nota lo explica en una
-// línea junto al campo.
+// dispersión; π cuando las dos usan las mismas (spec §7.1 y §12.2). Con Orden par y Rs ≠ RL, la
+// única que se arma (spec §7.4). La nota lo explica en una línea junto al campo.
 export function topologiaSugerida(
   tipo: TipoFiltro,
   aproximacion: Aproximacion,
   orden: number | null,
+  { ripple, rs, rl }: DatosDeTopologia = { ripple: null, rs: 1, rl: 1 },
 ): { topologia: TopologiaFiltro; nota: string } {
   if (orden === null) {
     return { topologia: 'π', nota: 'Por defecto, la que usa menos bobinas según el Orden.' };
   }
-  const n = ordenEfectivo(aproximacion, orden);
+  const r = relacionDe(rs, rl);
+  const n = ordenEfectivo(aproximacion, orden, ripple, r);
+  if (r !== 1 && aproximacion !== 'bessel' && n % 2 === 0) {
+    const unica = topologiaDeOrdenPar(rs, rl);
+    return {
+      topologia: unica,
+      nota:
+        `Con Orden par y Rs ≠ RL solo se puede armar ${unica}: el elemento en serie va del lado ` +
+        'de la R menor.',
+    };
+  }
   const enPi = contarBobinas(tipo, 'π', n);
   const enT = contarBobinas(tipo, 'T', n);
   if (enPi === enT) {
@@ -453,8 +561,18 @@ const BESSEL_RETARDO: Record<number, { g: readonly number[]; factor: number }> =
   },
 };
 
-export function prototipo(aproximacion: Aproximacion, n: number, ripple: number | null): Prototipo {
-  if (aproximacion === 'bessel') return bessel(n);
+// r = R mayor/R menor. Con r ≠ 1, las fórmulas de Takahasi; Bessel no las tiene (spec §7.4).
+export function prototipo(
+  aproximacion: Aproximacion,
+  n: number,
+  ripple: number | null,
+  r = 1,
+): Prototipo {
+  if (aproximacion === 'bessel') {
+    if (r !== 1) throw new Error('Bessel no tiene fórmulas con Rs ≠ RL');
+    return bessel(n);
+  }
+  if (r !== 1) return takahasi(aproximacion, n, ripple, r);
   return aproximacion === 'butterworth' ? butterworth(n) : chebyshev(n, ripple!);
 }
 
@@ -484,6 +602,7 @@ function bessel(n: number): Prototipo {
     beta: null,
     gamma: null,
     factorRetardo: factor,
+    takahasi: null,
     pasos,
   };
 }
@@ -507,6 +626,7 @@ function butterworth(n: number): Prototipo {
     beta: null,
     gamma: null,
     factorRetardo: null,
+    takahasi: null,
     pasos,
   };
 }
@@ -585,6 +705,7 @@ function chebyshev(n: number, ripple: number): Prototipo {
     beta,
     gamma,
     factorRetardo: null,
+    takahasi: null,
     pasos,
   };
 }
@@ -621,26 +742,35 @@ const FORMULA_COHN = '\\Delta L_0 \\approx 4{,}343 \\sum \\dfrac{g_k}{Q_u}\\;\\t
 const FORMULA_COHN_BANDA =
   '\\Delta L_0 \\approx 4{,}343 \\sum \\dfrac{g_k}{Q_k},\\; Q_k = \\mathrm{FBW} \\cdot Q_u';
 
+// Cómo se arma la escalera desde la fuente: la Topología, los g en ese orden con su índice en el
+// prototipo, y la R con la que se escalan. Con Rs = RL, g1 … gn y R0 = Rs.
+interface Disposicion {
+  topologia: TopologiaFiltro;
+  g: readonly number[];
+  indices: readonly number[];
+  r0: number;
+}
+
 function elementoDe(
   tipo: TipoBajoAlto,
-  topologia: TopologiaFiltro,
+  { topologia, g: gs, indices, r0 }: Disposicion,
   k: number,
-  g: number,
   fc: number,
-  r0: number,
 ): { elemento: ElementoFiltro; paso: Paso } {
   const posicion = posicionDe(topologia, k);
   const escala = ESCALA[tipo][posicion];
   const { componente } = escala;
   const nombre = `${componente}${k}`;
+  const g = gs[k - 1];
+  const indiceG = indices[k - 1];
   const valor = escala.valor(g, r0, 2 * Math.PI * fc);
   const magnitud = componente === 'L' ? 'inductancia' : 'capacidad';
   return {
-    elemento: { componente, nombre, valor, posicion, k, g },
+    elemento: { componente, nombre, valor, posicion, k, indiceG, g },
     paso: {
       texto: `${nombre}, ${DONDE[posicion]}`,
       latex:
-        `${componente}_{${k}} = ${escala.formula(`g_{${k}}`)} = ` +
+        `${componente}_{${k}} = ${escala.formula(`g_{${indiceG}}`)} = ` +
         `${escala.sustituida(numero(g), hz(fc), ohms(r0))} = ${valorLatex(valor, magnitud)}`,
     },
   };
@@ -649,17 +779,17 @@ function elementoDe(
 // El g de lugar k hecho resonador (spec §7.5): su L y su C, y el chequeo de que sintoniza en ω0.
 function resonadorDe(
   tipo: TipoDeBanda,
-  topologia: TopologiaFiltro,
+  { topologia, g: gs, indices, r0 }: Disposicion,
   k: number,
-  g: number,
   banda: Banda,
-  r0: number,
 ): { resonador: ResonadorFiltro; pasos: Paso[] } {
   const posicion = posicionDe(topologia, k);
   const escala = ESCALA_BANDA[tipo][posicion];
+  const g = gs[k - 1];
+  const indiceG = indices[k - 1];
   const w0 = 2 * Math.PI * banda.f0;
   const bw = 2 * Math.PI * banda.bw;
-  const simbolos: Simbolos = { ...SIMBOLOS_BANDA, g: `g_{${k}}` };
+  const simbolos: Simbolos = { ...SIMBOLOS_BANDA, g: `g_{${indiceG}}` };
   const sustituidos: Simbolos = {
     g: numero(g),
     r0: ohms(r0),
@@ -670,7 +800,15 @@ function resonadorDe(
 
   const armar = (componente: 'L' | 'C'): ElementoFiltro => {
     const { valor } = componente === 'L' ? escala.l : escala.c;
-    return { componente, nombre: `${componente}${k}`, valor: valor(g, r0, w0, bw), posicion, k, g };
+    return {
+      componente,
+      nombre: `${componente}${k}`,
+      valor: valor(g, r0, w0, bw),
+      posicion,
+      k,
+      indiceG,
+      g,
+    };
   };
   const l = armar('L');
   const c = armar('C');
@@ -954,9 +1092,11 @@ function pasoAtenuacionReal(
   };
 }
 
+// r = R mayor/R menor: con r ≥ r_min Chebyshev admite el Orden par (spec §7.4).
 export function ordenDesdeAtenuacion(
   datos: DatosDeOrden,
   { as, fs }: PedidoAtenuacion,
+  r = 1,
 ): ResultadoOrden {
   const { aproximacion, ripple } = datos;
   const omegaS = frecuenciaNormalizada(datos, fs);
@@ -975,12 +1115,17 @@ export function ordenDesdeAtenuacion(
   if (aproximacion === 'bessel') return ordenBessel(omegaS, as, fs, pasos);
 
   const { nExacto, n: minimo } = ordenMinimo(aproximacion, omegaS, ripple, as);
-  // Con terminaciones iguales Chebyshev se arma solo de Orden impar (spec §7.3 y §7.6).
-  const orden = ordenEfectivo(aproximacion, minimo);
+  // Chebyshev par se arma solo entre R distintas con r ≥ r_min: si no, el impar siguiente (spec
+  // §7.3, §7.4 y §7.6).
+  const orden = ordenEfectivo(aproximacion, minimo, ripple, r);
+  const porQueSube =
+    r === 1
+      ? 'con Rs = RL'
+      : `con r = ${numeroTexto(r)}, debajo de r_min = ${numeroTexto(relacionMinima(ripple!))},`;
   if (orden > ORDEN_MAXIMO) {
     const pide = Number.isFinite(nExacto) ? `n ≥ ${numeroTexto(nExacto)}` : 'un n enorme';
     const par =
-      orden !== minimo ? ` Es par, y con Rs = RL Chebyshev pasa al Orden ${orden}.` : '';
+      orden !== minimo ? ` Es par, y ${porQueSube} Chebyshev pasa al Orden ${orden}.` : '';
     return {
       estado: 'corte',
       codigo: 'orden-excedido',
@@ -1008,11 +1153,19 @@ export function ordenDesdeAtenuacion(
       },
       ...(minimo !== orden
         ? [
-            {
-              texto: `Orden ${minimo} es par: con Rs = RL se arma el impar siguiente, Orden ${orden}`,
-              latex: `n = ${minimo} + 1 = ${orden}`,
-              fuente: 'Spec §7.3: Chebyshev par pide una carga de coth²(β/4)·R0.',
-            },
+            r === 1
+              ? {
+                  texto: `Orden ${minimo} es par: con Rs = RL se arma el impar siguiente, Orden ${orden}`,
+                  latex: `n = ${minimo} + 1 = ${orden}`,
+                  fuente: 'Spec §7.3: Chebyshev par pide una carga de coth²(β/4)·R0.',
+                }
+              : {
+                  texto:
+                    `Orden ${minimo} es par y r = ${numeroTexto(r)} no llega a r_min = ` +
+                    `${numeroTexto(relacionMinima(ripple!))}: se arma el impar siguiente, Orden ${orden}`,
+                  latex: `n = ${minimo} + 1 = ${orden}`,
+                  fuente: 'Spec §7.4: Chebyshev par entre R distintas pide r ≥ r_min = coth²(β/4).',
+                },
           ]
         : []),
       pasoAtenuacionReal(aproximacion, ripple, orden, omegaS, atenuacionReal),
@@ -1091,6 +1244,11 @@ function frecuenciasValidas(entrada: EntradaFiltro): boolean {
   return 'f1' in banda ? banda.f1 > 0 && banda.f2 > banda.f1 : banda.f0 > 0 && banda.bw > 0;
 }
 
+const CORTE_BESSEL =
+  'Bessel con Rs ≠ RL no se calcula en π ni en T: las fórmulas de Takahasi valen para Butterworth ' +
+  'y Chebyshev, y Bessel no tiene una equivalente. Podés pasar a Butterworth, o diseñar con Rs = ' +
+  'RL y adaptar después con la Calculadora de redes de adaptación.';
+
 export function calcularFiltro(entrada: EntradaFiltro): ResultadoFiltro {
   const { tipo, aproximacion, ripple, topologia, orden, rs, rl, qBobina } = entrada;
   const rippleValido =
@@ -1104,56 +1262,57 @@ export function calcularFiltro(entrada: EntradaFiltro): ResultadoFiltro {
   ) {
     return { estado: 'corte', codigo: 'entrada-invalida', texto: CORTE_INVALIDA };
   }
-  if (rs !== rl) {
-    return {
-      estado: 'corte',
-      codigo: 'terminaciones-distintas',
-      texto:
-        'Esta Versión todavía no calcula filtros con Rs ≠ RL: por ahora la fuente y la carga ' +
-        'tienen que ser iguales. Para pasar de una a la otra está la Calculadora de redes de ' +
-        'adaptación.',
-    };
+  const r = relacionDe(rs, rl);
+  if (aproximacion === 'bessel' && r !== 1) {
+    return { estado: 'corte', codigo: 'bessel-terminaciones-distintas', texto: CORTE_BESSEL };
   }
 
-  // El Orden calculado ya sale impar en Chebyshev: no hace falta el aviso de Orden par.
+  // El Orden calculado ya sale impar en Chebyshev cuando hace falta: no lleva el aviso de Orden par.
   let ordenCalculado: OrdenCalculado | null = null;
   if (typeof orden !== 'number') {
-    const o = ordenDesdeAtenuacion(entrada, orden);
+    const o = ordenDesdeAtenuacion(entrada, orden, r);
     if (o.estado === 'corte') return { estado: 'corte', codigo: o.codigo, texto: o.texto };
     ordenCalculado = o;
   }
   const ordenPedido = typeof orden === 'number' ? orden : null;
-  const n = ordenCalculado ? ordenCalculado.orden : ordenEfectivo(aproximacion, ordenPedido!);
-  const avisos: Aviso<CodigoAvisoFiltro>[] = [];
-  if (ordenPedido !== null && n !== ordenPedido) {
-    const { carga } = prototipo(aproximacion, ordenPedido, ripple);
-    avisos.push({
-      codigo: 'chebyshev-par',
-      texto:
-        `Chebyshev de Orden ${ordenPedido} no se puede armar con Rs = RL: pide una carga de ` +
-        `${numeroTexto(carga)} veces la fuente. Se calcula con Orden ${n}.`,
-    });
-  }
+  const n = ordenCalculado
+    ? ordenCalculado.orden
+    : ordenEfectivo(aproximacion, ordenPedido!, ripple, r);
+  const avisoOrden =
+    ordenPedido !== null && n !== ordenPedido
+      ? avisoChebyshevPar(ordenPedido, n, ripple!, r)
+      : null;
 
-  const p = prototipo(aproximacion, n, ripple);
-  const r0 = rs;
-  const resultado =
-    'fc' in entrada
-      ? escaleraBajoAlto(entrada, entrada.tipo, p, r0)
-      : escaleraDeBanda(entrada, entrada.tipo, p, r0, avisos);
-  const { elementos, resonadores, banda, frecuenciaRevision, pasosEscalera } = resultado;
+  const p = prototipo(aproximacion, n, ripple, r);
+  const bandaEntrada = 'banda' in entrada ? entrada.banda : null;
+  const banda = bandaEntrada && bandaDe(bandaEntrada);
+  // fc, o f2: el borde alto de la banda, donde los parásitos del montaje pesan más.
+  const frecuenciaRevision = 'fc' in entrada ? entrada.fc : banda!.f2;
+  const armada =
+    r === 1
+      ? escaleraDeTerminacionesIguales(entrada, banda, p)
+      : escaleraDeTakahasi(entrada, banda, p, frecuenciaRevision);
+  const { elementos, resonadores } = armada.escalera;
+  const { terminaciones } = armada;
 
   const revision = revisarValores(elementos, frecuenciaRevision, {
     sugerencia: tipo === 'rechaza-banda' ? SUGERENCIA_RECHAZA_BANDA : SUGERENCIA_FILTROS,
   });
-  const cohn = perdidaDeCohn(tipo, elementos, p, banda, qBobina);
+  const cohn = r === 1 ? perdidaDeCohn(tipo, elementos, p, banda, qBobina) : SIN_COHN;
   const retardo = retardoDe(entrada, p);
+  const avisos: Aviso<CodigoAvisoFiltro>[] = [
+    ...(terminaciones ? [avisoPerdidaPlana(terminaciones, entrada, p)] : []),
+    ...(avisoOrden ? [avisoOrden] : []),
+    ...(armada.topologia !== topologia ? [avisoTopologia(armada.topologia, topologia, rs)] : []),
+    ...(banda && bandaEntrada && 'f0' in bandaEntrada ? [avisoF0(banda)] : []),
+  ];
 
   return {
     estado: 'calculado',
     tipo,
     aproximacion,
-    topologia,
+    topologia: armada.topologia,
+    topologiaPedida: topologia,
     ordenPedido,
     orden: n,
     ordenCalculado,
@@ -1162,35 +1321,127 @@ export function calcularFiltro(entrada: EntradaFiltro): ResultadoFiltro {
     frecuenciaRevision,
     elementos,
     resonadores,
+    terminaciones,
     perdidaCohn: cohn.perdida,
     retardoContinua: retardo.valor,
     formulas: [
       ...(ordenCalculado ? formulasDeOrden(tipo, aproximacion) : []),
-      ...formulasPrototipo(aproximacion),
+      ...formulasPrototipo(aproximacion, r),
       ...(esDeBanda(tipo) ? formulasBanda(tipo) : formulasEscala(tipo)),
       ...(cohn.formula ? [cohn.formula] : []),
     ],
     pasos: [
       ...(ordenCalculado?.pasos ?? []),
+      ...(r === 1 ? [] : [pasoRelacion(rs, rl, r)]),
       ...p.pasos,
-      ...pasosEscalera,
+      ...(banda && bandaEntrada ? pasosDeBanda(bandaEntrada, banda) : []),
+      ...armada.pasos,
       ...cohn.pasos,
       ...retardo.pasos,
       ...revision.pasos,
     ],
     revision,
-    referencias: REFERENCIAS_FILTROS,
+    referencias: r === 1 ? REFERENCIAS_FILTROS : [...REFERENCIAS_FILTROS, ...REFERENCIAS_TAKAHASI],
     avisos,
-    notas: notasDe(tipo, aproximacion),
+    notas: notasDe(tipo, aproximacion, terminaciones, ordenCalculado !== null),
   };
 }
 
-const formulasPrototipo = (aproximacion: Aproximacion): readonly string[] =>
-  aproximacion === 'butterworth'
+function avisoChebyshevPar(
+  pedido: number,
+  n: number,
+  ripple: number,
+  r: number,
+): Aviso<CodigoAvisoFiltro> {
+  if (r === 1) {
+    const { carga } = prototipo('chebyshev', pedido, ripple);
+    return {
+      codigo: 'chebyshev-par',
+      texto:
+        `Chebyshev de Orden ${pedido} no se puede armar con Rs = RL: pide una carga de ` +
+        `${numeroTexto(carga)} veces la fuente. Se calcula con Orden ${n}.`,
+    };
+  }
+  return {
+    codigo: 'chebyshev-par',
+    texto:
+      `Chebyshev de Orden ${pedido} entre Rs y RL distintas pide que la mayor sea al menos ` +
+      `r_min = ${numeroTexto(relacionMinima(ripple))} veces la menor con ` +
+      `${formatearValor(ripple, 'decibeles')} de ripple, y acá r = ${numeroTexto(r)}. Se calcula ` +
+      `con Orden ${n}.`,
+  };
+}
+
+const avisoTopologia = (
+  usada: TopologiaFiltro,
+  pedida: TopologiaFiltro,
+  rs: number,
+): Aviso<CodigoAvisoFiltro> => ({
+  codigo: 'topologia-orden-par',
+  texto:
+    `Con Orden par y Rs ≠ RL solo se puede armar ${usada} desde ` +
+    `${formatearValor(rs, 'resistencia')}: el elemento en serie va del lado de la R menor y el de ` +
+    `derivación, del de la mayor. Se calcula en ${usada} en lugar de ${pedida}.`,
+});
+
+const avisoF0 = (banda: Banda): Aviso<CodigoAvisoFiltro> => ({
+  codigo: 'f0-geometrica',
+  texto:
+    `Con f0 y BW, f0 se toma como la central geométrica √(f1·f2), no como el promedio de ` +
+    `f1 y f2: la banda va de ${formatearValor(banda.f1, 'frecuencia')} a ` +
+    `${formatearValor(banda.f2, 'frecuencia')}.`,
+});
+
+// El aviso obligatorio de spec §7.4, en los cuatro Tipos de filtro. El botón de pase a redes de
+// adaptación lo agrega la pantalla.
+function avisoPerdidaPlana(
+  t: Terminaciones,
+  { rs, rl, ripple }: EntradaFiltro,
+  p: Prototipo,
+): Aviso<CodigoAvisoFiltro> {
+  const plana = formatearValor(t.perdidaPlana, 'decibeles');
+  const par = p.aproximacion === 'chebyshev' && p.orden % 2 === 0;
+  return {
+    codigo: 'perdida-plana',
+    texto:
+      `Este filtro no adapta: tiene una pérdida plana de ${plana}, igual a la desadaptación ` +
+      `directa, 4r/(1+r)² = ${numeroTexto(desadaptacionDirecta(t.r))} con r = ` +
+      `${numeroTexto(t.r)} (de ${formatearValor(rs, 'resistencia')} a ` +
+      `${formatearValor(rl, 'resistencia')}).` +
+      (par
+        ? ` En Chebyshev de Orden par la banda pasante va de ` +
+          `${formatearValor(t.perdidaMinima, 'decibeles')} en los picos del ripple a ${plana}.`
+        : '') +
+      ' Para filtrar y además adaptar, diseñalo con Rs = RL y adaptá con la Calculadora de redes ' +
+      'de adaptación. Una carga balanceada (cinta de 300 Ω, dipolo plegado) necesita además un ' +
+      'balun aparte.',
+  };
+}
+
+function pasoRelacion(rs: number, rl: number, r: number): Paso {
+  return {
+    texto: 'Relación entre las terminaciones',
+    latex:
+      `r = \\dfrac{R_{\\max}}{R_{\\min}} = ` +
+      `\\dfrac{${ohms(Math.max(rs, rl))}}{${ohms(Math.min(rs, rl))}} = ${numero(r)}`,
+    fuente:
+      'Spec §7.4: las fórmulas de Takahasi ponen la fuente en la R menor (g0 = 1) y la carga en ' +
+      'g(n+1) = r.',
+  };
+}
+
+const formulasPrototipo = (aproximacion: Aproximacion, r: number): readonly string[] => {
+  if (r !== 1) {
+    return aproximacion === 'butterworth'
+      ? FORMULAS_TAKAHASI_BUTTERWORTH
+      : FORMULAS_TAKAHASI_CHEBYSHEV;
+  }
+  return aproximacion === 'butterworth'
     ? [FORMULA_BUTTERWORTH]
     : aproximacion === 'bessel'
       ? [FORMULA_BESSEL]
       : FORMULAS_CHEBYSHEV;
+};
 
 // El retardo en continua de Bessel, τ0 = factor/ωc (spec §7.3). Solo en pasa bajos: en pasa altos
 // no hay retardo en continua, y en pasa banda y rechaza banda el retardo no es el del prototipo.
@@ -1217,57 +1468,267 @@ function retardoDe(
   };
 }
 
+// Los L y C de una escalera, de la fuente a la carga, y la cuenta de cada uno.
 interface Escalera {
   elementos: ElementoFiltro[];
   resonadores: ResonadorFiltro[];
-  banda: Banda | null;
-  frecuenciaRevision: number;
-  // Los pasos de la banda (si hay) y de cada elemento.
-  pasosEscalera: Paso[];
+  pasos: Paso[];
 }
 
-function escaleraBajoAlto(
-  entrada: Extract<EntradaFiltro, { fc: number }>,
-  tipo: TipoBajoAlto,
-  p: Prototipo,
-  r0: number,
-): Escalera {
-  const armados = p.g.map((g, i) => elementoDe(tipo, entrada.topologia, i + 1, g, entrada.fc, r0));
-  return {
-    elementos: armados.map((x) => x.elemento),
-    resonadores: [],
-    banda: null,
-    frecuenciaRevision: entrada.fc,
-    pasosEscalera: armados.map((x) => x.paso),
-  };
-}
-
-// f2 es la frecuencia más alta de la banda, donde los parásitos del montaje pesan más.
-function escaleraDeBanda(
-  entrada: Extract<EntradaFiltro, { banda: BandaEntrada }>,
-  tipo: TipoDeBanda,
-  p: Prototipo,
-  r0: number,
-  avisos: Aviso<CodigoAvisoFiltro>[],
-): Escalera {
-  const banda = bandaDe(entrada.banda);
-  if ('f0' in entrada.banda) {
-    avisos.push({
-      codigo: 'f0-geometrica',
-      texto:
-        `Con f0 y BW, f0 se toma como la central geométrica √(f1·f2), no como el promedio de ` +
-        `f1 y f2: la banda va de ${formatearValor(banda.f1, 'frecuencia')} a ` +
-        `${formatearValor(banda.f2, 'frecuencia')}.`,
-    });
+// En pasa banda y rechaza banda, cada g es un resonador.
+function armarEscalera(entrada: EntradaFiltro, banda: Banda | null, d: Disposicion): Escalera {
+  if ('fc' in entrada) {
+    const armados = d.g.map((_, i) => elementoDe(entrada.tipo, d, i + 1, entrada.fc));
+    return {
+      elementos: armados.map((x) => x.elemento),
+      resonadores: [],
+      pasos: armados.map((x) => x.paso),
+    };
   }
-  const armados = p.g.map((g, i) => resonadorDe(tipo, entrada.topologia, i + 1, g, banda, r0));
+  const armados = d.g.map((_, i) => resonadorDe(entrada.tipo, d, i + 1, banda!));
   const resonadores = armados.map((x) => x.resonador);
   return {
     elementos: resonadores.flatMap((r) => [r.l, r.c]),
     resonadores,
-    banda,
-    frecuenciaRevision: banda.f2,
-    pasosEscalera: [...pasosDeBanda(entrada.banda, banda), ...armados.flatMap((x) => x.pasos)],
+    pasos: armados.flatMap((x) => x.pasos),
+  };
+}
+
+// La escalera que se muestra, la Topología con la que quedó y los pasos de cómo se armó.
+interface Armada {
+  escalera: Escalera;
+  topologia: TopologiaFiltro;
+  terminaciones: Terminaciones | null;
+  pasos: Paso[];
+}
+
+// Con Rs = RL: g1 … gn desde la fuente, en la Topología pedida, escalados con Rs.
+function escaleraDeTerminacionesIguales(
+  entrada: EntradaFiltro,
+  banda: Banda | null,
+  p: Prototipo,
+): Armada {
+  const escalera = armarEscalera(entrada, banda, {
+    topologia: entrada.topologia,
+    g: p.g,
+    indices: p.g.map((_, i) => i + 1),
+    r0: entrada.rs,
+  });
+  return { escalera, topologia: entrada.topologia, terminaciones: null, pasos: escalera.pasos };
+}
+
+const FORMA_VARIANTE: Record<
+  VarianteTakahasi,
+  { desdeMenor: boolean; dual: boolean; invertida: boolean; texto: string }
+> = {
+  a: {
+    desdeMenor: true,
+    dual: false,
+    invertida: false,
+    texto: 'la de las fórmulas, con g1 en serie junto a la R menor y escalada con ella',
+  },
+  b: {
+    desdeMenor: false,
+    dual: true,
+    invertida: false,
+    texto: 'la dual de la (a), con g1 en derivación junto a la R mayor y escalada con ella',
+  },
+  c: {
+    desdeMenor: false,
+    dual: false,
+    invertida: true,
+    texto:
+      'la (a) armada de la carga a la fuente: de gn a g1 desde la R mayor, escalada con la menor',
+  },
+  d: {
+    desdeMenor: true,
+    dual: true,
+    invertida: true,
+    texto:
+      'la (b) armada de la carga a la fuente: de gn a g1 desde la R menor, escalada con la mayor',
+  },
+};
+
+// El primer elemento: en serie en (a), en derivación en (b), y en las invertidas el de gn, que en
+// la (a) va en serie si n es impar y en la (b), en derivación.
+function topologiaDeVariante(v: VarianteTakahasi, n: number): TopologiaFiltro {
+  const impar = n % 2 === 1;
+  const enSerie = { a: true, b: false, c: impar, d: !impar }[v];
+  return enSerie ? 'T' : 'π';
+}
+
+// Una escalera de Takahasi armada, con lo que hace falta para elegir y para los pasos.
+interface Candidata extends EscaleraTakahasi {
+  escalera: Escalera;
+  disposicion: Disposicion;
+  // Los extremos de las L y de las C; null si hay menos de dos.
+  extremos: Record<'L' | 'C', { max: number; min: number } | null>;
+  // El nombre del valor con el peor error del montaje.
+  peor: string;
+}
+
+function armarVariante(
+  entrada: EntradaFiltro,
+  banda: Banda | null,
+  p: Prototipo,
+  variante: VarianteTakahasi,
+  frecuenciaRevision: number,
+): Candidata {
+  const { dual, invertida } = FORMA_VARIANTE[variante];
+  const n = p.orden;
+  const indices = Array.from({ length: n }, (_, i) => (invertida ? n - i : i + 1));
+  const { rs, rl } = entrada;
+  const disposicion: Disposicion = {
+    topologia: topologiaDeVariante(variante, n),
+    g: indices.map((i) => p.g[i - 1]),
+    indices,
+    r0: dual ? Math.max(rs, rl) : Math.min(rs, rl),
+  };
+  const escalera = armarEscalera(entrada, banda, disposicion);
+  const extremosDe = (componente: 'L' | 'C') => {
+    const valores = escalera.elementos
+      .filter((e) => e.componente === componente)
+      .map((e) => e.valor);
+    return valores.length < 2 ? null : { max: Math.max(...valores), min: Math.min(...valores) };
+  };
+  const extremos = { L: extremosDe('L'), C: extremosDe('C') };
+  const cociente = (x: { max: number; min: number } | null) => (x ? x.max / x.min : 1);
+  const peor = escalera.elementos
+    .map((e) => ({ nombre: e.nombre, error: errorDeMontaje(e, frecuenciaRevision) }))
+    .reduce((a, b) => (b.error > a.error ? b : a));
+  return {
+    variante,
+    r0: disposicion.r0,
+    elementos: escalera.elementos,
+    resonadores: escalera.resonadores,
+    dispersion: Math.max(cociente(extremos.L), cociente(extremos.C)),
+    peorError: peor.error,
+    escalera,
+    disposicion,
+    extremos,
+    peor: peor.nombre,
+  };
+}
+
+// La de menor dispersión (spec §7.4). Las dos de Orden par empatan siempre, porque por dualidad las
+// L de una son las C de la otra: desempata el criterio de valor impracticable (spec §5.6), con la
+// que tiene su peor valor menos afectado por el montaje.
+const EMPATE = 1e-9;
+const empatan = (x: Candidata, y: Candidata) => Math.abs(x.dispersion / y.dispersion - 1) <= EMPATE;
+const esMejor = (x: Candidata, y: Candidata) =>
+  empatan(x, y) ? x.peorError <= y.peorError : x.dispersion < y.dispersion;
+
+const comoEscalera = ({
+  escalera: _escalera,
+  disposicion: _disposicion,
+  extremos: _extremos,
+  peor: _peor,
+  ...escalera
+}: Candidata): EscaleraTakahasi => escalera;
+
+// Con Rs ≠ RL (spec §7.4): las escaleras de Takahasi del lado de la fuente en la Topología pedida, o
+// en la otra si con Orden par la pedida no existe. Con dos, la mejor y la alternativa.
+function escaleraDeTakahasi(
+  entrada: EntradaFiltro,
+  banda: Banda | null,
+  p: Prototipo,
+  frecuenciaRevision: number,
+): Armada {
+  const { rs, rl, topologia } = entrada;
+  const n = p.orden;
+  const delLado = (['a', 'b', 'c', 'd'] as const).filter(
+    (v) => FORMA_VARIANTE[v].desdeMenor === rs < rl,
+  );
+  // Con Orden impar hay una de cada Topología; con par, las dos son de la misma.
+  const pedidas = delLado.filter((v) => topologiaDeVariante(v, n) === topologia);
+  const candidatas = (pedidas.length > 0 ? pedidas : delLado).map((v) =>
+    armarVariante(entrada, banda, p, v, frecuenciaRevision),
+  );
+  const [elegida, alternativa = null] =
+    candidatas.length === 2 && !esMejor(candidatas[0], candidatas[1])
+      ? [candidatas[1], candidatas[0]]
+      : candidatas;
+
+  const { k } = p.takahasi!;
+  const r = relacionDe(rs, rl);
+  return {
+    escalera: elegida.escalera,
+    topologia: elegida.disposicion.topologia,
+    terminaciones: {
+      ...comoEscalera(elegida),
+      r,
+      k,
+      perdidaPlana: -10 * Math.log10(desadaptacionDirecta(r)),
+      perdidaMinima: -10 * Math.log10(k),
+      alternativa: alternativa && comoEscalera(alternativa),
+    },
+    pasos: [
+      pasoVariante(elegida, 'Escalera'),
+      ...(alternativa
+        ? [pasoDispersion(elegida), pasoDispersion(alternativa), pasoEleccion(elegida, alternativa)]
+        : []),
+      ...elegida.escalera.pasos,
+      ...(alternativa
+        ? [
+            pasoVariante(alternativa, 'Escalera alternativa', ', con la misma respuesta'),
+            ...alternativa.escalera.pasos,
+          ]
+        : []),
+    ],
+  };
+}
+
+function pasoVariante(c: Candidata, titulo: string, agregado = ''): Paso {
+  const { dual, texto } = FORMA_VARIANTE[c.variante];
+  const orden = c.disposicion.indices.map((i) => `g_{${i}}`).join(', ');
+  return {
+    texto: `${titulo} (${c.variante})${agregado}: ${texto}`,
+    latex:
+      `R_0 = R_{${dual ? '\\max' : '\\min'}} = ${ohms(c.r0)},\\; ` +
+      `\\text{desde la fuente: } ${orden}`,
+    fuente:
+      'research/filtros-terminaciones-desiguales.md, §3: las cuatro escaleras, por dualidad e ' +
+      'inversión, dan la misma respuesta.',
+  };
+}
+
+function pasoDispersion(c: Candidata): Paso {
+  const cociente = (componente: 'L' | 'C') => {
+    const x = c.extremos[componente];
+    const simbolo = `\\dfrac{${componente}_{\\max}}{${componente}_{\\min}}`;
+    if (!x) return `${simbolo} = 1`;
+    const magnitud = componente === 'L' ? 'inductancia' : 'capacidad';
+    return (
+      `${simbolo} = \\dfrac{${valorLatex(x.max, magnitud)}}{${valorLatex(x.min, magnitud)}} = ` +
+      numero(x.max / x.min)
+    );
+  };
+  return {
+    texto:
+      `Dispersión de la escalera (${c.variante}), D: el mayor de los cocientes entre las L y ` +
+      `entre las C. Su peor valor con el montaje es ${c.peor}, con e = ` +
+      `${formatearValor(c.peorError * 100, 'porcentaje')} de error`,
+    latex: `${cociente('L')},\\; ${cociente('C')}`,
+  };
+}
+
+function pasoEleccion(elegida: Candidata, alternativa: Candidata): Paso {
+  const d = (c: Candidata) => `D_{(${c.variante})} = ${numero(c.dispersion)}`;
+  const e = (c: Candidata) => `e_{(${c.variante})} = ${porcentajeLatex(c.peorError)}`;
+  const empate = empatan(elegida, alternativa);
+  return {
+    texto:
+      `Se muestra la (${elegida.variante}) y la (${alternativa.variante}) queda como alternativa` +
+      (empate
+        ? ': la dispersión empata y desempata el peor valor con el montaje'
+        : ': tiene menos dispersión'),
+    latex: empate
+      ? `${d(elegida)} = ${d(alternativa)},\\; ${e(elegida)} \\le ${e(alternativa)}`
+      : `${d(elegida)} < ${d(alternativa)}`,
+    fuente:
+      'Spec §7.4: la de menor dispersión de valores. Con Orden par las dos empatan siempre (por ' +
+      'dualidad, las L de una son las C de la otra) y desempata el criterio de valor ' +
+      'impracticable (spec §5.6): la que tiene su peor valor menos afectado por el montaje.',
   };
 }
 
@@ -1276,6 +1737,8 @@ interface Cohn {
   pasos: Paso[];
   formula: string | null;
 }
+
+const SIN_COHN: Cohn = { perdida: null, pasos: [], formula: null };
 
 // Estimación de Cohn (Matthaei ec. 4.13-11). Pasa bajos y pasa altos suman las bobinas, con
 // Qk = Qu; pasa banda suma todos los g, cada uno un resonador con Qk = FBW·Qu (ec. 4.13-2);
@@ -1287,7 +1750,7 @@ function perdidaDeCohn(
   banda: Banda | null,
   qu: number,
 ): Cohn {
-  if (tipo === 'rechaza-banda') return { perdida: null, pasos: [], formula: null };
+  if (tipo === 'rechaza-banda') return SIN_COHN;
   if (tipo === 'pasa-banda') {
     const q = banda!.fbw * qu;
     const perdida = (DB_POR_NEPER * p.g.reduce((s, g) => s + g, 0)) / q;
@@ -1313,7 +1776,7 @@ function pasoCohn(bobinas: readonly ElementoFiltro[], qu: number, perdida: numbe
       fuente,
     };
   }
-  const indices = bobinas.map((e) => `g_{${e.k}}`).join(' + ');
+  const indices = bobinas.map((e) => `g_{${e.indiceG}}`).join(' + ');
   const valores = bobinas.map((e) => numero(e.g)).join(' + ');
   return {
     texto: `Pérdida de Cohn en el centro de la banda pasante, con Qu = ${numeroTexto(qu)}`,
@@ -1338,13 +1801,34 @@ function pasoCohnBanda(g: readonly number[], banda: Banda, qu: number, perdida: 
   };
 }
 
-function notasDe(tipo: TipoFiltro, aproximacion: Aproximacion): string[] {
+function notasDe(
+  tipo: TipoFiltro,
+  aproximacion: Aproximacion,
+  terminaciones: Terminaciones | null,
+  conOrdenCalculado: boolean,
+): string[] {
   const borde = aproximacion === 'chebyshev' ? 'los bordes del ripple' : 'los puntos de −3 dB';
   return [
     ...notasDeFrecuencia(tipo, aproximacion, borde),
-    'π y T dan la misma respuesta con los mismos g: la diferencia es cuántas bobinas llevan.',
+    terminaciones
+      ? 'Con Rs ≠ RL hay varias escaleras con la misma respuesta: los g de Takahasi armados desde ' +
+        'la fuente o desde la carga, y escalados con la R menor o con la mayor.'
+      : 'π y T dan la misma respuesta con los mismos g: la diferencia es cuántas bobinas llevan.',
+    ...(terminaciones && conOrdenCalculado
+      ? [
+          'Con Rs ≠ RL, la atenuación pedida y la real se cuentan desde la transmisión máxima de ' +
+            'la banda pasante: entre Rs y RL hay que sumarles ' +
+            `${formatearValor(terminaciones.perdidaMinima, 'decibeles')}.`,
+        ]
+      : []),
     'Los valores no se redondean a una serie E.',
-    ...notasDePerdida(tipo),
+    ...(terminaciones
+      ? [
+          'La pérdida de Cohn no se muestra con Rs ≠ RL: la ec. 4.13-11 de Matthaei supone fuente ' +
+            'y carga iguales, y con terminaciones distintas cada bobina pesa distinto según de ' +
+            'qué lado queda.',
+        ]
+      : notasDePerdida(tipo)),
     ...(tipo === 'pasa-altos'
       ? [
           'Los valores se revisan en fc, pero un pasa altos trabaja por encima de fc: ahí el ' +

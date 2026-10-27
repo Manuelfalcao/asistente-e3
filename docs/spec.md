@@ -996,6 +996,8 @@ Quedan para la construcción:
 |---|---|---|
 | P1 | **Pérdida de Cohn en rechaza banda.** No se investigó cómo se aplica | No mostrarla en rechaza banda |
 | P2 | **Término E de Maxwell** en la versión externa de dos capas (sección 6.4). La investigación da E ≈ 0,017 (Circular 74) para la fórmula original y no aclara si lo mantuvo en la versión externa | **Resuelto en el ticket 34:** E = 0,017 se mantiene. Con E la fórmula reproduce las cifras de la investigación y las 7 geometrías dan de −0,51 a +0,05 % contra la suma de anillos; sin E, de −0,60 a −0,09 % |
+| P3 | **Pérdida de Cohn con R_s ≠ R_L** en π y T (sección 7.8). La ec. 4.13-11 de Matthaei supone fuente y carga iguales: con R_s ≠ R_L, a primer orden, cada g en serie pesa 2R0/(R_s + R_L) y cada uno en derivación 2R_s·R_L/(R0·(R_s + R_L)), y sin ese peso la estimación se aparta hasta 3,5 veces (50 a 300 Ω) | **Ticket 45:** no se muestra, como en P1, con una nota. Mostrarla con el peso sería una Deducción propia |
+| P4 | **Menor dispersión de valores** entre las escaleras de Takahasi (sección 7.4). Con Orden par las dos posibles empatan siempre: por dualidad, los cocientes de las L de una son los de las C de la otra | **Ticket 45:** la dispersión no decide nunca: con Orden impar hay una sola escalera por Topología, y con Orden par las dos empatan (también en pasa banda y rechaza banda). La que se muestra es la que tiene su peor valor menos afectado por el montaje (error relativo de la sección 5.6); la dispersión queda en los pasos. De 50 a 300 Ω con n = 4 a 100 MHz queda la de C4 = 50,3 pF y no la de C4 = 2,12 pF |
 
 ### 12.2 Valores por defecto que fijó la redacción
 

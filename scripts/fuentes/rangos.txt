@@ -14,6 +14,7 @@
 00F1
 00F3
 00FA
+02C6         # ˆ: el acento de â (Takahasi)
 0391-03A1    # griegas mayúsculas
 03A3-03A9
 03B1-03C9    # griegas minúsculas
