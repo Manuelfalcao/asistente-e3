@@ -60,6 +60,26 @@ describe('respuesta de una red en escalera', () => {
     expect(r.zEntrada.im).toBeCloseTo(-50, 9);
   });
 
+  it('una L en serie vale R_s + jωL vista desde la carga', () => {
+    const f = 10e6;
+    const l = 1e-6;
+    const r = respuesta(
+      { rs: 75, rl: R, elementos: [{ componente: 'L', posicion: 'serie', valor: l }] },
+      f,
+    );
+    expect(r.zSalida.re).toBeCloseTo(75, 12);
+    expect(r.zSalida.im).toBeCloseTo(2 * Math.PI * f * l, 9);
+  });
+
+  it('una R en derivación vale R_s en paralelo con ella vista desde la carga', () => {
+    const r = respuesta(
+      { rs: 50, rl: 200, elementos: [{ componente: 'R', posicion: 'derivacion', valor: 50 }] },
+      1e6,
+    );
+    expect(r.zSalida.re).toBeCloseTo(25, 12);
+    expect(r.zSalida.im).toBeCloseTo(0, 12);
+  });
+
   it('la atenuación es −10·log10 |S21|²', () => {
     const red: RedBarrido = {
       rs: 50,

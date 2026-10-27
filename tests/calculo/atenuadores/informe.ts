@@ -32,7 +32,13 @@ import {
   GRILLA_IMPEDANCIAS,
   TOLERANCIA_ORACULO,
 } from './casos-pad';
-import { escaleraDeAtenuador, escaleraDePad, medir, potencias } from './elementos';
+import {
+  CASOS_COMPORTAMIENTO_COMERCIAL,
+  CASOS_VERIFICACION_COMERCIAL,
+  TOLERANCIA_COMERCIAL,
+} from './casos-comerciales';
+import { valoresDelCaso } from './comerciales';
+import { escaleraDeAtenuador, escaleraDePad, medir, medirOpcion, potencias } from './elementos';
 import { recorrerGrilla, recorrerGrillaPad } from './grilla';
 
 // El adaptador de las tablas de Casos de prueba de atenuadores para el Informe de casos (spec
@@ -435,6 +441,95 @@ const valorImpracticable = () =>
     }),
   );
 
+// --- Valores comerciales -------------------------------------------------------------------------
+
+const valores = (xs: readonly number[]) => xs.map(R).join(' · ');
+
+const verificacionComercial = () =>
+  CASOS_VERIFICACION_COMERCIAL.map((caso) =>
+    enCaso(caso, () => {
+      const v = valoresDelCaso(caso);
+      const opciones = [
+        ['redondeo', v.redondeo],
+        ...v.mejores.map((o, i) => [`mejor ${i + 1}`, o] as const),
+      ] as const;
+      const medidas = opciones.flatMap(([nombre, o]) => {
+        const m = medirOpcion(o, caso.z1, caso.z2);
+        const etiqueta = `${nombre}: ${valores(o.resistencias.map((r) => r.valor))}`;
+        return [
+          medidaNumerica({
+            nombre: `Atenuación (${etiqueta})`,
+            esperado: m.atenuacion,
+            obtenido: o.atenuacion,
+            tolerancia: TOLERANCIA_COMERCIAL.atenuacion,
+            decimales: 9,
+            unidad: 'dB',
+          }),
+          medidaNumerica({
+            nombre: `PR de entrada (${etiqueta})`,
+            esperado: m.prEntrada,
+            obtenido: o.prEntrada,
+            tolerancia: TOLERANCIA_COMERCIAL.perdidaDeRetorno,
+            decimales: 6,
+            unidad: 'dB',
+          }),
+          medidaNumerica({
+            nombre: `PR de salida (${etiqueta})`,
+            esperado: m.prSalida,
+            obtenido: o.prSalida,
+            tolerancia: TOLERANCIA_COMERCIAL.perdidaDeRetorno,
+            decimales: 6,
+            unidad: 'dB',
+          }),
+        ];
+      });
+      return {
+        clase: 'verificacion',
+        id: caso.id,
+        entradas:
+          `${caso.topologia === 'pad' ? 'pad de mínima pérdida' : `${caso.topologia} de ${DB(caso.atenuacion!)}`}` +
+          ` · Z₁ = ${R(caso.z1)} · Z₂ = ${R(caso.z2)} · ${caso.redondeo}`,
+        referencia: caso.referencia,
+        oraculo: caso.oraculo,
+        medidas,
+        pasos: [],
+      };
+    }),
+  );
+
+const comportamientoComercial = () =>
+  CASOS_COMPORTAMIENTO_COMERCIAL.map((caso) =>
+    enCaso(caso, () => {
+      const v = valoresDelCaso(caso);
+      const describir = (r: readonly number[], evaluadas: number, adentro: boolean) =>
+        `redondeo ${valores(r)} · ${evaluadas} combinaciones · ` +
+        (adentro ? 'hay en la ventana' : 'ninguna en la ventana, con aviso');
+      const esperado = describir(
+        caso.esperado.redondeo,
+        caso.esperado.evaluadas,
+        caso.esperado.dentroDeLaVentana,
+      );
+      const obtenido = describir(
+        v.redondeo.resistencias.map((r) => r.valor),
+        v.evaluadas,
+        v.dentroDeLaVentana,
+      );
+      return {
+        clase: 'comportamiento',
+        id: caso.id,
+        entradas:
+          `${caso.topologia} de ${DB(caso.atenuacion!)} · Z₁ = ${R(caso.z1)} · Z₂ = ${R(caso.z2)} · ` +
+          `${caso.redondeo}` +
+          (caso.inventario ? ` (${valores(caso.inventario)})` : '') +
+          (caso.ventana ? ` · ventana ±${DB(caso.ventana)}` : ''),
+        referencia: caso.referencia,
+        esperado,
+        obtenido,
+        coincide: esperado === obtenido,
+      };
+    }),
+  );
+
 export const INFORME: AporteInforme = {
   calculadora: 'atenuadores',
   casos: () => [
@@ -447,5 +542,7 @@ export const INFORME: AporteInforme = {
     grillaPad(),
     ...comportamiento(),
     ...valorImpracticable(),
+    ...verificacionComercial(),
+    ...comportamientoComercial(),
   ],
 };

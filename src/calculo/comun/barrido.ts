@@ -41,6 +41,8 @@ export interface Respuesta {
   s21Cuadrado: number;
   // Con R_L conectada.
   zEntrada: Complejo;
+  // Lo que ve la carga hacia la fuente, con R_s conectada.
+  zSalida: Complejo;
 }
 
 function impedancia(e: ElementoBarrido, omega: number): Complejo {
@@ -76,6 +78,8 @@ export function respuesta(red: RedBarrido, f: number): Respuesta {
     s21Cuadrado: (4 * rs * rl) / modulo2(denominador),
     // Zin = (A·R_L + B) / (C·R_L + D)
     zEntrada: cociente(suma(escalar(a, rl), b), suma(escalar(cc, rl), d)),
+    // Zout = (D·R_s + B) / (C·R_s + A)
+    zSalida: cociente(suma(escalar(d, rs), b), suma(escalar(cc, rs), a)),
   };
 }
 

@@ -1,4 +1,6 @@
 import { useEffect } from 'preact/hooks';
+import { almacen } from '../../almacen/almacen';
+import { TIPOS } from '../../calculo/arreglos/inventario';
 import {
   type Atenuador,
   type EntradaAtenuador,
@@ -12,15 +14,26 @@ import {
   calcularAtenuadores,
   calcularMinimaPerdida,
 } from '../../calculo/atenuadores/atenuadores';
+import {
+  type ConfigComercial,
+  type ContextoComercial,
+  type Redondeo,
+  disponiblesDe,
+  valoresComerciales,
+} from '../../calculo/atenuadores/valores-comerciales';
+import type { SerieE } from '../../calculo/comun/series-e';
 import type { Revision } from '../../calculo/comun/valor-impracticable';
 import { mensajeDeResultados } from '../../entrada/campo';
 import { formatearDbm, formatearValor, vatiosADbm } from '../../entrada/formato';
 import type { Escalera } from '../esquema';
+import { useInventario } from '../arreglos/inventario';
+import { BotonesSegmentados, type Opcion } from '../comun/BotonesSegmentados';
 import {
   CampoEntradaValor,
   type CampoEntrada,
   intercambiar,
   useCampoEntrada,
+  useOpcionGuardada,
 } from '../comun/CampoEntrada';
 import { BotonPaseDe } from '../comun/BotonPase';
 import { Esquema } from '../comun/Esquema';
@@ -31,7 +44,38 @@ import { Rotulo } from '../comun/Rotulo';
 import { useEstadoDeSesion } from '../comun/sesion';
 import { TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
 import { type Pase, paseDeComponente } from '../pases';
-import { ATENUACION, FRECUENCIA, POTENCIA, Z1, Z2, Z_POR_DEFECTO } from './campos';
+import {
+  ATENUACION,
+  FRECUENCIA,
+  POTENCIA,
+  TOLERANCIA,
+  TOLERANCIA_POR_DEFECTO,
+  VENTANA,
+  VENTANA_POR_DEFECTO,
+  Z1,
+  Z2,
+  Z_POR_DEFECTO,
+} from './campos';
+import { ValoresComerciales } from './ValoresComerciales';
+
+const REDONDEOS: readonly Opcion<Redondeo>[] = [
+  { valor: 'E6', texto: 'E6' },
+  { valor: 'E12', texto: 'E12' },
+  { valor: 'E24', texto: 'E24' },
+  { valor: 'inventario', texto: 'Inventario de resistencias' },
+];
+const SERIES: readonly SerieE[] = ['E6', 'E12', 'E24'];
+
+// Con el Inventario por exclusión vale la serie que el Alumno eligió en Arreglos equivalentes.
+function serieDeArreglos(): SerieE {
+  const guardada = almacen.entrada('arreglos', 'serie')?.texto;
+  return SERIES.find((s) => s === guardada) ?? 'E12';
+}
+
+// Lo que cada card necesita para sus Valores comerciales.
+interface Comercial extends ConfigComercial {
+  redondeo: Redondeo;
+}
 
 // La Calculadora de atenuadores (spec §10): el T y el π juntos, cada uno con su esquema, sus
 // resistencias, sus fórmulas, la referencia y los pasos intermedios.
@@ -42,6 +86,14 @@ export function Atenuadores({ onPasar }: { onPasar?: (pase: Pase) => void }) {
   const z2 = useCampoEntrada(Z2, Z_POR_DEFECTO, guardado('z2'));
   const potencia = useCampoEntrada(POTENCIA, '', guardado('potencia'));
   const frecuencia = useCampoEntrada(FRECUENCIA, '', guardado('frecuencia'));
+  const tolerancia = useCampoEntrada(TOLERANCIA, TOLERANCIA_POR_DEFECTO, guardado('tolerancia'));
+  const ventana = useCampoEntrada(VENTANA, VENTANA_POR_DEFECTO, guardado('ventana'));
+  const [redondeoElegido, setRedondeo] = useOpcionGuardada(REDONDEOS, 'E12', guardado('redondeo'));
+  // El Inventario de resistencias se ofrece si hay uno guardado (spec §10.1).
+  const [inventario] = useInventario('resistencia');
+  const hayInventario = inventario.modo !== 'ninguno';
+  const redondeo: Redondeo =
+    redondeoElegido === 'inventario' && !hayInventario ? 'E12' : redondeoElegido;
   // El botón "Mínima pérdida" (spec §10.1): fija la atenuación en A_min y muestra la red L.
   // Se recuerda en la sesión para que, al volver de un pase, siga el pad de mínima pérdida.
   const [minima, setMinima] = useEstadoDeSesion('atenuadores:minima', false);
@@ -62,20 +114,40 @@ export function Atenuadores({ onPasar }: { onPasar?: (pase: Pase) => void }) {
     else if (modoMinima && textoAMin !== null && a.texto !== textoAMin) a.setTexto(textoAMin);
   }, [minima, textoAMin, a.texto, hayPad]);
 
-  const mensaje = mensajeDeResultados(
-    [a, z1, z2, potencia, frecuencia]
-      .filter((c) => !(modoMinima && c === a))
-      .map((c) => ({
+  const paraMensaje = (campos: CampoEntrada[]) =>
+    mensajeDeResultados(
+      campos.map((c) => ({
         nombre: c.spec.nombre,
         obligatorio: !!c.spec.obligatorio,
         estado: c.estado,
       })),
+    );
+  const mensaje = paraMensaje(
+    [a, z1, z2, potencia, frecuencia].filter((c) => !(modoMinima && c === a)),
   );
 
   const comunes = {
     frecuencia: frecuencia.estado.estado === 'valido' ? frecuencia.estado.valor : null,
     potencia: potencia.estado.estado === 'valido' ? potencia.estado.valor : null,
   };
+  // Lo que falta para los Valores comerciales no tapa el T y el π ideales: se avisa en la tarjeta.
+  const disponibles = disponiblesDe(redondeo, serieDeArreglos(), inventario);
+  const problemaComercial =
+    paraMensaje([tolerancia, ventana]) ??
+    (redondeo === 'inventario' && disponibles.length === 0
+      ? `El Inventario de ${TIPOS.resistencia} no tiene valores: cargalos en Arreglos equivalentes, «Editar Inventario»`
+      : null);
+  const comercial: Comercial | { problema: string } =
+    problemaComercial !== null ||
+    tolerancia.estado.estado !== 'valido' ||
+    ventana.estado.estado !== 'valido'
+      ? { problema: problemaComercial ?? '' }
+      : {
+          redondeo,
+          disponibles,
+          tolerancia: tolerancia.estado.valor / 100,
+          ventana: ventana.estado.valor,
+        };
   const entrada: EntradaAtenuador | null =
     mensaje === null && a.estado.estado === 'valido' && impedancias
       ? { atenuacion: a.estado.valor, ...impedancias, ...comunes }
@@ -131,14 +203,34 @@ export function Atenuadores({ onPasar }: { onPasar?: (pase: Pase) => void }) {
           campo={potencia}
         />
         <CampoEntradaValor id="frecuencia" etiqueta="Frecuencia (opcional)" campo={frecuencia} />
+        <BotonesSegmentados
+          etiqueta="Redondeo"
+          nombre="redondeo"
+          opciones={hayInventario ? REDONDEOS : REDONDEOS.filter((o) => o.valor !== 'inventario')}
+          valor={redondeo}
+          onCambio={setRedondeo}
+        />
+        <CampoEntradaValor
+          id="tolerancia"
+          etiqueta="Tolerancia"
+          campo={tolerancia}
+          unidadFija="%"
+        />
+        <CampoEntradaValor
+          id="ventana"
+          etiqueta="Ventana de atenuación"
+          campo={ventana}
+          unidadFija="dB"
+        />
       </section>
       <section class="resultados" aria-label="Resultados" aria-live="polite">
         {entradaMinima ? (
-          <ResultadoMinima entrada={entradaMinima} onPasar={onPasar} />
+          <ResultadoMinima entrada={entradaMinima} comercial={comercial} onPasar={onPasar} />
         ) : entrada ? (
           <Resultado
             resultado={calcularAtenuadores(entrada)}
             entrada={entrada}
+            comercial={comercial}
             onMinima={() => setMinima(true)}
             onPasar={onPasar}
           />
@@ -153,11 +245,13 @@ export function Atenuadores({ onPasar }: { onPasar?: (pase: Pase) => void }) {
 function Resultado({
   resultado,
   entrada,
+  comercial,
   onMinima,
   onPasar,
 }: {
   resultado: ResultadoAtenuadores;
   entrada: EntradaAtenuador;
+  comercial: Comercial | { problema: string };
   onMinima: () => void;
   onPasar?: (pase: Pase) => void;
 }) {
@@ -199,6 +293,8 @@ function Resultado({
               red={red}
               titulo={`Atenuador ${red.topologia} de ${titulo}`}
               resultado={resultado}
+              contexto={{ z1: entrada.z1, z2: entrada.z2, frecuencia: entrada.frecuencia ?? null }}
+              comercial={comercial}
               onPasar={onPasar}
             />
           ))}
@@ -236,11 +332,15 @@ function TarjetaAtenuador({
   red,
   titulo,
   resultado,
+  contexto,
+  comercial,
   onPasar,
 }: {
   red: Atenuador;
   titulo: string;
   resultado: Extract<ResultadoAtenuadores, { estado: 'calculado' }>;
+  contexto: ContextoComercial;
+  comercial: Comercial | { problema: string };
   onPasar?: (pase: Pase) => void;
 }) {
   const { revision } = red;
@@ -269,6 +369,7 @@ function TarjetaAtenuador({
         );
       })}
       {red.potencia && <Potencia potencia={red.potencia} />}
+      <Comerciales red={red} contexto={contexto} comercial={comercial} />
       <div class="formulas">
         {red.formulas.map((f) => (
           <Formula key={f} latex={f} />
@@ -276,6 +377,30 @@ function TarjetaAtenuador({
       </div>
       <Cita referencias={resultado.referencias} />
     </TarjetaResultado>
+  );
+}
+
+// Las resistencias con Valores comerciales de un atenuador o del pad (spec §10.4).
+function Comerciales({
+  red,
+  contexto,
+  comercial,
+}: {
+  red: Atenuador | PadMinimaPerdida;
+  contexto: ContextoComercial;
+  comercial: Comercial | { problema: string };
+}) {
+  if ('problema' in comercial) {
+    return <p class="nota-tarjeta corregir">Valores comerciales: {comercial.problema}</p>;
+  }
+  const calculo = valoresComerciales(red, contexto, comercial);
+  return (
+    <ValoresComerciales
+      comercial={calculo}
+      redondeo={comercial.redondeo}
+      ventana={comercial.ventana}
+      objetivo={red.verificacion.atenuacion}
+    />
   );
 }
 
@@ -313,9 +438,11 @@ function escaleraPad(pad: PadMinimaPerdida): Escalera {
 
 function ResultadoMinima({
   entrada,
+  comercial,
   onPasar,
 }: {
   entrada: EntradaMinimaPerdida;
+  comercial: Comercial | { problema: string };
   onPasar?: (pase: Pase) => void;
 }) {
   const resultado = calcularMinimaPerdida(entrada);
@@ -364,6 +491,11 @@ function ResultadoMinima({
             );
           })}
           {pad.potencia && <Potencia potencia={pad.potencia} />}
+          <Comerciales
+            red={pad}
+            contexto={{ z1: entrada.z1, z2: entrada.z2, frecuencia: entrada.frecuencia ?? null }}
+            comercial={comercial}
+          />
           <div class="formulas">
             {pad.formulas.map((f) => (
               <Formula key={f} latex={f} />

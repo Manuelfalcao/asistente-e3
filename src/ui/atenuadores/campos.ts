@@ -36,3 +36,23 @@ export const FRECUENCIA: EspecSinSelector = {
 
 // Z1 y Z2 vienen en 50 Ω.
 export const Z_POR_DEFECTO = '50';
+
+// Valores comerciales (spec §10.1). La tolerancia vale para todas las resistencias, salvo las del
+// Inventario con tolerancia propia; la ventana es el ± en dB de las mejores combinaciones.
+export const TOLERANCIA: EspecSinSelector = {
+  nombre: 'Tolerancia',
+  magnitud: 'porcentaje',
+  obligatorio: true,
+  rango: { min: 0, max: 100 },
+};
+
+export const VENTANA: EspecSinSelector = {
+  nombre: 'Ventana de atenuación',
+  magnitud: 'decibeles',
+  obligatorio: true,
+  rango: { min: 0, max: 60 },
+};
+
+// ±5 % y ±0,1 dB.
+export const TOLERANCIA_POR_DEFECTO = '5';
+export const VENTANA_POR_DEFECTO = '0,1';

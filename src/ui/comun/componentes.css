@@ -603,8 +603,23 @@
   margin-top: var(--esp-2);
 }
 
-.potencia {
+.potencia,
+.valores-comerciales {
   margin-top: var(--esp-3);
+}
+.lista-comercial {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lista-comercial > li {
+  border-top: 1px solid var(--borde);
+}
+.opcion-titulo {
+  margin: var(--esp-2) 0 0;
+  font-size: var(--tam-3);
+  font-weight: 600;
+  color: var(--texto-suave);
 }
 
 /* ---------- Redes de adaptación ---------- */
