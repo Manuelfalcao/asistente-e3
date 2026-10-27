@@ -52,6 +52,7 @@ import {
   perdidaSimulada,
   perdidaSimuladaBanda,
 } from './elementos';
+import { casosResonadores } from './informe-resonadores';
 
 // El adaptador de las tablas de Casos de prueba de filtros para el Informe de casos (spec §13.6):
 // corre el cálculo con las entradas de cada caso y deja el obtenido, el error y los pasos
@@ -510,5 +511,6 @@ export const INFORME: AporteInforme = {
     ...verificacionOrden(),
     ...cohn(),
     ...comportamiento(),
+    ...casosResonadores(),
   ],
 };

@@ -119,8 +119,8 @@ function describir({ fuente, carga, elementos }: Escalera): string {
   const partes = elementos.map((e) => {
     const donde = e.posicion === 'serie' ? 'en serie' : 'en derivación';
     return e.tipo === 'LC'
-      ? `${e.nombreL} y ${e.nombreC} (resonador ${e.conexion}) ${donde}`
-      : `${e.nombre} ${donde}`;
+      ? `${plano(e.nombreL)} y ${plano(e.nombreC)} (resonador ${e.conexion}) ${donde}`
+      : `${plano(e.nombre)} ${donde}`;
   });
   const lista =
     partes.length > 1

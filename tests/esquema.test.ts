@@ -116,6 +116,26 @@ describe('esquema en escalera', () => {
       for (const fila of esquema.filas) expect(fila.ancho).toBeLessThanOrEqual(ANCHO_CELULAR);
       expect(rotulosEnOrden(esquema)).toEqual(['R_s', 'L1', 'C1', 'L2', 'C2', 'L3', 'C3', 'R_L']);
     }
+    expect(
+      trazarEsquema(
+        {
+          fuente: 'R_s',
+          carga: 'R_L',
+          elementos: [
+            { tipo: 'C', posicion: 'serie', nombre: 'C_01' },
+            {
+              tipo: 'LC',
+              conexion: 'paralelo',
+              posicion: 'derivacion',
+              nombreL: 'L',
+              nombreC: 'C_1',
+            },
+          ],
+        },
+        ANCHO_CELULAR,
+      ).descripcion,
+      'el lector de pantalla no lee el guion bajo del subíndice',
+    ).toBe('De Rs a RL: C01 en serie y L y C1 (resonador paralelo) en derivación.');
     expect(trazarEsquema(pasaBanda, ANCHO_CELULAR).descripcion).toBe(
       'De Rs a RL: L1 y C1 (resonador paralelo) en derivación, ' +
         'L2 y C2 (resonador serie) en serie y L3 y C3 (resonador paralelo) en derivación.',

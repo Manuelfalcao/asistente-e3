@@ -739,7 +739,7 @@ const formulasBanda = (tipo: TipoDeBanda) => [
 ];
 
 const FORMULA_COHN = '\\Delta L_0 \\approx 4{,}343 \\sum \\dfrac{g_k}{Q_u}\\;\\text{(bobinas)}';
-const FORMULA_COHN_BANDA =
+export const FORMULA_COHN_BANDA =
   '\\Delta L_0 \\approx 4{,}343 \\sum \\dfrac{g_k}{Q_k},\\; Q_k = \\mathrm{FBW} \\cdot Q_u';
 
 // Cómo se arma la escalera desde la fuente: la Topología, los g en ese orden con su índice en el
@@ -1430,7 +1430,7 @@ function pasoRelacion(rs: number, rl: number, r: number): Paso {
   };
 }
 
-const formulasPrototipo = (aproximacion: Aproximacion, r: number): readonly string[] => {
+export const formulasPrototipo = (aproximacion: Aproximacion, r: number): readonly string[] => {
   if (r !== 1) {
     return aproximacion === 'butterworth'
       ? FORMULAS_TAKAHASI_BUTTERWORTH

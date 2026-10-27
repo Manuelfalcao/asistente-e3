@@ -98,6 +98,7 @@ Origen: [Formatos de distribución](issues/06-formatos-distribucion.md), [Protot
 - **Vitest** para `src/calculo/` y `src/entrada/`, y para las funciones puras de `src/ui/` (el trazado del esquema y el contraste de la paleta).
 - Los Casos de prueba se escriben **como tablas de datos** (entradas, esperado, tolerancia con motivo, referencia). Las mismas tablas corren en Vitest y alimentan el Informe de casos (sección 13).
 - En la primera versión no hay tests de interfaz. Si el pase entre Calculadoras resulta frágil, se suman tests de componentes con `@testing-library/preact`.
+  - **Ticket 46:** la pantalla de la Topología de resonadores acoplados se prueba con `@testing-library/preact` en jsdom (`tests/ui/*.test.tsx`, que lo declaran en su primera línea). Los demás tests siguen sin DOM.
 
 ### 3.4 Publicación
 
@@ -639,7 +640,7 @@ n resonadores LC paralelo en derivación, todos con la misma L, unidos por **Cap
   - cota inferior: la mayor entre la L mínima de Valor impracticable (6 nH) y la que pide cada extremo, R·FBW/(g·ω0);
   - cota superior: la que deja el Capacitor de acople más chico en 1 pF (C mínima de Valor impracticable), `L ≤ FBW/(ω0²·máx√(gk·g(k+1))·1 pF)`.
   - En 144–148 MHz con n = 3 (50 → 50 Ω) queda de 6 a 23 nH.
-- **El Asistente propone la L más grande de la serie E12 dentro de la ventana** (22 nH en ese caso), como valor editable, con la ventana a la vista ("válida: 9,0 – 23,0 nH").
+- **El Asistente propone la L más grande de la serie E12 dentro de la ventana** (22 nH en ese caso), como valor editable, con la ventana a la vista ("válida: 9,0 – 23,0 nH"). Con Orden 1, o con banda ancha, la cota de arriba sale como dice la sección 12.1, P5.
 - Si el Alumno pone una L fuera de la ventana, se avisa qué cota viola: el Rp > R de qué extremo, la L mínima o el Capacitor de acople mínimo.
 - Si la ventana queda vacía, se avisa y se sugiere bajar el Orden o aceptar acoples debajo del mínimo.
 - Los Valores dudosos dentro de la ventana salen con su aviso. En el caso típico, el acople de ~1,05 pF es un Valor dudoso inevitable en esa banda.
@@ -998,6 +999,9 @@ Quedan para la construcción:
 | P2 | **Término E de Maxwell** en la versión externa de dos capas (sección 6.4). La investigación da E ≈ 0,017 (Circular 74) para la fórmula original y no aclara si lo mantuvo en la versión externa | **Resuelto en el ticket 34:** E = 0,017 se mantiene. Con E la fórmula reproduce las cifras de la investigación y las 7 geometrías dan de −0,51 a +0,05 % contra la suma de anillos; sin E, de −0,60 a −0,09 % |
 | P3 | **Pérdida de Cohn con R_s ≠ R_L** en π y T (sección 7.8). La ec. 4.13-11 de Matthaei supone fuente y carga iguales: con R_s ≠ R_L, a primer orden, cada g en serie pesa 2R0/(R_s + R_L) y cada uno en derivación 2R_s·R_L/(R0·(R_s + R_L)), y sin ese peso la estimación se aparta hasta 3,5 veces (50 a 300 Ω) | **Ticket 45:** no se muestra, como en P1, con una nota. Mostrarla con el peso sería una Deducción propia |
 | P4 | **Menor dispersión de valores** entre las escaleras de Takahasi (sección 7.4). Con Orden par las dos posibles empatan siempre: por dualidad, los cocientes de las L de una son los de las C de la otra | **Ticket 45:** la dispersión no decide nunca: con Orden impar hay una sola escalera por Topología, y con Orden par las dos empatan (también en pasa banda y rechaza banda). La que se muestra es la que tiene su peor valor menos afectado por el montaje (error relativo de la sección 5.6); la dispersión queda en los pasos. De 50 a 300 Ω con n = 4 a 100 MHz queda la de C4 = 50,3 pF y no la de C4 = 2,12 pF |
+| P5 | **Cota de arriba de la Ventana de L** (sección 7.7). Con Orden 1 no hay Capacitor de acople; y con banda ancha la L que deja el acople en 1 pF deja los Capacitores de sintonía de los extremos en décimas de pF o negativos (el C01e crece con la L: de 120 a 160 MHz la propuesta daba C1 < 0) | **Ticket 46:** con Orden 1 la cota la pone el Capacitor de extremo más chico en 1 pF. La cota de arriba también incluye la L en que el Capacitor de sintonía más chico llega a 1 pF (por bisección), con el mismo criterio que el acople. Sin valores de la E12 adentro se propone el centro geométrico de la ventana; con la ventana vacía, la L más chica de la E12 que todavía se arma (Rp > R y todos los Capacitores de sintonía positivos), aceptando capacitores debajo de 1 pF. El Asistente nunca propone una L que corta. Va en el Criterio práctico de la Ventana de L |
+| P6 | **Cifras de la Frecuencia de sintonía** (sección 7.7). Con 3 cifras, en 144–148 MHz la Frecuencia de sintonía (145,959 MHz) y la central geométrica (145,986 MHz) salen las dos "146 MHz", y un 1 % de error de sintonía corre la banda un 18 % del BW | **Ticket 46:** las dos se muestran con las cifras que llevan la última hasta una milésima del BW (6 en ese caso, 145,959 MHz), y nunca menos de 3. El resto del resultado sigue con 3 |
+| P7 | **Rp ≤ R o algún Ck ≤ 0** (sección 7.10 dice "Aviso con la cota violada"). Con Rp ≤ R el Capacitor de extremo no existe, y un Capacitor de sintonía negativo no se puede armar | **Ticket 46:** las dos cortan, con el aviso de la cota violada en lugar del resultado: con Rp ≤ R se dice qué extremo y la L mínima; con C1 o Cn ≤ 0, la L máxima. Si ninguna L arma el filtro (un Capacitor de sintonía del medio es negativo con cualquier L, o la L mínima de un extremo pasa la máxima de la sintonía) corta igual, sin proponer una L, y dice por qué |
 
 ### 12.2 Valores por defecto que fijó la redacción
 
@@ -1059,7 +1063,7 @@ Los valores numéricos de cada caso están en las investigaciones de [`research/
   - Takahasi R1 a R10 (Zverev y Williams), con los r_min;
   - el ejemplo de Orden de Matthaei 8.04, con ±0,5 dB por la lectura de un gráfico.
 - *Verificación:* C1 a C8 y CR1 a CR14, simulados con la red armada: el Orden calculado alcanza la atenuación pedida, la atenuación en fc es la de la Aproximación y la pérdida plana es 4r/(1+r)². La pérdida de Cohn va con su diferencia esperada contra la simulación, de +2 a +7 %.
-- *Comportamiento:* Chebyshev par que sube al impar; R10 rechazado; Bessel sin solución; Orden mayor que 10; avisos de FBW; Ventana de L vacía (CR9); Valor impracticable.
+- *Comportamiento:* Chebyshev par que sube al impar; R10 rechazado; Bessel sin solución; Orden mayor que 10; avisos de FBW; Ventana de L vacía (Butterworth n = 7 de 50 a 300 Ω) y CR9, el extremo que no llega a Rp > R; Valor impracticable.
 
 **Arreglos equivalentes** (`research/busqueda-arreglos-equivalentes.md`)
 

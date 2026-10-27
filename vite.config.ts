@@ -129,7 +129,8 @@ export default defineConfig(({ mode }) => {
           ]),
     ],
     test: {
-      include: ['tests/**/*.test.ts'],
+      // Los .test.tsx son de pantalla: corren en jsdom (lo declaran en su primera línea).
+      include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
       // La caché de módulos no se entera de un archivo nuevo que entra en un import.meta.glob: el
       // informe dejaba de ver el informe.ts de una Calculadora nueva en local, y en CI no.
       fsModuleCache: false,

@@ -13,6 +13,7 @@ import {
   relacionDe,
   topologiaSugerida,
 } from '../../calculo/filtros/filtros';
+import { type EntradaResonadores, calcularResonadores } from '../../calculo/filtros/resonadores';
 import { mensajeDeResultados } from '../../entrada/campo';
 import { formatearValor } from '../../entrada/formato';
 import type { Escalera } from '../esquema';
@@ -39,6 +40,7 @@ import {
   F2,
   FC,
   FS,
+  L_RESONADORES,
   MODOS_BANDA,
   MODOS_ORDEN,
   ORDEN,
@@ -52,7 +54,9 @@ import {
   TIPOS,
   TOPOLOGIAS,
   TOPOLOGIAS_GUARDADAS,
+  TOPOLOGIAS_PASA_BANDA,
 } from './campos';
+import { ResultadoAcoplados, ayudaDeL } from './Acoplados';
 
 // La Calculadora de filtros (spec §7): por ahora escaleras π y T de los cuatro Tipos de filtro,
 // Butterworth, Chebyshev y Bessel, con el Orden escrito o calculado desde una atenuación, y con Rs ≠
@@ -89,12 +93,18 @@ export function Filtros() {
   const rs = useCampoEntrada(RS, R_POR_DEFECTO, guardado('rs'));
   const rl = useCampoEntrada(RL, R_POR_DEFECTO, guardado('rl'));
   const qBobina = useCampoEntrada(Q_BOBINA, Q_BOBINA_POR_DEFECTO, guardado('q-bobina'));
+  const lResonadores = useCampoEntrada(L_RESONADORES, '', guardado('l-resonadores'));
 
   const esChebyshev = aproximacion === 'chebyshev';
   const deBanda = esDeBanda(tipo);
+  // Los resonadores acoplados solo existen en pasa banda (spec §7.7); en los otros Tipos de filtro
+  // la elección guardada no cuenta y vale la sugerida.
+  const acoplados = tipo === 'pasa-banda' && elegida === 'resonadores';
   // fc en pasa bajos y pasa altos; en pasa banda y rechaza banda, f1 y f2 o f0 y BW.
   const frecuencias = !deBanda ? [fc] : modoBanda === 'f1-f2' ? [f1, f2] : [f0, bw];
-  const camposOrden = modoOrden === 'ingresar' ? [orden] : [atenuacion, fs];
+  // En resonadores acoplados el Orden se ingresa: el calculado llega con el ticket 47.
+  const ingresaOrden = acoplados || modoOrden === 'ingresar';
+  const camposOrden = ingresaOrden ? [orden] : [atenuacion, fs];
   const campos = [
     ...(esChebyshev ? [ripple] : []),
     ...camposOrden,
@@ -102,6 +112,7 @@ export function Filtros() {
     rs,
     rl,
     qBobina,
+    ...(acoplados ? [lResonadores] : []),
   ];
   const mensaje = mensajeDeResultados(
     campos.map((c) => ({
@@ -132,8 +143,11 @@ export function Filtros() {
         : null;
 
   // El Orden pedido: el escrito, o la atenuación As a fs de la que se calcula.
-  const pedidoOrden =
-    modoOrden === 'ingresar' ? vOrden : vAs !== null && vFs !== null ? { as: vAs, fs: vFs } : null;
+  const pedidoOrden = ingresaOrden
+    ? vOrden
+    : vAs !== null && vFs !== null
+      ? { as: vAs, fs: vFs }
+      : null;
 
   // Con el Orden calculado, la Topología por defecto se elige con el que salió (si salió uno).
   const datosOrden: DatosDeOrden | null =
@@ -166,7 +180,8 @@ export function Filtros() {
 
   // Mientras el Alumno no elija, la Topología es la que usa menos bobinas con el Orden elegido.
   const sugerida = topologiaSugerida(tipo, aproximacion, ordenParaTopologia, terminaciones);
-  const topologia = elegida === 'sugerida' ? sugerida.topologia : elegida;
+  const topologia =
+    elegida === 'sugerida' || elegida === 'resonadores' ? sugerida.topologia : elegida;
   // Una elegida que coincide con la que usa menos bobinas vuelve a seguirla.
   useEffect(() => {
     if (elegida === sugerida.topologia) setElegida('sugerida');
@@ -192,6 +207,21 @@ export function Filtros() {
       entrada = { ...comun, tipo, fc: vFc };
     }
   }
+  const entradaAcoplada: EntradaResonadores | null =
+    acoplados && comun && banda && typeof comun.orden === 'number'
+      ? {
+          aproximacion,
+          ripple: comun.ripple,
+          orden: comun.orden,
+          banda,
+          rs: comun.rs,
+          rl: comun.rl,
+          qBobina: comun.qBobina,
+          inductancia: valor(lResonadores),
+        }
+      : null;
+  const acoplado = entradaAcoplada && calcularResonadores(entradaAcoplada);
+  const ventana = acoplado && 'ventana' in acoplado ? acoplado.ventana : undefined;
 
   return (
     <div class="cuerpo-calculadora">
@@ -233,19 +263,21 @@ export function Filtros() {
         <BotonesSegmentados
           etiqueta="Topología"
           nombre="topologia-filtro"
-          opciones={TOPOLOGIAS}
-          valor={topologia}
+          opciones={tipo === 'pasa-banda' ? TOPOLOGIAS_PASA_BANDA : TOPOLOGIAS}
+          valor={acoplados ? 'resonadores' : topologia}
           onCambio={setElegida}
         />
-        <p class="nota-campo">{sugerida.nota}</p>
-        <BotonesSegmentados
-          etiqueta="Orden"
-          nombre="modo-orden-filtro"
-          opciones={MODOS_ORDEN}
-          valor={modoOrden}
-          onCambio={setModoOrden}
-        />
-        {modoOrden === 'ingresar' ? (
+        <p class="nota-campo">{acoplados ? NOTA_ACOPLADOS : sugerida.nota}</p>
+        {!acoplados && (
+          <BotonesSegmentados
+            etiqueta="Orden"
+            nombre="modo-orden-filtro"
+            opciones={MODOS_ORDEN}
+            valor={modoOrden}
+            onCambio={setModoOrden}
+          />
+        )}
+        {ingresaOrden ? (
           <CampoEntradaValor id="orden" etiqueta="Orden" campo={orden} />
         ) : (
           <>
@@ -291,9 +323,27 @@ export function Filtros() {
         </div>
         <CampoEntradaValor id="rl" etiqueta="RL (carga)" campo={rl} />
         <CampoEntradaValor id="q-bobina" etiqueta="Q de las bobinas (Qu)" campo={qBobina} />
+        {acoplados && (
+          <CampoEntradaValor
+            id="l-resonadores"
+            etiqueta="L de los resonadores"
+            campo={lResonadores}
+            ayuda={ventana ? ayudaDeL(ventana) : 'Vacío: la que propone el Asistente.'}
+          />
+        )}
       </section>
       <section class="resultados" aria-label="Resultados" aria-live="polite">
-        {entrada ? (
+        {acoplados ? (
+          acoplado ? (
+            <ResultadoAcoplados
+              resultado={acoplado}
+              ripple={esChebyshev ? vRipple : null}
+              qBobina={vQ!}
+            />
+          ) : (
+            <p class="sin-resultado corregir">{mensaje}</p>
+          )
+        ) : entrada ? (
           <Resultado
             resultado={calcularFiltro(entrada)}
             entrada={entrada}
@@ -306,6 +356,10 @@ export function Filtros() {
     </div>
   );
 }
+
+const NOTA_ACOPLADOS =
+  'Resonadores LC en derivación, todos con la misma L, unidos por Capacitores de acople: este ' +
+  'filtro sí adapta Rs y RL. El Orden se ingresa.';
 
 // En pasa banda y rechaza banda cada g es un resonador LC, con los nombres de su L y su C.
 function escalera(

@@ -46,6 +46,37 @@ describe('registro de Criterios prácticos y Deducciones propias', () => {
     expect(deduccion).toContain("D' = \\sqrt{p d}");
   });
 
+  it('registra el Chebyshev par de resonadores acoplados como Deducción propia, con su bandera', () => {
+    const par = REGISTRO.find((e) => e.id === 'chebyshev-par-resonadores');
+    expect(par?.tipo).toBe('deduccion-propia');
+    expect(par?.bandera).toBe('PLAN_B_CHEBYSHEV_PAR');
+    expect(par?.respaldo).toMatch(/CR5.*CR6/);
+    expect(par?.planB).toMatch(/impar/);
+    expect(par?.deduccion?.length).toBeGreaterThan(0);
+  });
+
+  it('registra el divisor capacitivo como Deducción propia, que con el plan B sale de los pasos', () => {
+    const divisor = REGISTRO.find((e) => e.id === 'divisor-capacitivo');
+    expect(divisor?.tipo).toBe('deduccion-propia');
+    expect(divisor?.bandera).toBe('PLAN_B_DIVISOR_CAPACITIVO');
+    expect(divisor?.respaldo).toMatch(/−0,7 %/);
+    expect(divisor?.planB).toMatch(/pasos intermedios/);
+    expect(divisor?.deduccion?.map((p) => p.latex).join(' ')).toContain('C_b');
+  });
+
+  it('registra la Ventana de L y el ±20 % del trimmer como Criterios prácticos', () => {
+    const ventana = REGISTRO.find((e) => e.id === 'ventana-de-l');
+    expect(ventana?.tipo).toBe('criterio-practico');
+    // Los números salen del mismo lugar que usa el cálculo.
+    expect(ventana?.queEs).toContain('6 nH');
+    expect(ventana?.queEs).toContain('1 pF');
+    expect(ventana?.queEs).toMatch(/E12/);
+    expect(ventana?.adaptacion).toMatch(/Orden 1/);
+    const trimmer = REGISTRO.find((e) => e.id === 'trimmer-20');
+    expect(trimmer?.tipo).toBe('criterio-practico');
+    expect(trimmer?.queEs).toContain('±20 %');
+  });
+
   it('cada entrada dice qué es, qué se adaptó y por qué, su respaldo y su plan B', () => {
     for (const e of REGISTRO) {
       for (const campo of [e.nombre, e.queEs, e.adaptacion, e.respaldo, e.planB]) {

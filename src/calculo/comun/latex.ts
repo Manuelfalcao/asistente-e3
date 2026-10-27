@@ -26,8 +26,13 @@ export const errorLatex = (fraccion: number) =>
 export const enteroLatex = (n: number) =>
   String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '\\,');
 
-export function valorLatex(valor: number, magnitud: Magnitud, nivel: Nivel = 'paso'): string {
-  const texto = formatearValor(valor, magnitud, nivel);
+export function valorLatex(
+  valor: number,
+  magnitud: Magnitud,
+  nivel: Nivel = 'paso',
+  cifras?: number,
+): string {
+  const texto = formatearValor(valor, magnitud, nivel, cifras);
   const espacio = texto.lastIndexOf(' ');
   if (espacio < 0) return aLatex(texto);
   const unidad = texto

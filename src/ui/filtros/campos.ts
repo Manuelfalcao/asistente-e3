@@ -33,18 +33,33 @@ export const APROXIMACIONES: readonly Opcion<Aproximacion>[] = [
   { valor: 'bessel', texto: 'Bessel' },
 ];
 
-export const TOPOLOGIAS: readonly Opcion<TopologiaFiltro>[] = [
+// Las escaleras π y T, y en pasa banda también los resonadores acoplados (spec §7.1 y §7.7).
+export type TopologiaPantalla = TopologiaFiltro | 'resonadores';
+
+export const TOPOLOGIAS: readonly Opcion<TopologiaPantalla>[] = [
   { valor: 'π', texto: 'π' },
   { valor: 'T', texto: 'T' },
 ];
 
+export const TOPOLOGIAS_PASA_BANDA: readonly Opcion<TopologiaPantalla>[] = [
+  ...TOPOLOGIAS,
+  { valor: 'resonadores', texto: 'Resonadores acoplados' },
+];
+
 // Lo que se guarda de la Topología: "sugerida" mientras el Alumno no elija una, y entonces sigue a
 // la que usa menos bobinas.
-export type TopologiaElegida = TopologiaFiltro | 'sugerida';
+export type TopologiaElegida = TopologiaPantalla | 'sugerida';
 export const TOPOLOGIAS_GUARDADAS: readonly Opcion<TopologiaElegida>[] = [
   { valor: 'sugerida', texto: 'La que usa menos bobinas' },
-  ...TOPOLOGIAS,
+  ...TOPOLOGIAS_PASA_BANDA,
 ];
+
+// La L de los resonadores acoplados. Vacía, la que propone el Asistente (spec §7.7).
+export const L_RESONADORES: EspecSinSelector = {
+  nombre: 'L de los resonadores',
+  magnitud: 'inductancia',
+  rango: MAYOR_QUE_CERO,
+};
 
 // Solo en Chebyshev.
 export const RIPPLE: EspecSinSelector = {

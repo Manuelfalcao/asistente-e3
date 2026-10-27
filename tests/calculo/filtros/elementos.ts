@@ -12,6 +12,7 @@ import {
   cascada,
   derivacion,
   serie,
+  zEntrada,
 } from '../../oraculos/abcd';
 
 // La escalera que arma el cálculo de filtros, pasada al oráculo ABCD. Es el único lugar donde los
@@ -120,6 +121,104 @@ export function atenuacionEntre(
   return escalera.resonadores.length > 0
     ? atenuacionResonadores(escalera.resonadores, f, rs, rl)
     : atenuacionOraculo(escalera.elementos, f, rs, rl);
+}
+
+// --- Resonadores acoplados -----------------------------------------------------------------------
+
+// Lo que el oráculo necesita de un filtro de resonadores acoplados: la L, los Capacitores de extremo,
+// de acople y de sintonía, y la Frecuencia de sintonía para la pérdida de las bobinas.
+interface Acoplado {
+  inductancia: { valor: number };
+  sintonia: { f0: number };
+  extremos: readonly { capacitor: { valor: number } }[];
+  acoples: readonly { capacitor: { valor: number } }[];
+  sintonias: readonly { capacitor: { valor: number } }[];
+}
+
+// Un divisor capacitivo en un extremo: Ca del resonador a la toma y Cb de la toma a masa, con la R en
+// la toma. El resonador de ese extremo no lleva Capacitor de sintonía.
+export interface DivisorOraculo {
+  ca: number;
+  cb: number;
+}
+
+// La red completa a la frecuencia f, de la fuente a la carga: el Capacitor de extremo en serie (o
+// el divisor), cada resonador LC paralelo en derivación y los Capacitores de acople en serie. Con
+// Qu, una R en paralelo de Qu·ω0·L en cada bobina (spec §5.7).
+export function redAcoplada(
+  r: Acoplado,
+  f: number,
+  {
+    qu = null,
+    divisores = null,
+  }: { qu?: number | null; divisores?: readonly DivisorOraculo[] | null } = {},
+): Elemento[] {
+  const omega = 2 * Math.PI * f;
+  const l = r.inductancia.valor;
+  const enSerie = (cap: number) => serie(c(0, -1 / (omega * cap)));
+  const aMasa = (cap: number) => derivacion(c(0, omega * cap));
+  const perdida = qu === null ? 0 : 1 / (qu * 2 * Math.PI * r.sintonia.f0 * l);
+  const n = r.sintonias.length;
+  const resonador = (k: number) => {
+    const cap = divisores && (k === 0 || k === n - 1) ? 0 : r.sintonias[k].capacitor.valor;
+    return derivacion(c(perdida, omega * cap - 1 / (omega * l)));
+  };
+  const red: Elemento[] = divisores
+    ? [aMasa(divisores[0].cb), enSerie(divisores[0].ca)]
+    : [enSerie(r.extremos[0].capacitor.valor)];
+  for (let k = 0; k < n; k++) {
+    red.push(resonador(k));
+    if (k < n - 1) red.push(enSerie(r.acoples[k].capacitor.valor));
+  }
+  red.push(
+    ...(divisores
+      ? [enSerie(divisores[1].ca), aMasa(divisores[1].cb)]
+      : [enSerie(r.extremos[1].capacitor.valor)]),
+  );
+  return red;
+}
+
+export const atenuacionAcoplada = (
+  r: Acoplado,
+  f: number,
+  rs: number,
+  rl: number,
+  opciones?: Parameters<typeof redAcoplada>[2],
+) => atenuacionDb(cascada(redAcoplada(r, f, opciones)), rs, rl);
+
+export const entradaAcoplada = (
+  r: Acoplado,
+  f: number,
+  rl: number,
+  divisores: readonly DivisorOraculo[] | null = null,
+) => zEntrada(cascada(redAcoplada(r, f, { divisores })), rl);
+
+// El borde de la banda pasante: el cruce más externo del umbral (−3,01 dB o el ripple), buscado desde
+// `afuera`, donde atenúa más, hacia `adentro`, y refinado por bisección. Desde afuera, para no
+// quedarse en un pico del ripple que pase apenas del umbral.
+export function bordeSimulado(
+  atenuacion: (f: number) => number,
+  afuera: number,
+  adentro: number,
+  umbral: number,
+): number {
+  const pasos = 4000;
+  let [lejos, cerca] = [afuera, adentro];
+  for (let i = 1; i <= pasos; i++) {
+    const f = afuera + ((adentro - afuera) * i) / pasos;
+    if (atenuacion(f) <= umbral) {
+      cerca = f;
+      break;
+    }
+    lejos = f;
+  }
+  for (let i = 0; i < 200; i++) {
+    const medio = (lejos + cerca) / 2;
+    if (medio === lejos || medio === cerca) break;
+    if (atenuacion(medio) <= umbral) cerca = medio;
+    else lejos = medio;
+  }
+  return (lejos + cerca) / 2;
 }
 
 // La pérdida en el centro de la banda del pasa banda con la pérdida de cada bobina: una R en serie

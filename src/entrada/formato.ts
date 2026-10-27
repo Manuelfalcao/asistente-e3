@@ -47,8 +47,14 @@ const PREFIJO_DEL_EXPONENTE = new Map<number, Prefijo | ''>([
   ),
 ]);
 
-export function formatearValor(valor: number, magnitud: Magnitud, nivel: Nivel = 'resultado') {
-  const cifras = CIFRAS[nivel];
+// `cifras` reemplaza a las del nivel, para un valor que las necesita, como la Frecuencia de sintonía
+// de un filtro angosto.
+export function formatearValor(
+  valor: number,
+  magnitud: Magnitud,
+  nivel: Nivel = 'resultado',
+  cifras = CIFRAS[nivel],
+) {
   const def = DEFINICIONES[magnitud];
   switch (magnitud) {
     case 'decibeles':

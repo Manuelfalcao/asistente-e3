@@ -14,6 +14,11 @@ import {
 } from '../../src/calculo/bobinas/dos-capas';
 import { revisarValores } from '../../src/calculo/comun/valor-impracticable';
 import { calcularFiltro, prototipo } from '../../src/calculo/filtros/filtros';
+import {
+  DEDUCCION_CHEBYSHEV_PAR,
+  DEDUCCION_DIVISOR_CAPACITIVO,
+  calcularResonadores,
+} from '../../src/calculo/filtros/resonadores';
 import { calcularRedL } from '../../src/calculo/redes/redes';
 import { calcularRedPiT } from '../../src/calculo/redes/redes-pi-t';
 import { caracteresDeLaFuente } from './woff2';
@@ -231,6 +236,37 @@ function formulasDeFiltros(): string[] {
   return formulas;
 }
 
+// Resonadores acoplados: las tres Aproximaciones, Bessel invertido, Chebyshev par, Orden 1, f0 y BW,
+// la ventana vacía, la L propuesta y la del Alumno, y las Deducciones propias.
+function formulasDeResonadores(): string[] {
+  const formulas: string[] = [
+    ...DEDUCCION_CHEBYSHEV_PAR.deduccion!.map((p) => p.latex),
+    ...DEDUCCION_DIVISOR_CAPACITIVO.deduccion!.map((p) => p.latex),
+  ];
+  for (const [aproximacion, ripple, orden, rs, rl, banda, inductancia] of [
+    ['butterworth', null, 3, 50, 300, { f1: 144e6, f2: 148e6 }, null],
+    ['bessel', null, 3, 50, 300, { f1: 144e6, f2: 148e6 }, 22e-9],
+    ['bessel', null, 3, 300, 50, { f1: 144e6, f2: 148e6 }, 22e-9],
+    ['chebyshev', 0.1, 4, 50, 50, { f0: 146e6, bw: 4e6 }, 22e-9],
+    ['butterworth', null, 1, 50, 200, { f1: 140e6, f2: 160e6 }, null],
+    ['butterworth', null, 7, 50, 300, { f1: 144e6, f2: 148e6 }, null],
+    ['butterworth', null, 3, 50, 50, { f1: 290e6, f2: 310e6 }, 150e-9],
+  ] as const) {
+    const r = calcularResonadores({
+      aproximacion,
+      ripple,
+      orden,
+      banda,
+      rs,
+      rl,
+      qBobina: 100,
+      inductancia,
+    });
+    if (r.estado === 'calculado') formulas.push(...r.formulas, ...r.pasos.map((p) => p.latex));
+  }
+  return formulas;
+}
+
 // Las cuentas del criterio de valor impracticable, con un valor por cada rama.
 function formulasDelCriterio(): string[] {
   const resultado = {
@@ -324,6 +360,12 @@ describe('fuente recortada de las fórmulas', () => {
 
   it('tiene cada carácter de las fórmulas de filtros', () => {
     const formulas = formulasDeFiltros();
+    expect(formulas.length).toBeGreaterThan(50);
+    expect(faltantes(formulas)).toEqual([]);
+  });
+
+  it('tiene cada carácter de las fórmulas de resonadores acoplados', () => {
+    const formulas = formulasDeResonadores();
     expect(formulas.length).toBeGreaterThan(50);
     expect(faltantes(formulas)).toEqual([]);
   });

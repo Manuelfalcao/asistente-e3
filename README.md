@@ -16,6 +16,8 @@ Calculadoras para dimensionar los componentes de circuitos de VHF. La especifica
 
 Node 24 (ver `.nvmrc`). La Versión sale de `package.json` más el hash corto del commit.
 
+Los tests de pantalla (`tests/ui/*.test.tsx`) corren en jsdom con `@testing-library/preact`, y lo declaran en su primera línea (`// @vitest-environment jsdom`); el resto corre sin DOM.
+
 ## Sistema visual
 
 - Colores, tipografía, tamaños y espaciado: `src/ui/tokens.css`. Las Calculadoras usan esas variables y nunca un color suelto; `tests/paleta.test.ts` verifica el contraste en el tema claro y en el oscuro ([ADR 1](docs/adr/0001-modo-oscuro-segun-el-sistema.md)).

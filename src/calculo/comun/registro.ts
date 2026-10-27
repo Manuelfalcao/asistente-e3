@@ -1,5 +1,11 @@
 import { DEDUCCION_DIAMETRO_RF } from '../bobinas/bobinas';
 import { DEDUCCION_DOS_CAPAS } from '../bobinas/dos-capas';
+import {
+  CRITERIO_TRIMMER,
+  CRITERIO_VENTANA_DE_L,
+  DEDUCCION_CHEBYSHEV_PAR,
+  DEDUCCION_DIVISOR_CAPACITIVO,
+} from '../filtros/resonadores';
 import type { Paso } from './resultado';
 import { CRITERIO_UMBRALES } from './valor-impracticable';
 
@@ -29,5 +35,9 @@ export interface EntradaRegistro {
 export const REGISTRO: readonly EntradaRegistro[] = [
   DEDUCCION_DIAMETRO_RF,
   DEDUCCION_DOS_CAPAS,
+  DEDUCCION_CHEBYSHEV_PAR,
+  DEDUCCION_DIVISOR_CAPACITIVO,
   CRITERIO_UMBRALES,
+  CRITERIO_VENTANA_DE_L,
+  CRITERIO_TRIMMER,
 ];
