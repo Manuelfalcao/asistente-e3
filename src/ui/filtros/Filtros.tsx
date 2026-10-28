@@ -58,10 +58,10 @@ import {
 } from './campos';
 import { ResultadoAcoplados, ayudaDeL } from './Acoplados';
 
-// La Calculadora de filtros (spec §7): por ahora escaleras π y T de los cuatro Tipos de filtro,
-// Butterworth, Chebyshev y Bessel, con el Orden escrito o calculado desde una atenuación, y con Rs ≠
-// RL por Takahasi (Bessel no). El resultado es el esquema con los valores en orden desde la fuente y
-// la pérdida de Cohn.
+// La Calculadora de filtros (spec §7): escaleras π y T de los cuatro Tipos de filtro y, en pasa
+// banda, resonadores acoplados. Butterworth, Chebyshev y Bessel, con el Orden escrito o calculado
+// desde una atenuación, y con Rs ≠ RL por Takahasi (Bessel no). El resultado es el esquema con los
+// valores en orden desde la fuente y la pérdida de Cohn.
 export function Filtros() {
   const guardado = (campo: string) => ({ calculadora: 'filtros', campo });
   const [tipo, setTipo] = useOpcionGuardada(TIPOS, 'pasa-bajos', guardado('tipo'));
@@ -102,8 +102,7 @@ export function Filtros() {
   const acoplados = tipo === 'pasa-banda' && elegida === 'resonadores';
   // fc en pasa bajos y pasa altos; en pasa banda y rechaza banda, f1 y f2 o f0 y BW.
   const frecuencias = !deBanda ? [fc] : modoBanda === 'f1-f2' ? [f1, f2] : [f0, bw];
-  // En resonadores acoplados el Orden se ingresa: el calculado llega con el ticket 47.
-  const ingresaOrden = acoplados || modoOrden === 'ingresar';
+  const ingresaOrden = modoOrden === 'ingresar';
   const camposOrden = ingresaOrden ? [orden] : [atenuacion, fs];
   const campos = [
     ...(esChebyshev ? [ripple] : []),
@@ -208,7 +207,7 @@ export function Filtros() {
     }
   }
   const entradaAcoplada: EntradaResonadores | null =
-    acoplados && comun && banda && typeof comun.orden === 'number'
+    acoplados && comun && banda
       ? {
           aproximacion,
           ripple: comun.ripple,
@@ -268,15 +267,13 @@ export function Filtros() {
           onCambio={setElegida}
         />
         <p class="nota-campo">{acoplados ? NOTA_ACOPLADOS : sugerida.nota}</p>
-        {!acoplados && (
-          <BotonesSegmentados
-            etiqueta="Orden"
-            nombre="modo-orden-filtro"
-            opciones={MODOS_ORDEN}
-            valor={modoOrden}
-            onCambio={setModoOrden}
-          />
-        )}
+        <BotonesSegmentados
+          etiqueta="Orden"
+          nombre="modo-orden-filtro"
+          opciones={MODOS_ORDEN}
+          valor={modoOrden}
+          onCambio={setModoOrden}
+        />
         {ingresaOrden ? (
           <CampoEntradaValor id="orden" etiqueta="Orden" campo={orden} />
         ) : (
@@ -348,6 +345,7 @@ export function Filtros() {
             resultado={calcularFiltro(entrada)}
             entrada={entrada}
             onButterworth={() => setAproximacion('butterworth')}
+            onResonadores={() => setElegida('resonadores')}
           />
         ) : (
           <p class="sin-resultado corregir">{mensaje}</p>
@@ -359,7 +357,19 @@ export function Filtros() {
 
 const NOTA_ACOPLADOS =
   'Resonadores LC en derivación, todos con la misma L, unidos por Capacitores de acople: este ' +
-  'filtro sí adapta Rs y RL. El Orden se ingresa.';
+  'filtro sí adapta Rs y RL.';
+
+// El botón de las sugerencias de resonadores acoplados (spec §7.4 y §7.7).
+function BotonResonadores({ onClick }: { onClick: () => void }) {
+  return (
+    <>
+      {' '}
+      <button type="button" class="boton-minima en-aviso" onClick={onClick}>
+        Pasar a resonadores acoplados
+      </button>
+    </>
+  );
+}
 
 // En pasa banda y rechaza banda cada g es un resonador LC, con los nombres de su L y su C.
 function escalera(
@@ -421,11 +431,14 @@ function Resultado({
   resultado,
   entrada,
   onButterworth,
+  onResonadores,
 }: {
   resultado: ResultadoFiltro;
   entrada: EntradaFiltro;
   // Bessel con Rs ≠ RL ofrece pasar a Butterworth (spec §7.4).
   onButterworth: () => void;
+  // En pasa banda, a resonadores acoplados (spec §7.4 y §7.7).
+  onResonadores: () => void;
 }) {
   if (resultado.estado === 'corte') {
     return (
@@ -441,6 +454,7 @@ function Resultado({
                 </button>
               </>
             )}
+            {resultado.sugerenciaResonadores && <BotonResonadores onClick={onResonadores} />}
           </Aviso>
         }
         principal={null}
@@ -462,9 +476,25 @@ function Resultado({
     r.revision.marcados.find((m) => m.nombre === e.nombre)?.nivel;
   return (
     <FormaResultado
-      avisos={r.avisos.map((a) => (
-        <Aviso key={a.codigo}>{a.texto}</Aviso>
-      ))}
+      avisos={[
+        ...r.avisos.map((a) => (
+          <Aviso key={a.codigo}>
+            {a.texto}
+            {a.codigo === 'perdida-plana' &&
+              r.sugerenciaResonadores?.motivo === 'perdida-plana' && (
+                <BotonResonadores onClick={onResonadores} />
+              )}
+          </Aviso>
+        )),
+        ...(r.sugerenciaResonadores?.motivo === 'banda-angosta'
+          ? [
+              <Aviso key="resonadores">
+                {r.sugerenciaResonadores.texto}
+                <BotonResonadores onClick={onResonadores} />
+              </Aviso>,
+            ]
+          : []),
+      ]}
       principal={
         <TarjetaResultado
           titulo={titulo}

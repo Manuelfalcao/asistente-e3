@@ -147,6 +147,17 @@ export function ResultadoAcoplados({
             valor={frecuencia(r.banda.bw)}
             detalle={`ancho de banda; FBW = ${formatearValor(r.sintonia.fbw * 100, 'porcentaje')}`}
           />
+          {r.ordenCalculado && (
+            <ValorResultado
+              nombre={`A(${frecuencia(r.ordenCalculado.prototipo.fs)})`}
+              valor={formatearValor(r.ordenCalculado.atenuacionSimulada, 'decibeles')}
+              detalle={
+                `atenuación de la red simulada en fs con Orden ${r.orden}; pediste al menos ` +
+                `${formatearValor(r.ordenCalculado.prototipo.as, 'decibeles')}. El prototipo ` +
+                `pedía Orden ${r.ordenCalculado.prototipo.orden}`
+              }
+            />
+          )}
           <ValorResultado
             nombre="L"
             valor={inductancia(r.inductancia.valor)}

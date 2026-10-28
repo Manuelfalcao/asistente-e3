@@ -6,6 +6,7 @@ import type {
   EntradaFiltro,
   PedidoAtenuacion,
   Prototipo,
+  SugerenciaResonadores,
   TipoBajoAlto,
   TipoDeBanda,
   TipoFiltro,
@@ -197,12 +198,29 @@ const BESSEL: readonly (readonly string[])[] = [
   ['0,7677', '0,3744', '0,2944', '0,2378', '0,1778', '0,1104', '0,0375', '1,0000'],
   ['0,7125', '0,3446', '0,2735', '0,2297', '0,1867', '0,1387', '0,0855', '0,0289', '1,0000'],
   [
-    '0,6678', '0,3203', '0,2547', '0,2184', '0,1859', '0,1506', '0,1112', '0,0682', '0,0230',
+    '0,6678',
+    '0,3203',
+    '0,2547',
+    '0,2184',
+    '0,1859',
+    '0,1506',
+    '0,1112',
+    '0,0682',
+    '0,0230',
     '1,0000',
   ],
   [
-    '0,6305', '0,3002', '0,2384', '0,2066', '0,1808', '0,1539', '0,1240', '0,0910', '0,0556',
-    '0,0187', '1,0000',
+    '0,6305',
+    '0,3002',
+    '0,2384',
+    '0,2066',
+    '0,1808',
+    '0,1539',
+    '0,1240',
+    '0,0910',
+    '0,0556',
+    '0,0187',
+    '1,0000',
   ],
 ];
 
@@ -537,7 +555,7 @@ export interface CasoComportamientoFiltro {
   clase: 'comportamiento';
   id: string;
   entradas: EntradaFiltro;
-  esperado:
+  esperado: (
     | { corte: CodigoCorteFiltro }
     | {
         orden: number;
@@ -546,7 +564,11 @@ export interface CasoComportamientoFiltro {
         topologia?: TopologiaFiltro;
         // Los valores marcados, con su nivel; los que no están no se marcan.
         marcados?: Readonly<Record<string, Nivel>>;
-      };
+      }
+  ) & {
+    // Si sugiere pasar a resonadores acoplados y por qué, cuando el caso lo fija (spec §7.4 y §7.7).
+    resonadores?: SugerenciaResonadores['motivo'] | null;
+  };
   referencia: string;
 }
 
@@ -758,6 +780,82 @@ export const CASOS_COMPORTAMIENTO: readonly CasoComportamientoFiltro[] = [
   },
   {
     clase: 'comportamiento',
+    id: 'Pasa banda π de 144 a 148 MHz (FBW 2,7 %) sugiere resonadores acoplados',
+    entradas: entradaBanda('pasa-banda', 'butterworth', 'π', 3, { f1: 144e6, f2: 148e6 }),
+    esperado: { orden: 3, avisos: [], resonadores: 'banda-angosta' },
+    referencia: 'spec §7.7 y §7.10',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Pasa banda T de 140 a 160 MHz (FBW 13 %) sugiere resonadores acoplados',
+    entradas: entradaBanda(
+      'pasa-banda',
+      'chebyshev',
+      'T',
+      3,
+      { f1: 140e6, f2: 160e6 },
+      {
+        ripple: 0.5,
+      },
+    ),
+    esperado: { orden: 3, avisos: [], resonadores: 'banda-angosta' },
+    referencia: 'spec §7.7 y §7.10',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Pasa banda π de 88 a 108 MHz (FBW 20,3 %, mapeo de Cohn) no sugiere resonadores acoplados',
+    entradas: entradaBanda('pasa-banda', 'butterworth', 'π', 3, BANDA_FM),
+    esperado: { orden: 3, avisos: [], resonadores: null },
+    referencia: 'spec §7.7 y §7.10',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Rechaza banda angosto no sugiere resonadores acoplados',
+    entradas: entradaBanda('rechaza-banda', 'butterworth', 'π', 3, { f1: 144e6, f2: 148e6 }),
+    esperado: { orden: 3, avisos: [], resonadores: null },
+    referencia: 'spec §7.7',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Pasa banda con Rs ≠ RL: el aviso de pérdida plana sugiere resonadores acoplados',
+    // También con FBW de más de 20 %: la sugerencia va en el aviso, no por el ancho.
+    entradas: entradaBanda('pasa-banda', 'butterworth', 'π', 3, BANDA_FM, { rs: 50, rl: 300 }),
+    esperado: { orden: 3, avisos: ['perdida-plana'], resonadores: 'perdida-plana' },
+    referencia: 'spec §7.4',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Pasa bajos con Rs ≠ RL: la pérdida plana no sugiere resonadores acoplados',
+    entradas: entradaFiltro('pasa-bajos', 'butterworth', 'π', 5, 100e6, { rs: 50, rl: 75 }),
+    esperado: { orden: 5, avisos: ['perdida-plana'], resonadores: null },
+    referencia: 'spec §7.4',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Bessel con Rs ≠ RL en pasa banda ofrece resonadores acoplados como tercera salida',
+    entradas: entradaBanda(
+      'pasa-banda',
+      'bessel',
+      'π',
+      3,
+      { f1: 144e6, f2: 148e6 },
+      {
+        rs: 50,
+        rl: 300,
+      },
+    ),
+    esperado: { corte: 'bessel-terminaciones-distintas', resonadores: 'bessel' },
+    referencia: 'spec §7.4 y §7.10',
+  },
+  {
+    clase: 'comportamiento',
+    id: 'Bessel con Rs ≠ RL en pasa bajos no ofrece resonadores acoplados',
+    entradas: entradaFiltro('pasa-bajos', 'bessel', 'π', 5, 100e6, { rs: 50, rl: 75 }),
+    esperado: { corte: 'bessel-terminaciones-distintas', resonadores: null },
+    referencia: 'spec §7.4',
+  },
+  {
+    clase: 'comportamiento',
     id: 'f2 menor que f1 es entrada inválida',
     entradas: entradaBanda('pasa-banda', 'butterworth', 'π', 3, { f1: 108e6, f2: 88e6 }),
     esperado: { corte: 'entrada-invalida' },
@@ -819,7 +917,9 @@ export const CASOS_COMPORTAMIENTO: readonly CasoComportamientoFiltro[] = [
   {
     clase: 'comportamiento',
     id: 'Orden calculado: fs igual a fc (Ωs = 1) tampoco tiene solución',
-    entradas: entradaFiltro('pasa-altos', 'chebyshev', 'T', pedido(40, 50e6), 50e6, { ripple: 0.5 }),
+    entradas: entradaFiltro('pasa-altos', 'chebyshev', 'T', pedido(40, 50e6), 50e6, {
+      ripple: 0.5,
+    }),
     esperado: { corte: 'banda-pasante' },
     referencia: 'spec §7.6',
   },

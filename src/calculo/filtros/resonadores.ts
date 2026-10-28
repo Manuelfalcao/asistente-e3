@@ -1,4 +1,5 @@
 import { formatearValor } from '../../entrada/formato';
+import { type ElementoBarrido, type RedBarrido, atenuacionDb } from '../comun/barrido';
 import { errorLatex, numeroLatex as numero, valorLatex } from '../comun/latex';
 import { type SeccionL, componenteDeReactancia, seccionL } from '../comun/red-l';
 import { pasosSeccionL } from '../comun/red-l';
@@ -15,14 +16,25 @@ import {
   type Aproximacion,
   type Banda,
   type BandaEntrada,
+  type OrdenCalculado,
+  type PedidoAtenuacion,
   type Prototipo,
+  type Sintonia,
+  FBW_MAXIMO_RESONADORES,
   FORMULA_COHN_BANDA,
   ORDEN_MAXIMO,
   RANGO_RIPPLE,
+  TOLERANCIA_CUMPLE_DB,
   bandaDe,
+  dbTexto,
+  formulasDeOrden,
   formulasPrototipo,
+  mapeoDeCohn,
+  ordenDesdeAtenuacion,
   prototipo,
 } from './filtros';
+
+export { type Sintonia, mapeoDeCohn } from './filtros';
 
 // La Topología de resonadores acoplados de la Calculadora de filtros (spec §7.7), solo en pasa
 // banda: n resonadores LC paralelo en derivación, todos con la misma L, unidos por Capacitores de
@@ -34,8 +46,8 @@ export interface EntradaResonadores {
   aproximacion: Aproximacion;
   // En dB; solo en Chebyshev.
   ripple: number | null;
-  // El que escribió el Alumno, de 1 a 10.
-  orden: number;
+  // El que escribió el Alumno, de 1 a 10, o la atenuación de la que se calcula (spec §7.7).
+  orden: number | PedidoAtenuacion;
   banda: BandaEntrada;
   rs: number;
   rl: number;
@@ -68,13 +80,6 @@ export interface DivisorCapacitivo {
 // Un capacitor del resultado. Lo revisa el criterio de valor impracticable.
 export interface CapacitorResonadores extends Componente {
   componente: 'C';
-}
-
-// La frecuencia a la que se ajusta cada resonador y el ancho relativo del diseño: el mapeo de Cohn
-// (Matthaei ec. 8.11-2 y 8.11-3), que no es la central geométrica.
-export interface Sintonia {
-  f0: number;
-  fbw: number;
 }
 
 // Un extremo del filtro: la R que se conecta, la que tiene que ver el resonador y el Capacitor de
@@ -112,7 +117,7 @@ export const AJUSTE_TRIMMER = 0.2;
 
 // Los avisos por FBW (spec §7.7): ninguno hasta 10 %, informativo hasta 20 %, fuerte de ahí en más.
 export const FBW_INFORMATIVO = 0.1;
-export const FBW_FUERTE = 0.2;
+export const FBW_FUERTE = FBW_MAXIMO_RESONADORES;
 
 // Los dos extremos del filtro: la entrada, hacia Rs, y la salida, hacia RL.
 export type Lado = 'entrada' | 'salida';
@@ -161,6 +166,11 @@ export interface VentanaDeL {
 
 export type CodigoCorteResonadores =
   | 'entrada-invalida'
+  // Orden calculado (spec §7.6 y §7.7): fs en la banda pasante, más de 10 en el prototipo o en la
+  // red simulada, o Bessel sin solución en el prototipo.
+  | 'banda-pasante'
+  | 'orden-excedido'
+  | 'bessel-sin-solucion'
   // Rp ≤ R en algún extremo.
   | 'extremo-no-realizable'
   // Algún Capacitor de sintonía ≤ 0.
@@ -170,6 +180,7 @@ export type CodigoCorteResonadores =
 
 export type CodigoAvisoResonadores =
   | 'chebyshev-par'
+  | 'orden-por-asimetria'
   | 'fbw-ancho'
   | 'fbw-fuera-de-rango'
   | 'trimmer'
@@ -178,6 +189,25 @@ export type CodigoAvisoResonadores =
   | 'acople-debajo-del-minimo'
   | 'sintonia-debajo-del-minimo'
   | 'ventana-vacia';
+
+// El Orden calculado desde una atenuación (spec §7.7): el del prototipo, y el que hace falta en la red
+// simulada en fs, con componentes ideales.
+export interface OrdenCalculadoResonadores {
+  // Ωs, la fórmula, el Orden del prototipo y su atenuación en fs.
+  prototipo: OrdenCalculado;
+  // El que se usa: el del prototipo, o más si la red simulada no llega.
+  orden: number;
+  // La de la red simulada en fs con ese Orden, en dB.
+  atenuacionSimulada: number;
+  // Cada Orden probado en la red simulada, con su atenuación en fs.
+  probados: readonly OrdenProbado[];
+}
+
+export interface OrdenProbado {
+  orden: number;
+  // En dB, en fs.
+  atenuacion: number;
+}
 
 export type ResultadoResonadores =
   | {
@@ -190,9 +220,12 @@ export type ResultadoResonadores =
   | {
       estado: 'calculado';
       aproximacion: Aproximacion;
-      // El que escribió el Alumno y el que se usa: con el plan B, Chebyshev par sube al impar.
-      ordenPedido: number;
+      // El que escribió el Alumno (null si lo pidió desde una atenuación) y el que se usa: con el plan
+      // B, Chebyshev par sube al impar.
+      ordenPedido: number | null;
       orden: number;
+      // Solo si el Orden se calculó desde una atenuación.
+      ordenCalculado: OrdenCalculadoResonadores | null;
       prototipo: Prototipo;
       // La banda que dio el Alumno: f1, f2, la central geométrica y BW.
       banda: Banda;
@@ -234,17 +267,18 @@ export function cifrasDeSintonia(f0: number, bw: number): number {
   return Math.min(9, Math.max(3, cifras));
 }
 
-// Matthaei ec. 8.11-2 y 8.11-3: ω0 = ω1 + ω2 − √((ω2 − ω1)² + ω1·ω2) y FBW = ω0/ω1 − ω0/ω2. En banda
-// angosta coincide con la central geométrica; con banda ancha mantiene los bordes y el ripple.
-export function mapeoDeCohn(f1: number, f2: number): Sintonia {
-  const f0 = f1 + f2 - Math.sqrt((f2 - f1) ** 2 + f1 * f2);
-  return { f0, fbw: f0 / f1 - f0 / f2 };
-}
-
 const CORTE_INVALIDA =
   `f1 y f2 (o f0 y BW), Rs, RL, el Q de las bobinas y la L de los resonadores tienen que ser ` +
-  `mayores que cero y f2 mayor que f1; el Orden, un entero de 1 a ${ORDEN_MAXIMO}; y el ripple, ` +
-  `de ${RANGO_RIPPLE.min} a ${RANGO_RIPPLE.max} dB.`;
+  `mayores que cero y f2 mayor que f1; el Orden, un entero de 1 a ${ORDEN_MAXIMO}, o la atenuación ` +
+  `pedida y su frecuencia fs, mayores que cero; y el ripple, de ${RANGO_RIPPLE.min} a ` +
+  `${RANGO_RIPPLE.max} dB.`;
+
+const esPositivoFinito = (x: number) => Number.isFinite(x) && x > 0;
+
+function ordenValido(orden: EntradaResonadores['orden']): boolean {
+  if (typeof orden !== 'number') return esPositivoFinito(orden.as) && esPositivoFinito(orden.fs);
+  return Number.isInteger(orden) && orden >= 1 && orden <= ORDEN_MAXIMO;
+}
 
 function entradaValida(e: EntradaResonadores): boolean {
   const { banda } = e;
@@ -260,9 +294,7 @@ function entradaValida(e: EntradaResonadores): boolean {
     e.rl > 0 &&
     e.qBobina > 0 &&
     (e.inductancia === null || e.inductancia > 0) &&
-    Number.isInteger(e.orden) &&
-    e.orden >= 1 &&
-    e.orden <= ORDEN_MAXIMO
+    ordenValido(e.orden)
   );
 }
 
@@ -280,11 +312,26 @@ export function calcularResonadores(
   if (!entradaValida(entrada)) {
     return { estado: 'corte', codigo: 'entrada-invalida', texto: CORTE_INVALIDA };
   }
-  const { aproximacion, ripple, orden: ordenPedido, rs, rl } = entrada;
+  const { orden } = entrada;
+  if (typeof orden !== 'number') {
+    return conOrdenCalculado(entrada, orden, planBChebyshevPar, planBDivisor);
+  }
   // Chebyshev par se arma con terminaciones iguales: el g(n+1) ≠ 1 lo absorbe el Capacitor de
   // extremo de la salida (Deducción propia). Con el plan B sube al impar, como en π y T (spec §7.3).
-  const chebyshevPar = aproximacion === 'chebyshev' && ordenPedido % 2 === 0;
-  const n = chebyshevPar && planBChebyshevPar ? ordenPedido + 1 : ordenPedido;
+  const chebyshevPar = entrada.aproximacion === 'chebyshev' && orden % 2 === 0;
+  const n = chebyshevPar && planBChebyshevPar ? orden + 1 : orden;
+  const r = disenarConOrden(entrada, n, planBDivisor);
+  if (r.estado === 'corte' || n === orden) return r;
+  return { ...r, ordenPedido: orden, avisos: [avisoChebyshevPar(orden, n), ...r.avisos] };
+}
+
+// El filtro con Orden n, el que se usa. ordenPedido queda en null: lo pone quien lo llama.
+function disenarConOrden(
+  entrada: EntradaResonadores,
+  n: number,
+  planBDivisor: boolean,
+): ResultadoResonadores {
+  const { aproximacion, ripple, rs, rl } = entrada;
   const banda = bandaDe(entrada.banda);
   const sintonia = mapeoDeCohn(banda.f1, banda.f2);
   const { fbw } = sintonia;
@@ -357,8 +404,9 @@ export function calcularResonadores(
   return {
     estado: 'calculado',
     aproximacion,
-    ordenPedido,
+    ordenPedido: null,
     orden: n,
+    ordenCalculado: null,
     prototipo: p,
     invertido,
     banda,
@@ -388,7 +436,6 @@ export function calcularResonadores(
     revision,
     referencias: REFERENCIAS_RESONADORES,
     avisos: [
-      ...(n !== ordenPedido ? [avisoChebyshevPar(ordenPedido, n)] : []),
       ...avisosDeFbw(fbw),
       ...avisosDeVentana(ventana, l, entrada.inductancia === null, acoples, extremos, sintonias),
       AVISO_TRIMMER,
@@ -400,6 +447,131 @@ export function calcularResonadores(
       ...NOTAS,
     ],
   };
+}
+
+type Calculado = Extract<ResultadoResonadores, { estado: 'calculado' }>;
+
+// La red completa entre Rs y RL para el barrido común (spec §5.7), con componentes ideales: el
+// Capacitor de extremo en serie, cada resonador LC paralelo en derivación y los Capacitores de
+// acople en serie.
+function redDe(r: Calculado, rs: number, rl: number): RedBarrido {
+  const enSerie = (valor: number): ElementoBarrido => ({
+    componente: 'C',
+    posicion: 'serie',
+    valor,
+  });
+  const n = r.sintonias.length;
+  return {
+    rs,
+    rl,
+    elementos: [
+      enSerie(r.extremos[0].capacitor.valor),
+      ...r.sintonias.flatMap((s, i): ElementoBarrido[] => [
+        { componente: 'L', posicion: 'derivacion', valor: r.inductancia.valor },
+        { componente: 'C', posicion: 'derivacion', valor: s.capacitor.valor },
+        ...(i < n - 1 ? [enSerie(r.acoples[i].capacitor.valor)] : []),
+      ]),
+      enSerie(r.extremos[1].capacitor.valor),
+    ],
+  };
+}
+
+// El Orden calculado (spec §7.7): el del prototipo, y después la red real simulada en fs. Si no llega,
+// se sube n de a uno (de a dos en Chebyshev con el plan B, que sigue impar) hasta 10. La red se
+// simula con la L que se va a usar, aunque con componentes ideales la atenuación casi no depende de
+// ella.
+function conOrdenCalculado(
+  entrada: EntradaResonadores,
+  pedido: PedidoAtenuacion,
+  planBChebyshevPar: boolean,
+  planBDivisor: boolean,
+): ResultadoResonadores {
+  const { aproximacion, ripple, rs, rl } = entrada;
+  const datos = { tipo: 'pasa-banda', aproximacion, ripple, banda: entrada.banda } as const;
+  const o = ordenDesdeAtenuacion(datos, pedido, 1, { parLibre: !planBChebyshevPar });
+  if (o.estado === 'corte') return { estado: 'corte', codigo: o.codigo, texto: o.texto };
+  const { as, fs } = pedido;
+  const flanco = flancoDe(fs, entrada.banda);
+  const salto = aproximacion === 'chebyshev' && planBChebyshevPar ? 2 : 1;
+  const probados: OrdenProbado[] = [];
+  for (let n = o.orden; n <= ORDEN_MAXIMO; n += salto) {
+    const r = disenarConOrden(entrada, n, planBDivisor);
+    if (r.estado === 'corte') {
+      if (n === o.orden) return r;
+      return {
+        ...r,
+        texto: `Por la asimetría del flanco ${flanco} hace falta Orden ${n}, y con él: ${r.texto}`,
+      };
+    }
+    const atenuacion = atenuacionDb(redDe(r, rs, rl), fs);
+    probados.push({ orden: n, atenuacion });
+    if (!cumple(atenuacion, as)) continue;
+    const ordenCalculado = { prototipo: o, orden: n, atenuacionSimulada: atenuacion, probados };
+    return {
+      ...r,
+      ordenCalculado,
+      formulas: [...formulasDeOrden('pasa-banda', aproximacion), ...r.formulas],
+      pasos: [...o.pasos, ...pasosDeSimulacion(pedido, probados), ...r.pasos],
+      avisos: [
+        ...(n !== o.orden ? [avisoAsimetria(o.orden, n, flanco, atenuacion, fs)] : []),
+        ...r.avisos,
+      ],
+      notas: [NOTA_ORDEN_SIMULADO, ...r.notas],
+    };
+  }
+  const ultimo = probados[probados.length - 1];
+  return {
+    estado: 'corte',
+    codigo: 'orden-excedido',
+    texto:
+      `El prototipo pedía n = ${o.orden}, pero por la asimetría del flanco ${flanco} la red ` +
+      `simulada no llega a ${dbTexto(as)} a ${formatearValor(fs, 'frecuencia')} ni con Orden ` +
+      `${ultimo.orden}, el máximo: da ${dbTexto(ultimo.atenuacion)}. Con esos datos no se ` +
+      'calcula: probá con una atenuación menor, con fs más lejos de la banda o con otra Aproximación.',
+  };
+}
+
+// Arriba de la banda la red atenúa menos que el prototipo, y abajo más (research/resonadores-
+// acoplados.md §4): los capacitores en serie son ceros de transmisión en continua.
+type Flanco = 'alto' | 'bajo';
+const flancoDe = (fs: number, banda: BandaEntrada): Flanco =>
+  fs > bandaDe(banda).f0 ? 'alto' : 'bajo';
+
+const cumple = (atenuacion: number, as: number) => atenuacion >= as - TOLERANCIA_CUMPLE_DB;
+
+const avisoAsimetria = (
+  prototipoPide: number,
+  n: number,
+  flanco: Flanco,
+  atenuacion: number,
+  fs: number,
+): Aviso<CodigoAvisoResonadores> => ({
+  codigo: 'orden-por-asimetria',
+  texto:
+    `El prototipo pedía n = ${prototipoPide}, pero por la asimetría del flanco ${flanco} hace ` +
+    `falta n = ${n}: con él, la red simulada atenúa ${dbTexto(atenuacion)} a ` +
+    `${formatearValor(fs, 'frecuencia')}.`,
+});
+
+const NOTA_ORDEN_SIMULADO =
+  'La atenuación en fs es la de la red simulada, con componentes ideales: esta Topología atenúa ' +
+  'menos que el prototipo arriba de la banda y más abajo.';
+
+function pasosDeSimulacion(
+  { as, fs }: PedidoAtenuacion,
+  probados: readonly OrdenProbado[],
+): Paso[] {
+  return probados.map(({ orden, atenuacion }) => {
+    const llega = cumple(atenuacion, as);
+    return {
+      texto: `Red simulada con Orden ${orden}, en fs: ${llega ? 'cumple' : 'no llega'}`,
+      latex:
+        `A(${hz(fs)}) = ${valorLatex(atenuacion, 'decibeles')} ` +
+        `${llega ? '\\ge' : '<'} A_s = ${valorLatex(as, 'decibeles')}`,
+      fuente:
+        'Análisis ABCD de la red completa entre Rs y RL, con componentes ideales (spec §5.7).',
+    };
+  });
 }
 
 // La de la spec §5.6 para esta Topología.

@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   CASOS_COHN_RESONADORES,
   CASOS_COMPORTAMIENTO_RESONADORES,
+  CASOS_ORDEN_RESONADORES,
   CASOS_VERIFICACION_RESONADORES,
 } from './casos-resonadores';
-import { casoCohn, casoComportamiento, casoVerificacion } from './informe-resonadores';
+import { casoCohn, casoComportamiento, casoOrden, casoVerificacion } from './informe-resonadores';
 
 // Los Casos de prueba de resonadores acoplados (spec §13.3), con las mismas medidas que muestra el
 // Informe de casos. Los que dependen de una Deducción propia corren de los dos lados de su bandera.
@@ -23,6 +24,16 @@ describe('pérdida de Cohn contra la red simulada con Qu', () => {
   for (const caso of CASOS_COHN_RESONADORES) {
     it(caso.id, () => {
       for (const m of casoCohn(caso).medidas) {
+        expect(m.dentro, `${m.nombre}: ${m.obtenido} contra ${m.esperado}`).toBe(true);
+      }
+    });
+  }
+});
+
+describe('Orden calculado en resonadores acoplados: alcanza As en fs en la red simulada', () => {
+  for (const caso of CASOS_ORDEN_RESONADORES) {
+    it(caso.id, () => {
+      for (const m of casoOrden(caso).medidas) {
         expect(m.dentro, `${m.nombre}: ${m.obtenido} contra ${m.esperado}`).toBe(true);
       }
     });

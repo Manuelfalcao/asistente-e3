@@ -55,13 +55,20 @@ describe('la Topología de resonadores acoplados en la pantalla de filtros', () 
     expect(topologias().queryByLabelText('Resonadores acoplados')).toBeNull();
   });
 
-  it('el Orden se ingresa: el cálculo desde una atenuación todavía no está', () => {
-    elegir('Tipo de filtro', 'Pasa banda');
+  it('el Orden también se calcula desde una atenuación, con la red simulada', () => {
+    pasaBandaAcoplado();
+    escribir('RL (carga)', '50');
     elegir('Orden', 'Calcular desde una atenuación');
-    elegir('Topología', 'Resonadores acoplados');
-    expect(screen.queryByRole('group', { name: 'Orden' })).toBeNull();
-    expect(screen.getByLabelText('Orden')).toBeTruthy();
-    expect(screen.queryByLabelText('As (atenuación mínima)')).toBeNull();
+    escribir('As (atenuación mínima)', '48');
+    escribir('fs (donde se pide)', '160');
+    const r = within(resultados());
+    expect(r.getByText(/de Orden 4 en resonadores acoplados/)).toBeTruthy();
+    expect(
+      r.getByText(
+        /El prototipo pedía n = 3, pero por la asimetría del flanco alto hace falta n = 4/,
+      ),
+    ).toBeTruthy();
+    expect(r.getByText(/atenuación de la red simulada en fs con Orden 4/)).toBeTruthy();
   });
 
   it('propone la L con la Ventana de L a la vista, y el campo vacío usa la propuesta', () => {
@@ -124,10 +131,73 @@ describe('la Topología de resonadores acoplados en la pantalla de filtros', () 
   it('al dejar el pasa banda vuelve a π o T', () => {
     pasaBandaAcoplado();
     elegir('Tipo de filtro', 'Pasa bajos');
-    const topologias = within(screen.getByRole('group', { name: 'Topología' }));
-    const marcada = topologias
+    expect(['π', 'T']).toContain(topologiaMarcada());
+  });
+});
+
+// 144–148 MHz, Butterworth de Orden 3, en π.
+function pasaBandaPi() {
+  elegir('Tipo de filtro', 'Pasa banda');
+  elegir('Topología', 'π');
+  escribir('Orden', '3');
+  escribir('f1 (borde bajo)', '144');
+  escribir('f2 (borde alto)', '148');
+}
+
+const pasarAResonadores = () =>
+  within(resultados()).queryByRole('button', { name: 'Pasar a resonadores acoplados' });
+
+const topologiaMarcada = () =>
+  (
+    within(screen.getByRole('group', { name: 'Topología' }))
       .getAllByRole('radio')
-      .find((x) => (x as HTMLInputElement).checked) as HTMLInputElement;
-    expect(['π', 'T']).toContain(marcada.value);
+      .find((x) => (x as HTMLInputElement).checked) as HTMLInputElement
+  ).value;
+
+describe('la sugerencia de resonadores acoplados en π y T (spec §7.4 y §7.7)', () => {
+  it('en un pasa banda angosto la sugiere, y el botón cambia de Topología', () => {
+    pasaBandaPi();
+    expect(within(resultados()).getByText(/Con una banda angosta \(FBW = 2,7/)).toBeTruthy();
+    fireEvent.click(pasarAResonadores()!);
+    expect(topologiaMarcada()).toBe('resonadores');
+    expect(within(resultados()).getByText(/en resonadores acoplados/)).toBeTruthy();
+  });
+
+  it('con FBW de más de 20 % no la sugiere', () => {
+    pasaBandaPi();
+    escribir('f1 (borde bajo)', '88');
+    escribir('f2 (borde alto)', '108');
+    expect(pasarAResonadores()).toBeNull();
+  });
+
+  it('con Rs ≠ RL el aviso de pérdida plana la sugiere, aunque la banda sea ancha', () => {
+    pasaBandaPi();
+    escribir('f1 (borde bajo)', '88');
+    escribir('f2 (borde alto)', '108');
+    escribir('RL (carga)', '300');
+    const aviso = within(resultados()).getByText(/Este filtro no adapta/);
+    expect(aviso.textContent).toMatch(/pasá a resonadores acoplados/);
+    fireEvent.click(within(aviso).getByRole('button', { name: 'Pasar a resonadores acoplados' }));
+    expect(topologiaMarcada()).toBe('resonadores');
+  });
+
+  it('Bessel con Rs ≠ RL ofrece las tres salidas', () => {
+    pasaBandaPi();
+    elegir('Aproximación', 'Bessel');
+    escribir('RL (carga)', '300');
+    const r = within(resultados());
+    expect(r.getByRole('button', { name: 'Pasar a Butterworth' })).toBeTruthy();
+    fireEvent.click(pasarAResonadores()!);
+    expect(topologiaMarcada()).toBe('resonadores');
+    expect(
+      within(resultados()).getByText(/Pasa banda Bessel de Orden 3 en resonadores/),
+    ).toBeTruthy();
+  });
+
+  it('en pasa bajos no la sugiere', () => {
+    escribir('Orden', '3');
+    escribir('fc', '100');
+    escribir('RL (carga)', '300');
+    expect(pasarAResonadores()).toBeNull();
   });
 });

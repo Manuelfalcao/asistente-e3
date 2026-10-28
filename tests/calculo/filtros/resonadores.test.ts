@@ -529,3 +529,48 @@ describe('el diseño de Matthaei, despejado en L (spec §7.7)', () => {
     });
   }
 });
+
+describe('Orden calculado desde una atenuación (spec §7.7)', () => {
+  const desde = (as: number, fs: number, e: Partial<EntradaResonadores> = {}) =>
+    calcularResonadores(entrada({ orden: { as, fs }, inductancia: null, ...e }));
+
+  it('si la red simulada no llega, sube y lo dice con las palabras de la spec', () => {
+    const r = calculado(desde(48, 160e6));
+    expect(r.ordenPedido).toBeNull();
+    expect(r.ordenCalculado!.prototipo.orden).toBe(3);
+    expect(r.orden).toBe(4);
+    expect(r.ordenCalculado!.probados.map((p) => p.orden)).toEqual([3, 4]);
+    const aviso = r.avisos.find((a) => a.codigo === 'orden-por-asimetria')!.texto;
+    expect(aviso).toMatch(
+      /^El prototipo pedía n = 3, pero por la asimetría del flanco alto hace falta n = 4/,
+    );
+    expect(r.pasos.some((p) => /^Red simulada con Orden 3, en fs: no llega/.test(p.texto))).toBe(
+      true,
+    );
+    expect(r.pasos.some((p) => /^Red simulada con Orden 4, en fs: cumple/.test(p.texto))).toBe(
+      true,
+    );
+    expect(r.notas[0]).toMatch(/red simulada, con componentes ideales/);
+  });
+
+  it('casi no depende de la L: con 10 nH y con 22 nH sale el mismo Orden', () => {
+    const a = calculado(desde(48, 160e6, { inductancia: 10e-9 }));
+    const b = calculado(desde(48, 160e6, { inductancia: 22e-9 }));
+    expect(a.orden).toBe(b.orden);
+    expect(a.ordenCalculado!.atenuacionSimulada).toBeCloseTo(
+      b.ordenCalculado!.atenuacionSimulada,
+      0,
+    );
+  });
+
+  it('si con 10 no llega, avisa y no calcula', () => {
+    const r = desde(125, 200e6, { banda: { f1: 140e6, f2: 160e6 } });
+    expect(r.estado === 'corte' && r.codigo).toBe('orden-excedido');
+    expect(r.estado === 'corte' && r.texto).toMatch(/ni con Orden 10/);
+  });
+
+  it('una atenuación de 0 dB es entrada inválida', () => {
+    const r = desde(0, 160e6);
+    expect(r.estado === 'corte' && r.codigo).toBe('entrada-invalida');
+  });
+});

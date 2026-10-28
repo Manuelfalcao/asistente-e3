@@ -40,6 +40,24 @@ export interface Banda {
   fbw: number;
 }
 
+// La frecuencia a la que se ajusta cada resonador acoplado y el ancho relativo de su diseño: el mapeo
+// de Cohn (Matthaei ec. 8.11-2 y 8.11-3), que no es la central geométrica.
+export interface Sintonia {
+  f0: number;
+  fbw: number;
+}
+
+// Matthaei ec. 8.11-2 y 8.11-3: ω0 = ω1 + ω2 − √((ω2 − ω1)² + ω1·ω2) y FBW = ω0/ω1 − ω0/ω2. En banda
+// angosta coincide con la central geométrica; con banda ancha mantiene los bordes y el ripple.
+export function mapeoDeCohn(f1: number, f2: number): Sintonia {
+  const f0 = f1 + f2 - Math.sqrt((f2 - f1) ** 2 + f1 * f2);
+  return { f0, fbw: f0 / f1 - f0 / f2 };
+}
+
+// Hasta dónde vale el método de los resonadores acoplados (Matthaei, ~20 %), con el FBW del mapeo de
+// Cohn: más arriba la Topología avisa fuerte y π y T no la sugieren (spec §7.7).
+export const FBW_MAXIMO_RESONADORES = 0.2;
+
 // En lugar del Orden, la atenuación mínima As (dB) que el Alumno pide a la frecuencia fs (Hz): el
 // Asistente calcula el Orden más chico que la cumple (spec §7.6).
 export interface PedidoAtenuacion {
@@ -148,6 +166,12 @@ export type CodigoCorteFiltro =
 export type CodigoAvisoFiltro =
   'perdida-plana' | 'chebyshev-par' | 'topologia-orden-par' | 'f0-geometrica';
 
+// Por qué un pasa banda π o T sugiere los resonadores acoplados, con un botón para cambiar (spec §7.4
+// y §7.7). Con la banda angosta es un aviso aparte; con la pérdida plana y con Bessel, el texto ya va
+// en el aviso o en el corte, que solo en pasa banda los nombran.
+export type SugerenciaResonadores =
+  { motivo: 'banda-angosta'; texto: string } | { motivo: 'perdida-plana' | 'bessel' };
+
 // Las cuatro escaleras de Takahasi, con la misma respuesta (spec §7.4; research/filtros-
 // terminaciones-desiguales.md §3). (a) es la de las fórmulas: g1 en serie, la fuente en la R menor y
 // la carga en la mayor. (b) es su dual, vista desde la R mayor; (c) y (d) son las mismas dos armadas
@@ -202,12 +226,21 @@ export type ResultadoOrden =
   | ({ estado: 'calculado' } & OrdenCalculado)
   | {
       estado: 'corte';
-      codigo: Extract<CodigoCorteFiltro, 'banda-pasante' | 'orden-excedido' | 'bessel-sin-solucion'>;
+      codigo: Extract<
+        CodigoCorteFiltro,
+        'banda-pasante' | 'orden-excedido' | 'bessel-sin-solucion'
+      >;
       texto: string;
     };
 
 export type ResultadoFiltro =
-  | { estado: 'corte'; codigo: CodigoCorteFiltro; texto: string }
+  | {
+      estado: 'corte';
+      codigo: CodigoCorteFiltro;
+      texto: string;
+      // Solo en Bessel con Rs ≠ RL en pasa banda.
+      sugerenciaResonadores?: SugerenciaResonadores;
+    }
   | {
       estado: 'calculado';
       tipo: TipoFiltro;
@@ -246,6 +279,8 @@ export type ResultadoFiltro =
       revision: Revision;
       referencias: readonly Referencia[];
       avisos: readonly Aviso<CodigoAvisoFiltro>[];
+      // Solo en pasa banda.
+      sugerenciaResonadores: SugerenciaResonadores | null;
       notas: readonly string[];
     };
 
@@ -926,9 +961,9 @@ export function atenuacionPrototipo(
 }
 
 // Cuánto puede quedar corta la atenuación por el redondeo de las cuentas y seguir cumpliendo.
-const TOLERANCIA_CUMPLE_DB = 1e-9;
+export const TOLERANCIA_CUMPLE_DB = 1e-9;
 
-const dbTexto = (x: number) => (x === Infinity ? '∞' : formatearValor(x, 'decibeles'));
+export const dbTexto = (x: number) => (x === Infinity ? '∞' : formatearValor(x, 'decibeles'));
 const dbLatex = (x: number) => (x === Infinity ? '\\infty' : db(x));
 const numeroOInfinito = (x: number) => (x === Infinity ? '\\infty' : numero(x));
 
@@ -986,8 +1021,7 @@ function pasoOmega(datos: DatosDeOrden, fs: number, omegaS: number): Paso {
   }
   const b = bandaDe(datos.banda);
   const separacion = '\\left|\\dfrac{f_s}{f_0} - \\dfrac{f_0}{f_s}\\right|';
-  const separacionValor =
-    `\\left|\\dfrac{${hz(fs)}}{${hz(b.f0)}} - \\dfrac{${hz(b.f0)}}{${hz(fs)}}\\right|`;
+  const separacionValor = `\\left|\\dfrac{${hz(fs)}}{${hz(b.f0)}} - \\dfrac{${hz(b.f0)}}{${hz(fs)}}\\right|`;
   const [simbolo, sustituida] =
     datos.tipo === 'pasa-banda'
       ? [`\\dfrac{${separacion}}{\\mathrm{FBW}}`, `\\dfrac{${separacionValor}}{${numero(b.fbw)}}`]
@@ -1060,7 +1094,7 @@ const FORMULA_ORDEN: Record<'butterworth' | 'chebyshev', string> = {
 };
 
 // Las fórmulas del Orden calculado, sin números, para el resultado principal.
-const formulasDeOrden = (tipo: TipoFiltro, aproximacion: Aproximacion): string[] =>
+export const formulasDeOrden = (tipo: TipoFiltro, aproximacion: Aproximacion): string[] =>
   aproximacion === 'bessel'
     ? [FORMULA_OMEGA[tipo], FORMULA_ATENUACION_BESSEL]
     : [
@@ -1092,11 +1126,13 @@ function pasoAtenuacionReal(
   };
 }
 
-// r = R mayor/R menor: con r ≥ r_min Chebyshev admite el Orden par (spec §7.4).
+// r = R mayor/R menor: con r ≥ r_min Chebyshev admite el Orden par (spec §7.4). Con parLibre, el de
+// los resonadores acoplados, sale el mínimo, par o impar (spec §7.7).
 export function ordenDesdeAtenuacion(
   datos: DatosDeOrden,
   { as, fs }: PedidoAtenuacion,
   r = 1,
+  { parLibre = false }: { parLibre?: boolean } = {},
 ): ResultadoOrden {
   const { aproximacion, ripple } = datos;
   const omegaS = frecuenciaNormalizada(datos, fs);
@@ -1117,7 +1153,7 @@ export function ordenDesdeAtenuacion(
   const { nExacto, n: minimo } = ordenMinimo(aproximacion, omegaS, ripple, as);
   // Chebyshev par se arma solo entre R distintas con r ≥ r_min: si no, el impar siguiente (spec
   // §7.3, §7.4 y §7.6).
-  const orden = ordenEfectivo(aproximacion, minimo, ripple, r);
+  const orden = parLibre ? minimo : ordenEfectivo(aproximacion, minimo, ripple, r);
   const porQueSube =
     r === 1
       ? 'con Rs = RL'
@@ -1244,10 +1280,16 @@ function frecuenciasValidas(entrada: EntradaFiltro): boolean {
   return 'f1' in banda ? banda.f1 > 0 && banda.f2 > banda.f1 : banda.f0 > 0 && banda.bw > 0;
 }
 
-const CORTE_BESSEL =
+const CORTE_BESSEL_SALIDAS =
   'Bessel con Rs ≠ RL no se calcula en π ni en T: las fórmulas de Takahasi valen para Butterworth ' +
   'y Chebyshev, y Bessel no tiene una equivalente. Podés pasar a Butterworth, o diseñar con Rs = ' +
-  'RL y adaptar después con la Calculadora de redes de adaptación.';
+  'RL y adaptar después con la Calculadora de redes de adaptación';
+const CORTE_BESSEL = `${CORTE_BESSEL_SALIDAS}.`;
+
+// En pasa banda, la tercera salida (spec §7.4).
+const CORTE_BESSEL_BANDA =
+  `${CORTE_BESSEL_SALIDAS}, o pasar a resonadores acoplados, que admiten Bessel con Rs ≠ RL y ` +
+  'además adaptan.';
 
 export function calcularFiltro(entrada: EntradaFiltro): ResultadoFiltro {
   const { tipo, aproximacion, ripple, topologia, orden, rs, rl, qBobina } = entrada;
@@ -1264,7 +1306,14 @@ export function calcularFiltro(entrada: EntradaFiltro): ResultadoFiltro {
   }
   const r = relacionDe(rs, rl);
   if (aproximacion === 'bessel' && r !== 1) {
-    return { estado: 'corte', codigo: 'bessel-terminaciones-distintas', texto: CORTE_BESSEL };
+    return tipo === 'pasa-banda'
+      ? {
+          estado: 'corte',
+          codigo: 'bessel-terminaciones-distintas',
+          texto: CORTE_BESSEL_BANDA,
+          sugerenciaResonadores: { motivo: 'bessel' },
+        }
+      : { estado: 'corte', codigo: 'bessel-terminaciones-distintas', texto: CORTE_BESSEL };
   }
 
   // El Orden calculado ya sale impar en Chebyshev cuando hace falta: no lleva el aviso de Orden par.
@@ -1306,6 +1355,8 @@ export function calcularFiltro(entrada: EntradaFiltro): ResultadoFiltro {
     ...(armada.topologia !== topologia ? [avisoTopologia(armada.topologia, topologia, rs)] : []),
     ...(banda && bandaEntrada && 'f0' in bandaEntrada ? [avisoF0(banda)] : []),
   ];
+  const sugerenciaResonadores =
+    tipo === 'pasa-banda' ? sugerenciaDeResonadores(banda!, terminaciones !== null) : null;
 
   return {
     estado: 'calculado',
@@ -1343,7 +1394,27 @@ export function calcularFiltro(entrada: EntradaFiltro): ResultadoFiltro {
     revision,
     referencias: r === 1 ? REFERENCIAS_FILTROS : [...REFERENCIAS_FILTROS, ...REFERENCIAS_TAKAHASI],
     avisos,
+    sugerenciaResonadores,
     notas: notasDe(tipo, aproximacion, terminaciones, ordenCalculado !== null),
+  };
+}
+
+// En pasa banda (spec §7.4 y §7.7): con Rs ≠ RL la sugiere siempre el aviso de pérdida plana, porque
+// los resonadores sí adaptan; con Rs = RL, solo con la banda angosta, donde el método vale y π y T
+// suelen dar valores extremos.
+function sugerenciaDeResonadores(
+  banda: Banda,
+  conPerdidaPlana: boolean,
+): SugerenciaResonadores | null {
+  if (conPerdidaPlana) return { motivo: 'perdida-plana' };
+  const { fbw } = mapeoDeCohn(banda.f1, banda.f2);
+  if (!(fbw < FBW_MAXIMO_RESONADORES)) return null;
+  return {
+    motivo: 'banda-angosta',
+    texto:
+      `Con una banda angosta (FBW = ${formatearValor(fbw * 100, 'porcentaje')}), este pasa banda ` +
+      'también se arma en resonadores acoplados: todos los resonadores con la misma L, que propone ' +
+      'el Asistente, en lugar de las L y C extremas que suelen salir en π y T.',
   };
 }
 
@@ -1396,7 +1467,7 @@ const avisoF0 = (banda: Banda): Aviso<CodigoAvisoFiltro> => ({
 // adaptación lo agrega la pantalla.
 function avisoPerdidaPlana(
   t: Terminaciones,
-  { rs, rl, ripple }: EntradaFiltro,
+  { tipo, rs, rl }: EntradaFiltro,
   p: Prototipo,
 ): Aviso<CodigoAvisoFiltro> {
   const plana = formatearValor(t.perdidaPlana, 'decibeles');
@@ -1413,7 +1484,11 @@ function avisoPerdidaPlana(
           `${formatearValor(t.perdidaMinima, 'decibeles')} en los picos del ripple a ${plana}.`
         : '') +
       ' Para filtrar y además adaptar, diseñalo con Rs = RL y adaptá con la Calculadora de redes ' +
-      'de adaptación. Una carga balanceada (cinta de 300 Ω, dipolo plegado) necesita además un ' +
+      'de adaptación' +
+      (tipo === 'pasa-banda'
+        ? ', o pasá a resonadores acoplados, que filtran y adaptan a la vez.'
+        : '.') +
+      ' Una carga balanceada (cinta de 300 Ω, dipolo plegado) necesita además un ' +
       'balun aparte.',
   };
 }
@@ -1445,10 +1520,7 @@ export const formulasPrototipo = (aproximacion: Aproximacion, r: number): readon
 
 // El retardo en continua de Bessel, τ0 = factor/ωc (spec §7.3). Solo en pasa bajos: en pasa altos
 // no hay retardo en continua, y en pasa banda y rechaza banda el retardo no es el del prototipo.
-function retardoDe(
-  entrada: EntradaFiltro,
-  p: Prototipo,
-): { valor: number | null; pasos: Paso[] } {
+function retardoDe(entrada: EntradaFiltro, p: Prototipo): { valor: number | null; pasos: Paso[] } {
   if (p.factorRetardo === null || entrada.tipo !== 'pasa-bajos' || !('fc' in entrada)) {
     return { valor: null, pasos: [] };
   }

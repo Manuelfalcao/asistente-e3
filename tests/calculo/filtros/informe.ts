@@ -1,4 +1,5 @@
 import {
+  type SugerenciaResonadores,
   type EntradaFiltro,
   type ResultadoFiltro,
   atenuacionPrototipo,
@@ -260,7 +261,8 @@ const verificacionOrden = () =>
             nombre: `Atenuación en ${HZ(fs)} con la red armada, contra la que informa el Asistente`,
             esperado: atenuacion(r, fs),
             obtenido: r.ordenCalculado!.atenuacionReal,
-            tolerancia: aproximacion === 'bessel' ? TOLERANCIA_ORDEN_BESSEL_DB : TOLERANCIA_ORDEN_DB,
+            tolerancia:
+              aproximacion === 'bessel' ? TOLERANCIA_ORDEN_BESSEL_DB : TOLERANCIA_ORDEN_DB,
             decimales: 4,
             unidad: 'dB',
           }),
@@ -320,25 +322,37 @@ const listaMarcados = (marcados: readonly (readonly [string, string])[]) =>
     .map(([nombre, nivel]) => `${nombre} ${nivel}`)
     .join(', ') || 'ninguno';
 
-// La Topología y los marcados solo entran si el caso los fija.
-function describir(r: ResultadoFiltro, conTopologia: boolean, conMarcados: boolean): string {
-  if (r.estado === 'corte') return `corte: ${r.codigo}`;
+// La Topología, los marcados y la sugerencia de resonadores acoplados solo entran si el caso los fija.
+const sugerenciaTexto = (motivo: SugerenciaResonadores['motivo'] | null) =>
+  ` · sugiere resonadores: ${motivo ?? 'no'}`;
+
+function describir(r: ResultadoFiltro, esperado: CasoComportamientoFiltro['esperado']): string {
+  const fija = (campo: string) =>
+    campo in esperado && (esperado as Record<string, unknown>)[campo] !== undefined;
+  const sugerencia = fija('resonadores')
+    ? sugerenciaTexto(r.sugerenciaResonadores?.motivo ?? null)
+    : '';
+  if (r.estado === 'corte') return `corte: ${r.codigo}${sugerencia}`;
   const marcados = listaMarcados(r.revision.marcados.map((m) => [m.nombre, m.nivel] as const));
   return (
     `Orden ${r.orden}` +
-    (conTopologia ? ` en ${r.topologia}` : '') +
+    (fija('topologia') ? ` en ${r.topologia}` : '') +
     ` · avisos: ${r.avisos.map((a) => a.codigo).join(', ') || 'ninguno'}` +
-    (conMarcados ? ` · marcados: ${marcados}` : '')
+    (fija('marcados') ? ` · marcados: ${marcados}` : '') +
+    sugerencia
   );
 }
 
 function textoEsperado({ esperado }: CasoComportamientoFiltro): string {
-  if ('corte' in esperado) return `corte: ${esperado.corte}`;
+  const sugerencia =
+    esperado.resonadores === undefined ? '' : sugerenciaTexto(esperado.resonadores);
+  if ('corte' in esperado) return `corte: ${esperado.corte}${sugerencia}`;
   return (
     `Orden ${esperado.orden}` +
     (esperado.topologia ? ` en ${esperado.topologia}` : '') +
     ` · avisos: ${esperado.avisos.join(', ') || 'ninguno'}` +
-    (esperado.marcados ? ` · marcados: ${listaMarcados(Object.entries(esperado.marcados))}` : '')
+    (esperado.marcados ? ` · marcados: ${listaMarcados(Object.entries(esperado.marcados))}` : '') +
+    sugerencia
   );
 }
 
@@ -346,11 +360,7 @@ const comportamiento = () =>
   CASOS_COMPORTAMIENTO.map((caso) =>
     enCaso(caso, () => {
       const esperado = textoEsperado(caso);
-      const obtenido = describir(
-        calcularFiltro(caso.entradas),
-        'topologia' in caso.esperado && caso.esperado.topologia !== undefined,
-        'marcados' in caso.esperado && caso.esperado.marcados !== undefined,
-      );
+      const obtenido = describir(calcularFiltro(caso.entradas), caso.esperado);
       return {
         clase: 'comportamiento',
         id: caso.id,

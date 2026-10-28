@@ -348,6 +348,74 @@ export const CASOS_COHN_RESONADORES: readonly CasoCohnResonadores[] = [
   cohn('Cohn CR4: Bessel n = 3, Qu = 100', { aproximacion: 'bessel' }, 0.06754),
 ];
 
+// El Orden calculado desde una atenuación (spec §7.7): el del prototipo y el que hace falta en la red
+// simulada, con la L propuesta. La asimetría del flanco alto le quita unos dB a la red frente al
+// prototipo (research/resonadores-acoplados.md §4): a 160 MHz, con Butterworth de Orden 3, 46,45 dB
+// contra 49,56 dB.
+export interface CasoOrdenResonadores {
+  clase: 'verificacion';
+  id: string;
+  entradas: EntradaResonadores;
+  ordenPrototipo: number;
+  ordenEsperado: number;
+  oraculo: string;
+  referencia: string;
+}
+
+const ordenCalculado = (
+  id: string,
+  entradas: Partial<EntradaResonadores>,
+  ordenPrototipo: number,
+  ordenEsperado: number,
+): CasoOrdenResonadores => ({
+  clase: 'verificacion',
+  id,
+  entradas: entradaResonadores({ inductancia: null, ...entradas }),
+  ordenPrototipo,
+  ordenEsperado,
+  oraculo: ORACULO,
+  referencia: 'spec §7.6 y §7.7; Matthaei, Young y Jones (1964), ec. 8.04-1',
+});
+
+export const CASOS_ORDEN_RESONADORES: readonly CasoOrdenResonadores[] = [
+  ordenCalculado(
+    'Orden calculado en resonadores: Butterworth 30 dB a 140 MHz, alcanza el del prototipo (4)',
+    { orden: { as: 30, fs: 140e6 } },
+    4,
+    4,
+  ),
+  ordenCalculado(
+    'Orden calculado en resonadores: Butterworth 48 dB a 160 MHz, el prototipo pide 3 y hacen falta 4',
+    { orden: { as: 48, fs: 160e6 } },
+    3,
+    4,
+  ),
+  ordenCalculado(
+    'Orden calculado en resonadores: Butterworth 48 dB a 160 MHz, de 50 a 300 Ω',
+    { orden: { as: 48, fs: 160e6 }, rl: 300 },
+    3,
+    4,
+  ),
+  ordenCalculado(
+    'Orden calculado en resonadores: Chebyshev 0,5 dB 70 dB a 160 MHz sale par (4)',
+    { ...CHEBYSHEV_05, orden: { as: 70, fs: 160e6 } },
+    4,
+    4,
+  ),
+  ordenCalculado(
+    'Orden calculado en resonadores: Chebyshev 0,5 dB 72 dB a 160 MHz, el prototipo pide 4 y hacen falta 5',
+    { ...CHEBYSHEV_05, orden: { as: 72, fs: 160e6 } },
+    4,
+    5,
+  ),
+  ordenCalculado(
+    'Orden calculado en resonadores: Butterworth 30 dB a 130 MHz, por debajo de la banda',
+    { orden: { as: 30, fs: 130e6 } },
+    2,
+    2,
+  ),
+];
+
 // --- Comportamiento ------------------------------------------------------------------------------
 
 export interface CasoComportamientoResonadores {
@@ -493,5 +561,43 @@ export const CASOS_COMPORTAMIENTO_RESONADORES: readonly CasoComportamientoResona
     { orden: 3, avisos: ['trimmer'], divisor: false },
     'spec §7.7 y §13.5',
     { bandera: planB(DEDUCCION_DIVISOR), opciones: { planBDivisor: true } },
+  ),
+  comportamiento(
+    'Orden calculado en resonadores: el prototipo alcanza, sin aviso de asimetría',
+    { orden: { as: 30, fs: 140e6 }, inductancia: null },
+    { orden: 4, avisos: ['trimmer'] },
+    'spec §7.7',
+  ),
+  comportamiento(
+    'Orden calculado en resonadores: sube de 3 a 4 por la asimetría del flanco alto y avisa',
+    { orden: { as: 48, fs: 160e6 }, inductancia: null },
+    { orden: 4, avisos: ['orden-por-asimetria', 'trimmer'] },
+    'spec §7.7: "el prototipo pedía n = 3, pero por la asimetría del flanco alto hace falta n = 4"',
+  ),
+  comportamiento(
+    'Orden calculado en resonadores: Chebyshev, plan B, sale impar',
+    { ...CHEBYSHEV_05, orden: { as: 70, fs: 160e6 }, inductancia: null },
+    { orden: 5, avisos: ['trimmer'] },
+    'spec §7.7 y §13.5',
+    { bandera: planB(DEDUCCION_PAR), opciones: { planBChebyshevPar: true } },
+  ),
+  comportamiento(
+    'Orden calculado en resonadores: el prototipo pide 10 y la red simulada no llega con 10',
+    // 140–160 MHz a 200 MHz: el prototipo de Orden 10 da 128,7 dB y la red, unos 105 dB.
+    { orden: { as: 125, fs: 200e6 }, banda: { f1: 140e6, f2: 160e6 }, inductancia: null },
+    { corte: 'orden-excedido' },
+    'spec §7.7 y §7.10',
+  ),
+  comportamiento(
+    'Orden calculado en resonadores: el prototipo ya pide más de 10',
+    { orden: { as: 200, fs: 160e6 }, inductancia: null },
+    { corte: 'orden-excedido' },
+    'spec §7.6 y §7.10',
+  ),
+  comportamiento(
+    'Orden calculado en resonadores: fs dentro de la banda no tiene solución',
+    { orden: { as: 30, fs: 146e6 }, inductancia: null },
+    { corte: 'banda-pasante' },
+    'spec §7.6 y §7.10',
   ),
 ];

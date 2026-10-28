@@ -649,12 +649,14 @@ n resonadores LC paralelo en derivación, todos con la misma L, unidos por **Cap
 
 - **Orden par libre** en Chebyshev, ingresado o calculado (sale el mínimo, par o impar). El capacitor de salida absorbe el g(n+1) ≠ 1. Una nota indica que en la Frecuencia de sintonía la pérdida es igual al ripple. **Es una Deducción propia a aprobar** (sección 13.5); el plan B sube el par al impar, como en π y T.
 - **Bessel con R_s ≠ R_L:** el prototipo se orienta siempre con el g grande del lado de la R mayor, sin preguntar (con R_s = R_L, la orientación de tabla). Una nota corta lo explica y el detalle va en los pasos intermedios.
-- **Orden calculado desde una atenuación:** después de calcularlo con el prototipo, se simula la red real (ABCD, componentes ideales; no depende de la L) en fs. Si no llega, se sube n de a uno, y el resultado muestra la atenuación simulada con el aviso *"el prototipo pedía n = 3, pero por la asimetría del flanco alto hace falta n = 4"*. Si con n = 10 no llega, se avisa y no se calcula.
+- **Orden calculado desde una atenuación:** después de calcularlo con el prototipo, se simula la red real (ABCD, componentes ideales; no depende de la L) en fs. Si no llega, se sube n de a uno (de a dos con el plan B del Chebyshev par, que sigue impar), y el resultado muestra la atenuación simulada con el aviso *"el prototipo pedía n = 3, pero por la asimetría del flanco alto hace falta n = 4"*. Si con n = 10 no llega, se avisa y no se calcula.
+  - **Ticket 47:** el n nunca queda por debajo del Orden del prototipo. Abajo de la banda la red atenúa más que el prototipo (a 140 MHz, en 144–148 MHz, Butterworth de Orden 3 da 30,2 dB contra 29,1 dB), pero el Orden sale del prototipo y la red solo lo sube. La red se simula con la L que se usa (la propuesta para cada n, o la del Alumno); de 10 a 22 nH la atenuación en fs cambia décimas de dB. Si al subir el n la L no arma el filtro, el corte lo dice con el n que hacía falta.
 - **Avisos por FBW** (nunca bloquean):
   - hasta 10 %: ninguno;
   - entre 10 y 20 %: informativo, la atenuación por encima de f2 es menor que la del prototipo por la asimetría propia de la Topología;
   - más de 20 %: fuerte, fuera del rango de validez del método (Matthaei, ~20 %), y los bordes pueden correrse.
 - **Sugerencia de Topología:** en pasa banda π o T con FBW < 20 %, la Calculadora sugiere resonadores acoplados con un botón para cambiar. Por encima de 20 % no la sugiere.
+  - **Ticket 47:** el FBW es el del mapeo de Cohn, el mismo del aviso fuerte de esta Topología: con R_s = R_L la sugerencia por banda angosta no lleva a un filtro que avise que está fuera de rango (de 88 a 108 MHz da 20,3 % y no se sugiere). Con R_s ≠ R_L, en cambio, la sugerencia va en el aviso de pérdida plana o en el corte de Bessel con cualquier FBW, como pide la sección 7.4: es la única Topología que adapta, y si la banda es ancha el resultado de resonadores lo dice con su aviso fuerte. No se repite aparte.
 
 **Capacitores de sintonía**
 
