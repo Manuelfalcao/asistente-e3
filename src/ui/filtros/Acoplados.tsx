@@ -9,9 +9,8 @@ import { formatearValor } from '../../entrada/formato';
 import type { Escalera } from '../esquema';
 import { BotonPaseDe } from '../comun/BotonPase';
 import { Esquema } from '../comun/Esquema';
-import { Formula } from '../comun/Formula';
 import { Aviso } from '../comun/Franjas';
-import { Cita, FormaResultado, Pasos } from '../comun/Resultado';
+import { FormaResultado, FormulasYFuentes, Pasos } from '../comun/Resultado';
 import { Rotulo } from '../comun/Rotulo';
 import { Desplegable, TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
 import type { Pase } from '../pases';
@@ -131,6 +130,27 @@ export function ResultadoAcoplados({
         <TarjetaResultado
           titulo={titulo}
           destacada
+          desplegables={
+            <Desplegable titulo="Frecuencias de la banda">
+              <ValorResultado nombre="f1" valor={frecuencia(r.banda.f1)} detalle="borde bajo" />
+              <ValorResultado nombre="f2" valor={frecuencia(r.banda.f2)} detalle="borde alto" />
+              <ValorResultado
+                nombre="f0"
+                valor={sintonia(r.banda.f0)}
+                detalle={
+                  <>
+                    central geométrica √(f<sub>1</sub>·f<sub>2</sub>): no es la de sintonía
+                  </>
+                }
+              />
+              <ValorResultado
+                nombre="BW"
+                valor={frecuencia(r.banda.bw)}
+                detalle={`ancho de banda; FBW = ${formatearValor(r.sintonia.fbw * 100, 'porcentaje')}`}
+              />
+            </Desplegable>
+          }
+          formulas={<FormulasYFuentes formulas={r.formulas} referencias={r.referencias} />}
           pasos={<Pasos pasos={r.pasos} />}
           motivos={r.revision.marcados.map((m) => ({ nivel: m.nivel, texto: m.motivo }))}
           sugerencia={r.revision.sugerencia ?? undefined}
@@ -140,22 +160,6 @@ export function ResultadoAcoplados({
             nombre="Frecuencia de sintonía"
             valor={sintonia(r.sintonia.f0)}
             detalle="ajustá cada resonador a esta frecuencia (mapeo de Cohn)"
-          />
-          <ValorResultado
-            nombre="f0"
-            valor={sintonia(r.banda.f0)}
-            detalle={
-              <>
-                central geométrica √(f<sub>1</sub>·f<sub>2</sub>): no es la de sintonía
-              </>
-            }
-          />
-          <ValorResultado nombre="f1" valor={frecuencia(r.banda.f1)} detalle="borde bajo" />
-          <ValorResultado nombre="f2" valor={frecuencia(r.banda.f2)} detalle="borde alto" />
-          <ValorResultado
-            nombre="BW"
-            valor={frecuencia(r.banda.bw)}
-            detalle={`ancho de banda; FBW = ${formatearValor(r.sintonia.fbw * 100, 'porcentaje')}`}
           />
           {r.ordenCalculado && (
             <ValorResultado
@@ -232,14 +236,6 @@ export function ResultadoAcoplados({
             rotulos={<Rotulo tipo="estimacion" />}
             detalle={`de Cohn en la Frecuencia de sintonía, con Qu = ${formatearValor(qBobina, 'numero')}`}
           />
-          <Desplegable titulo="Fórmulas">
-            <div class="formulas">
-              {r.formulas.map((f) => (
-                <Formula key={f} latex={f} />
-              ))}
-            </div>
-          </Desplegable>
-          <Cita referencias={r.referencias} />
         </TarjetaResultado>
       }
       notas={r.notas}

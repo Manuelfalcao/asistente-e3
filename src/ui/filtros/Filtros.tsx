@@ -1,5 +1,6 @@
 import { useEffect } from 'preact/hooks';
 import {
+  type Banda,
   type DatosDeOrden,
   type ElementoFiltro,
   type EntradaFiltro,
@@ -26,9 +27,8 @@ import {
   useOpcionGuardada,
 } from '../comun/CampoEntrada';
 import { Esquema } from '../comun/Esquema';
-import { Formula } from '../comun/Formula';
 import { Aviso } from '../comun/Franjas';
-import { Cita, FormaResultado, Pasos } from '../comun/Resultado';
+import { FormaResultado, FormulasYFuentes, Pasos } from '../comun/Resultado';
 import { Rotulo } from '../comun/Rotulo';
 import { Desplegable, TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
 import type { Pase } from '../pases';
@@ -429,6 +429,31 @@ function AtenuacionReal({ orden }: { orden: OrdenCalculado }) {
   );
 }
 
+// f1, f2, f0 y BW de pasa banda y rechaza banda, cerradas debajo de los componentes: se ingresaron
+// o salen de lo ingresado.
+function FrecuenciasDeLaBanda({ banda }: { banda: Banda }) {
+  return (
+    <>
+      <ValorResultado nombre="f1" valor={frecuencia(banda.f1)} detalle="borde bajo" />
+      <ValorResultado nombre="f2" valor={frecuencia(banda.f2)} detalle="borde alto" />
+      <ValorResultado
+        nombre="f0"
+        valor={frecuencia(banda.f0)}
+        detalle={
+          <>
+            central geométrica √(f<sub>1</sub>·f<sub>2</sub>)
+          </>
+        }
+      />
+      <ValorResultado
+        nombre="BW"
+        valor={frecuencia(banda.bw)}
+        detalle={`ancho de banda; FBW = ${formatearValor(banda.fbw * 100, 'porcentaje')}`}
+      />
+    </>
+  );
+}
+
 const omegaTexto = (x: number) => (x === Infinity ? '∞' : formatearValor(x, 'numero'));
 
 type ResultadoCalculado = Extract<ResultadoFiltro, { estado: 'calculado' }>;
@@ -520,31 +545,19 @@ function Resultado({
         <TarjetaResultado
           titulo={titulo}
           destacada
+          desplegables={
+            r.banda && (
+              <Desplegable titulo="Frecuencias de la banda">
+                <FrecuenciasDeLaBanda banda={r.banda} />
+              </Desplegable>
+            )
+          }
+          formulas={<FormulasYFuentes formulas={r.formulas} referencias={r.referencias} />}
           pasos={<Pasos pasos={r.pasos} />}
           motivos={r.revision.marcados.map((m) => ({ nivel: m.nivel, texto: m.motivo }))}
           sugerencia={r.revision.sugerencia ?? undefined}
         >
           <Esquema escalera={escalera(r.elementos, r.resonadores)} />
-          {r.banda && (
-            <>
-              <ValorResultado nombre="f1" valor={frecuencia(r.banda.f1)} detalle="borde bajo" />
-              <ValorResultado nombre="f2" valor={frecuencia(r.banda.f2)} detalle="borde alto" />
-              <ValorResultado
-                nombre="f0"
-                valor={frecuencia(r.banda.f0)}
-                detalle={
-                  <>
-                    central geométrica √(f<sub>1</sub>·f<sub>2</sub>)
-                  </>
-                }
-              />
-              <ValorResultado
-                nombre="BW"
-                valor={frecuencia(r.banda.bw)}
-                detalle={`ancho de banda; FBW = ${formatearValor(r.banda.fbw * 100, 'porcentaje')}`}
-              />
-            </>
-          )}
           {r.ordenCalculado && <AtenuacionReal orden={r.ordenCalculado} />}
           {r.elementos.map((e, i) => {
             const marca = nivel(e);
@@ -585,15 +598,6 @@ function Resultado({
               detalle={`de Cohn en la banda pasante, con Qu = ${formatearValor(entrada.qBobina, 'numero')}`}
             />
           )}
-          {/* Cerradas, como los pasos: para no cargar la primera vista. */}
-          <Desplegable titulo="Fórmulas">
-            <div class="formulas">
-              {r.formulas.map((f) => (
-                <Formula key={f} latex={f} />
-              ))}
-            </div>
-          </Desplegable>
-          <Cita referencias={r.referencias} />
         </TarjetaResultado>
       }
       notas={r.notas}

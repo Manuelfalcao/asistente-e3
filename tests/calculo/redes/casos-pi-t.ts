@@ -91,7 +91,7 @@ export const CASOS_REFERENCIA_PI_T: readonly CasoReferenciaPiT[] = [
       { nombre: 'X_s1', impreso: '100', unidad: 'Ω', medido: { de: 'reactancia', indice: 0 } },
       { nombre: 'Q₂', impreso: '4,4', unidad: '', medido: { de: 'q', seccion: 1 } },
       {
-        nombre: 'X_p1 ∥ X_p2',
+        nombre: 'X_p1 || X_p2',
         impreso: '70,2',
         unidad: 'Ω',
         medido: { de: 'reactancia', indice: 1 },

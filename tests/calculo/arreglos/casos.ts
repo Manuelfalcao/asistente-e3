@@ -1,6 +1,7 @@
 import {
   type EntradaArreglos,
   MAGNITUD,
+  NOTA_VHF,
   POR_DEFECTO,
   type ResultadoArreglos,
 } from '../../../src/calculo/arreglos/arreglos';
@@ -91,7 +92,9 @@ export const CASO_FORMAS = {
 
 // --- Verificación ---------------------------------------------------------------------------------
 
-const BASE = { ...POR_DEFECTO };
+// Los casos se escribieron con el umbral del 1 %, que deja ver las dos reglas de orden con pocas
+// filas; el 5 % por defecto se prueba aparte.
+const BASE = { ...POR_DEFECTO, umbral: 0.01 };
 
 export const ORACULO_FUERZA_BRUTA =
   'tests/oraculos/arreglos.ts: fuerza bruta sobre todas las redes de hasta 4 componentes';
@@ -164,15 +167,15 @@ export const CASOS_TOP10: readonly CasoTop10[] = [
   top10ConInventario('por inclusión, con 0,5 pF y 4,3 pF', 4.8e-12, INCLUSION_FUERA_DE_SERIE),
 ];
 
-// La cuenta a mano de research §5: 39 pF J ∥ 8,2 pF C con todos al mínimo y todos al máximo.
+// La cuenta a mano de research §5: 39 pF J || 8,2 pF C con todos al mínimo y todos al máximo.
 //   mínimo: 39·0,95 + (8,2 − 0,25) = 37,05 + 7,95 = 45,00 pF
 //   máximo: 39·1,05 + (8,2 + 0,25) = 40,95 + 8,45 = 49,40 pF
 //   respecto de 47,2 pF: −2,2/47,2 = −4,661 % y +2,2/47,2 = +4,661 %, o sea ±4,7 %.
 export const CASO_TOLERANCIA_47 = {
   clase: 'verificacion' as const,
-  id: 'Tolerancia del arreglo de 47 pF = 39 pF J ∥ 8,2 pF C',
+  id: 'Tolerancia del arreglo de 47 pF = 39 pF J || 8,2 pF C',
   entrada: { ...BASE, componente: 'capacitor', buscado: 47e-12, serie: 'E12' } as EntradaArreglos,
-  conexion: '8,2 pF ∥ 39 pF',
+  conexion: '8,2 pF || 39 pF',
   esperado: { minimo: '45,00', maximo: '49,40', abajo: '4,7', arriba: '4,7' },
   tolerancia: MEDIA_UNIDAD,
   oraculo: 'Cuenta a mano, en los pasos "Cuenta a mano" del caso',
@@ -317,20 +320,18 @@ export const CASOS_COMPORTAMIENTO: readonly CasoComportamiento[] = [
     clase: 'comportamiento',
     id: 'Nota de VHF: 37,3 pF con E12',
     entrada: capacitor(37.3e-12),
-    esperado: 'con nota todas las filas de 3 o 4 componentes y ninguna de 1 o 2',
-    observar: (r) => {
-      const bien = r.filas.every((f) => (f.nota !== null) === f.componentes >= 3);
-      return bien
-        ? 'con nota todas las filas de 3 o 4 componentes y ninguna de 1 o 2'
-        : r.filas.map((f) => `${f.componentes}: ${f.nota ? 'nota' : '—'}`).join(', ');
-    },
+    esperado: 'una sola vez, en las notas del pie: hay filas de 3 o 4 componentes',
+    observar: (r) =>
+      r.notas.filter((n) => n === NOTA_VHF).length === 1 && r.filas.some((f) => f.componentes >= 3)
+        ? 'una sola vez, en las notas del pie: hay filas de 3 o 4 componentes'
+        : `notas: ${r.notas.join(' / ') || '—'}`,
     referencia: 'spec §8.5',
   },
   {
     clase: 'comportamiento',
     id: 'Inventario por exclusión: 47 pF sin el 47 pF ni el 39 pF',
     entrada: capacitor(47e-12, { inventario: SIN_47_Y_39 }),
-    esperado: '10 pF ∥ 10 pF ∥ 27 pF; ninguna fila usa un Valor excluido',
+    esperado: '10 pF || 10 pF || 27 pF; ninguna fila usa un Valor excluido',
     observar: (r) => {
       const usaExcluido = r.filas.some((f) => /(^|[ (])(47|39) pF/.test(f.conexion));
       return `${primera(r).conexion}; ${usaExcluido ? 'usa un Valor excluido' : 'ninguna fila usa un Valor excluido'}`;
@@ -370,7 +371,7 @@ export const CASOS_COMPORTAMIENTO: readonly CasoComportamiento[] = [
     clase: 'comportamiento',
     id: 'Inventario por inclusión: 4,8 pF con 0,5 pF, 4,3 pF y otros fuera de la serie',
     entrada: capacitor(4.8e-12, { inventario: INCLUSION_FUERA_DE_SERIE }),
-    esperado: '0,5 pF ∥ 4,3 pF; Error del arreglo 0 %',
+    esperado: '0,5 pF || 4,3 pF; Error del arreglo 0 %',
     observar: (r) =>
       `${primera(r).conexion}; Error del arreglo ${formatearErrorRelativo(primera(r).error * 100)}`,
     referencia: 'spec §8.2 (por inclusión): 0,5 + 4,3 = 4,8 pF en paralelo',
@@ -388,7 +389,7 @@ export const CASOS_COMPORTAMIENTO: readonly CasoComportamiento[] = [
         ],
       },
     }),
-    esperado: '10 pF ∥ 22 pF: [31,68 pF; 32,32 pF]',
+    esperado: '10 pF || 22 pF: [31,68 pF; 32,32 pF]',
     observar: rango,
     referencia:
       'spec §8.2 y §8.5: mínimo 22 · 0,99 + (10 − 0,1) = 21,78 + 9,90 = 31,68 pF; ' +

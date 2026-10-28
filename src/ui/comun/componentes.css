@@ -115,6 +115,10 @@
   margin-top: var(--esp-3);
   border-top: 1px solid var(--borde);
 }
+/* Varios desplegables seguidos quedan pegados, separados solo por la línea. */
+.pasos + .pasos {
+  margin-top: 0;
+}
 .pasos > summary {
   display: flex;
   align-items: center;
@@ -603,23 +607,8 @@
   margin-top: var(--esp-2);
 }
 
-.potencia,
-.valores-comerciales {
+.potencia {
   margin-top: var(--esp-3);
-}
-.lista-comercial {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.lista-comercial > li {
-  border-top: 1px solid var(--borde);
-}
-.opcion-titulo {
-  margin: var(--esp-2) 0 0;
-  font-size: var(--tam-3);
-  font-weight: 600;
-  color: var(--texto-suave);
 }
 
 /* ---------- Redes de adaptación ---------- */
@@ -884,14 +873,24 @@
   gap: var(--esp-1) var(--esp-3);
   align-items: baseline;
 }
-.fila-arreglo .tolerancia,
-.fila-arreglo .nota {
-  flex-basis: 100%;
+/* El Error del arreglo, en una píldora: es lo que se compara entre filas. */
+.fila-arreglo .error {
+  padding: 0.1em 0.6em;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-pildora);
+  background: var(--superficie-2);
   font-size: var(--tam-3);
   color: var(--texto-suave);
 }
-.fila-arreglo .nota {
-  font-style: italic;
+.fila-arreglo .error .valor {
+  font-size: var(--tam-4);
+  font-weight: 700;
+  color: var(--texto);
+}
+.fila-arreglo .tolerancia {
+  flex-basis: 100%;
+  font-size: var(--tam-3);
+  color: var(--texto-suave);
 }
 .pasos-subtitulo {
   margin: var(--esp-4) 0 var(--esp-2);

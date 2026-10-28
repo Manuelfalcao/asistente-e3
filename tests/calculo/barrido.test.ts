@@ -55,7 +55,7 @@ describe('respuesta de una red en escalera', () => {
       { rs: 100, rl: 100, elementos: [{ componente: 'C', posicion: 'derivacion', valor: c }] },
       f,
     );
-    // 100 ∥ −j100 = 50 − j50
+    // 100 || −j100 = 50 − j50
     expect(r.zEntrada.re).toBeCloseTo(50, 9);
     expect(r.zEntrada.im).toBeCloseTo(-50, 9);
   });

@@ -49,6 +49,30 @@ export function Cita({ referencias }: { referencias: readonly Referencia[] }) {
   );
 }
 
+// El contenido del desplegable de fórmulas: las fórmulas, lo que las acompañe (como la nota de qué
+// fórmula se usó) y la referencia de donde salen.
+export function FormulasYFuentes({
+  formulas,
+  referencias,
+  children,
+}: {
+  formulas: readonly string[];
+  referencias: readonly Referencia[];
+  children?: ComponentChildren;
+}) {
+  return (
+    <>
+      <div class="formulas">
+        {formulas.map((f) => (
+          <Formula key={f} latex={f} />
+        ))}
+      </div>
+      {children}
+      <Cita referencias={referencias} />
+    </>
+  );
+}
+
 // El contenido del desplegable de pasos intermedios: qué se calcula, la fórmula sustituida y, si
 // hay, de dónde salen sus números.
 export function Pasos({ pasos }: { pasos: readonly Paso[] }) {

@@ -151,7 +151,7 @@ const FUENTE_ESL =
   `ESL de ${ESL}: radial de paso 2,54 mm con terminales de 3 mm, sobre la ESL medida por ` +
   'KYOCERA AVX (Cain, Parasitic Inductance of Multilayer Ceramic Capacitors).';
 const FUENTE_R =
-  `Modelo (R + jωLs) ∥ Cp de KOA (KDST_TN-010); Ls = ${LS} y Cp = ${CP} del axial de ` +
+  `Modelo (R + jωLs) || Cp de KOA (KDST_TN-010); Ls = ${LS} y Cp = ${CP} del axial de ` +
   'película de Brinson (documentación de Qucs, ajuste a medición).';
 
 function incertidumbre(c: Componente, delta: number, magnitud: Magnitud): Chequeo {

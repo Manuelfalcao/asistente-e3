@@ -56,10 +56,10 @@ export interface EntradaArreglos {
   toleranciaChicos: number;
 }
 
-// Los valores por defecto de §8.1: E12, umbral del 1 %, J (±5 %) y C (±0,25 pF).
+// Los valores por defecto de §8.1: E12, umbral del 5 %, J (±5 %) y C (±0,25 pF).
 export const POR_DEFECTO = {
   serie: 'E12' as SerieE,
-  umbral: 0.01,
+  umbral: 0.05,
   tolerancia: 0.05,
   toleranciaChicos: 0.25e-12,
 };
@@ -89,7 +89,7 @@ export const valoresDeBusqueda = (entrada: EntradaArreglos): number[] =>
   inventarioDeBusqueda(entrada).map((v) => v.valor);
 
 export interface FilaArreglo {
-  // "(27 pF serie 68 pF) ∥ 15 pF"
+  // "(27 pF serie 68 pF) || 15 pF"
   conexion: string;
   valor: number;
   // Fracción con signo: (valor − buscado)/buscado.
@@ -99,8 +99,6 @@ export interface FilaArreglo {
   repetidos: string | null;
   // El peor caso: la red con todos los componentes al mínimo y con todos al máximo.
   tolerancia: { minimo: number; maximo: number };
-  // La nota de VHF de los Arreglos de 3 o 4 componentes.
-  nota: string | null;
   // El Error del arreglo y la cuenta de la Tolerancia del arreglo.
   pasos: readonly Paso[];
 }
@@ -115,6 +113,8 @@ export interface ResultadoArreglos {
   pasos: readonly Paso[];
   revision: Revision;
   referencias: readonly Referencia[];
+  // Las del pie: la de VHF, si alguna fila tiene 3 o 4 componentes.
+  notas: readonly string[];
 }
 
 export const NOTA_VHF = 'En VHF cada componente y cada soldadura agregan L y C parásitas.';
@@ -176,7 +176,6 @@ export function calcularArreglos(entrada: EntradaArreglos): ResultadoArreglos {
       componentes: a.componentes,
       repetidos: repetidos(red, valores, convencion.magnitud),
       tolerancia,
-      nota: a.componentes >= 3 ? NOTA_VHF : null,
       pasos: pasosDeFila(red, a.valor, error, tolerancia, buscado, inventario, convencion),
     };
   });
@@ -202,6 +201,7 @@ export function calcularArreglos(entrada: EntradaArreglos): ResultadoArreglos {
     ],
     revision,
     referencias: REFERENCIAS_ARREGLOS,
+    notas: filas.some((f) => f.componentes >= 3) ? [NOTA_VHF] : [],
   };
 }
 
@@ -220,7 +220,7 @@ const extremo = (v: ValorInventario, signo: -1 | 1) => Math.max(0, v.valor + sig
 // --- Cómo se escribe un Arreglo ---------------------------------------------------------------------
 
 // Primero las subredes, de más a menos componentes, y después los componentes sueltos de menor a
-// mayor: "(27 pF serie 68 pF) ∥ 15 pF", "39 pF serie 270 pF".
+// mayor: "(27 pF serie 68 pF) || 15 pF", "39 pF serie 270 pF".
 function ordenarParaMostrar(red: Red, valores: readonly number[]): Red {
   if (!('op' in red)) return red;
   const hijos = red.hijos.map((h) => ordenarParaMostrar(h, valores));
@@ -233,10 +233,10 @@ function ordenarParaMostrar(red: Red, valores: readonly number[]): Red {
   return { op: red.op, hijos };
 }
 
-// Con "serie" y "∥" y paréntesis, nunca "+": con capacitores se leería como una suma (spec §8.5).
+// Con "serie" y "||" y paréntesis, nunca "+": con capacitores se leería como una suma (spec §8.5).
 function conexion(red: Red, valores: readonly number[], c: Convencion, raiz: boolean): string {
   if (!('op' in red)) return formatearValor(valores[red.hoja], c.magnitud);
-  const union = red.op === c.serie ? ' serie ' : ' ∥ ';
+  const union = red.op === c.serie ? ' serie ' : ' || ';
   const texto = red.hijos.map((h) => conexion(h, valores, c, false)).join(union);
   return raiz ? texto : `(${texto})`;
 }

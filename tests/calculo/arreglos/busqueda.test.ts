@@ -51,7 +51,7 @@ describe('formas de conexión', () => {
 });
 
 describe('valor de una red', () => {
-  it('suma y suma recíproca: 39 ∥ 8,2 con capacitores es la suma', () => {
+  it('suma y suma recíproca: 39 || 8,2 con capacitores es la suma', () => {
     const red = { op: 'suma' as const, hijos: [{ hoja: 0 }, { hoja: 1 }] };
     expect(valorDeRed(red, (i) => [39, 8.2][i])).toBeCloseTo(47.2, 12);
   });

@@ -22,8 +22,7 @@ import {
   useCampoEntrada,
   useOpcionGuardada,
 } from '../comun/CampoEntrada';
-import { Formula } from '../comun/Formula';
-import { Cita, FormaResultado, Pasos } from '../comun/Resultado';
+import { FormaResultado, FormulasYFuentes, Pasos } from '../comun/Resultado';
 import { Rotulo } from '../comun/Rotulo';
 import { TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
 import { type PaseDeValor, componenteDelPase, precargaDe } from '../pases';
@@ -249,8 +248,9 @@ function BloqueInventario({
   );
 }
 
-// Primero la tarjeta de los 10 Arreglos, con el valor buscado y su rótulo; después, la de las
-// fórmulas, la referencia y los pasos intermedios de la fila elegida.
+// La tarjeta de los 10 Arreglos, con el valor buscado y su rótulo y, en desplegables, las fórmulas
+// con sus fuentes y los pasos intermedios de la fila elegida; al pie, la nota de VHF si alguna fila
+// tiene 3 o 4 componentes.
 function Resultado({
   resultado,
   calculando,
@@ -277,6 +277,20 @@ function Resultado({
         <TarjetaResultado
           titulo={titulo}
           destacada
+          formulas={
+            <FormulasYFuentes formulas={resultado.formulas} referencias={resultado.referencias} />
+          }
+          pasos={
+            <>
+              <Pasos pasos={resultado.pasos} />
+              {fila && (
+                <>
+                  <h4 class="pasos-subtitulo">Fila elegida: {fila.conexion}</h4>
+                  <Pasos pasos={fila.pasos} />
+                </>
+              )}
+            </>
+          }
           motivos={revision.marcados.map((m) => ({ nivel: m.nivel, texto: m.motivo }))}
         >
           <ValorResultado
@@ -305,29 +319,7 @@ function Resultado({
           </p>
         </TarjetaResultado>
       }
-      tarjetas={
-        <TarjetaResultado
-          titulo="Fórmulas y referencias"
-          pasos={
-            <>
-              <Pasos pasos={resultado.pasos} />
-              {fila && (
-                <>
-                  <h4 class="pasos-subtitulo">Fila elegida: {fila.conexion}</h4>
-                  <Pasos pasos={fila.pasos} />
-                </>
-              )}
-            </>
-          }
-        >
-          <div class="formulas">
-            {resultado.formulas.map((f) => (
-              <Formula key={f} latex={f} />
-            ))}
-          </div>
-          <Cita referencias={resultado.referencias} />
-        </TarjetaResultado>
-      }
+      notas={resultado.notas}
     />
   );
 }
@@ -355,7 +347,9 @@ function FilaResultado({
         <span class="conexion">{fila.conexion}</span>
         <span class="datos">
           <span class="valor">{v(fila.valor)}</span>
-          <span class="valor error">{formatearErrorRelativo(fila.error * 100)}</span>
+          <span class="error">
+            Error <span class="valor">{formatearErrorRelativo(fila.error * 100)}</span>
+          </span>
           <span>
             {fila.componentes} {fila.componentes === 1 ? 'componente' : 'componentes'}
           </span>
@@ -365,7 +359,6 @@ function FilaResultado({
           Tolerancia del arreglo: [{v(minimo)}; {v(maximo)}] ({relativa(minimo)} /{' '}
           {relativa(maximo)})
         </span>
-        {fila.nota && <span class="nota">{fila.nota}</span>}
       </label>
     </li>
   );

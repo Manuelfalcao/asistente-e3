@@ -16,6 +16,7 @@ import {
   calcularRedPiT,
   qMinimoDe,
 } from '../../calculo/redes/redes-pi-t';
+import type { Referencia } from '../../calculo/comun/resultado';
 import { mensajeDeResultados } from '../../entrada/campo';
 import { formatearValor } from '../../entrada/formato';
 import type { Escalera } from '../esquema';
@@ -29,9 +30,8 @@ import {
   useOpcionGuardada,
 } from '../comun/CampoEntrada';
 import { Esquema } from '../comun/Esquema';
-import { Formula } from '../comun/Formula';
 import { Aviso } from '../comun/Franjas';
-import { Cita, FormaResultado, Pasos } from '../comun/Resultado';
+import { FormaResultado, FormulasYFuentes, Pasos } from '../comun/Resultado';
 import { Rotulo } from '../comun/Rotulo';
 import { Desplegable, TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
 import { type Pase, type PaseARedes, paseDeComponente, precargaDe, precargaDeF0 } from '../pases';
@@ -198,6 +198,7 @@ function Resultado({
               titulo={TITULO_L[v.filtrado]}
               variante={v}
               f0={entrada.f0}
+              referencias={resultado.referencias}
               onPasar={onPasar}
               q={<ValorResultado nombre="Q" valor={formatearValor(v.q, 'numero')} />}
             />
@@ -205,16 +206,19 @@ function Resultado({
         </div>
       }
       tarjetas={
-        <TarjetaResultado titulo={titulo} destacada pasos={<Pasos pasos={resultado.pasos} />}>
+        <TarjetaResultado
+          titulo={titulo}
+          destacada
+          formulas={
+            <FormulasYFuentes formulas={[resultado.formula]} referencias={resultado.referencias} />
+          }
+          pasos={<Pasos pasos={resultado.pasos} />}
+        >
           <ValorResultado
             nombre="Q"
             valor={formatearValor(resultado.q, 'numero')}
             detalle="Lo fijan Rs y RL: la red L no tiene otro"
           />
-          <div class="formulas">
-            <Formula latex={resultado.formula} />
-          </div>
-          <Cita referencias={resultado.referencias} />
         </TarjetaResultado>
       }
       notas={resultado.notas}
@@ -302,6 +306,7 @@ function ResultadoPiT({
                   titulo={TITULO_PI_T[v.tipo]}
                   variante={v}
                   f0={entrada.f0}
+                  referencias={resultado.referencias}
                   onPasar={onPasar}
                   q={
                     <>
@@ -337,7 +342,17 @@ function ResultadoPiT({
             </div>
           }
           tarjetas={
-            <TarjetaResultado titulo={titulo} destacada pasos={<Pasos pasos={resultado.pasos} />}>
+            <TarjetaResultado
+              titulo={titulo}
+              destacada
+              formulas={
+                <FormulasYFuentes
+                  formulas={resultado.formulas}
+                  referencias={resultado.referencias}
+                />
+              }
+              pasos={<Pasos pasos={resultado.pasos} />}
+            >
               <ValorResultado
                 nombre="Q de diseño"
                 valor={formatearValor(resultado.q, 'numero')}
@@ -352,12 +367,6 @@ function ResultadoPiT({
                 valor={ohms(resultado.resistenciaVirtual)}
                 detalle="Resistencia virtual"
               />
-              <div class="formulas">
-                {resultado.formulas.map((f) => (
-                  <Formula key={f} latex={f} />
-                ))}
-              </div>
-              <Cita referencias={resultado.referencias} />
             </TarjetaResultado>
           }
           notas={resultado.notas}
@@ -398,6 +407,7 @@ function TarjetaVariante({
   f0,
   onPasar,
   q,
+  referencias,
 }: {
   titulo: string;
   variante: VarianteL | VariantePiT;
@@ -405,12 +415,20 @@ function TarjetaVariante({
   f0: number;
   onPasar?: (pase: Pase) => void;
   q: ComponentChildren;
+  // Las de la red entera: cada variante usa las mismas fórmulas de fondo.
+  referencias: readonly Referencia[];
 }) {
   const { revision } = v;
   const nivel = (c: ComponenteRed) => revision.marcados.find((m) => m.nombre === c.nombre)?.nivel;
   return (
     <TarjetaResultado
       titulo={titulo}
+      desplegables={
+        <Desplegable titulo="Fuera de f₀">
+          <Barrido barrido={v.barrido} />
+        </Desplegable>
+      }
+      formulas={<FormulasYFuentes formulas={v.formulas} referencias={referencias} />}
       pasos={<Pasos pasos={v.pasos} />}
       motivos={revision.marcados.map((m) => ({ nivel: m.nivel, texto: m.motivo }))}
       sugerencia={revision.sugerencia ?? undefined}
@@ -453,17 +471,6 @@ function TarjetaVariante({
         );
       })}
       {q}
-      {/* Cerrados, como los pasos: para no cargar la primera vista. */}
-      <Desplegable titulo="Fuera de f₀">
-        <Barrido barrido={v.barrido} />
-      </Desplegable>
-      <Desplegable titulo="Fórmulas">
-        <div class="formulas">
-          {v.formulas.map((f) => (
-            <Formula key={f} latex={f} />
-          ))}
-        </div>
-      </Desplegable>
     </TarjetaResultado>
   );
 }

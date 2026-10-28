@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  POR_DEFECTO,
   RANGO_SIN_INVENTARIO,
   calcularArreglos,
   valoresDeBusqueda,
 } from '../../../src/calculo/arreglos/arreglos';
 import { formasDeConexion } from '../../../src/calculo/comun/arreglos';
 import { leerEntrada } from '../../../src/entrada/leer';
+import { UMBRAL_POR_DEFECTO } from '../../../src/ui/arreglos/campos';
 import { dentroDeTolerancia, margen } from '../../casos';
 import { mejoresArreglos } from '../../oraculos/arreglos';
 import { CASOS_COMPORTAMIENTO, CASOS_TOP10, CASO_FORMAS, CASO_TOLERANCIA_47 } from './casos';
@@ -82,7 +84,12 @@ describe('Arreglos equivalentes: salidas', () => {
     expect(RANGO_SIN_INVENTARIO.resistencia).toEqual({ min: 1, max: 10e6 });
   });
 
-  it('la conexión se escribe con "serie", "∥" y paréntesis, nunca con "+"', () => {
+  it('el Umbral de error arranca en 5 %', () => {
+    expect(POR_DEFECTO.umbral).toBe(0.05);
+    expect(UMBRAL_POR_DEFECTO).toBe('5');
+  });
+
+  it('la conexión se escribe con "serie", "||" y paréntesis, nunca con "+"', () => {
     for (const componente of ['capacitor', 'resistencia'] as const) {
       const r = calcularArreglos({
         ...CASO_TOLERANCIA_47.entrada,
@@ -92,7 +99,7 @@ describe('Arreglos equivalentes: salidas', () => {
       });
       for (const f of r.filas) {
         expect(f.conexion).not.toContain('+');
-        if (f.componentes >= 2) expect(f.conexion).toMatch(/ serie | ∥ /);
+        if (f.componentes >= 2) expect(f.conexion).toMatch(/ serie | \|\| /);
         // los paréntesis abren y cierran
         expect(f.conexion.split('(').length).toBe(f.conexion.split(')').length);
       }
@@ -100,11 +107,11 @@ describe('Arreglos equivalentes: salidas', () => {
     }
   });
 
-  it('una subred va entre paréntesis y primero: (27 pF serie 68 pF) ∥ 15 pF', () => {
+  it('una subred va entre paréntesis y primero: (27 pF serie 68 pF) || 15 pF', () => {
     const r = calcularArreglos(CASO_TOLERANCIA_47.entrada);
     const tres = r.filas.filter((f) => f.componentes === 3).map((f) => f.conexion);
     expect(tres.length).toBeGreaterThan(0);
-    for (const c of tres) expect(c).toMatch(/^\([^()]+\) (∥|serie) [^()]+$|^[^()]+$/);
+    for (const c of tres) expect(c).toMatch(/^\([^()]+\) (\|\||serie) [^()]+$|^[^()]+$/);
   });
 
   it('en resistencias la serie suma y el paralelo es la suma recíproca', () => {
@@ -116,7 +123,7 @@ describe('Arreglos equivalentes: salidas', () => {
     const dos = r.filas.filter((f) => f.componentes === 2);
     expect(dos.length).toBeGreaterThan(1);
     for (const f of dos) {
-      const [a, b] = f.conexion.split(/ serie | ∥ /).map(ohms);
+      const [a, b] = f.conexion.split(/ serie | \|\| /).map(ohms);
       const esperado = f.conexion.includes(' serie ') ? a + b : (a * b) / (a + b);
       expect(f.valor, f.conexion).toBeCloseTo(esperado, 9);
     }
@@ -124,12 +131,12 @@ describe('Arreglos equivalentes: salidas', () => {
 
   it('un Arreglo exacto tiene Error del arreglo 0, sin el residuo del redondeo', () => {
     const r = calcularArreglos({ ...CASO_TOLERANCIA_47.entrada, buscado: 37.3e-12 });
-    expect(r.filas.find((f) => f.conexion === '(68 pF serie 68 pF) ∥ 3,3 pF')?.error).toBe(0);
+    expect(r.filas.find((f) => f.conexion === '(68 pF serie 68 pF) || 3,3 pF')?.error).toBe(0);
   });
 
-  it('el Error del arreglo tiene signo: 8,2 pF ∥ 39 pF queda +0,43 % sobre 47 pF', () => {
+  it('el Error del arreglo tiene signo: 8,2 pF || 39 pF queda +0,43 % sobre 47 pF', () => {
     const r = calcularArreglos(CASO_TOLERANCIA_47.entrada);
-    const fila = r.filas.find((f) => f.conexion === '8,2 pF ∥ 39 pF')!;
+    const fila = r.filas.find((f) => f.conexion === '8,2 pF || 39 pF')!;
     expect(fila.error).toBeCloseTo(0.2 / 47, 12);
     const bajo = r.filas.find((f) => f.error < 0);
     expect(bajo).toBeDefined();

@@ -1,8 +1,7 @@
 // Búsqueda de Arreglos equivalentes (spec §8.3 y §8.4): los mejores Arreglos serie-paralelo de hasta
 // 4 componentes que aproximan un valor buscado. Un solo motor con dos operaciones, la suma y la suma
 // recíproca; cuál es "serie" lo decide quien la usa (en capacitores el paralelo suma, en
-// resistencias la serie). La usan los Arreglos equivalentes y, con valores comerciales, los
-// atenuadores. Pura: recibe los valores en SI y devuelve las redes con índices a esos valores.
+// resistencias la serie). La usan los Arreglos equivalentes. Pura: recibe los valores en SI y devuelve las redes con índices a esos valores.
 
 export type Operacion = 'suma' | 'reciproca';
 

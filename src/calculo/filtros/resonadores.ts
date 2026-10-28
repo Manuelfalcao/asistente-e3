@@ -695,7 +695,7 @@ function disenar(modelo: Modelo, l: number) {
 }
 
 // El divisor de un extremo (research/resonadores-acoplados.md §3.2, cálculo propio verificado por
-// simulación). Desde el nodo, Ca en serie con Cb ∥ R tiene que dar la admitancia que daban el
+// simulación). Desde el nodo, Ca en serie con Cb || R tiene que dar la admitancia que daban el
 // Capacitor de extremo con su R y el de sintonía: Gp + jB, con Gp = 1/Rp y B = ω0·(Ck + C01e).
 // Igualando partes reales sale Cb, y con las imaginarias, Ca. Null si no se arma.
 function divisorDe(x: ExtremoResonadores, ck: number, w0: number): DivisorCapacitivo | null {
@@ -1498,7 +1498,7 @@ export const DEDUCCION_DIVISOR_CAPACITIVO: EntradaRegistro = {
   deduccion: [
     {
       texto:
-        'Desde el nodo, Ca en serie con Cb ∥ R tiene que dar lo que daban el Capacitor de extremo ' +
+        'Desde el nodo, Ca en serie con Cb || R tiene que dar lo que daban el Capacitor de extremo ' +
         'con su R y el de sintonía',
       latex:
         '\\dfrac{1}{j\\omega_0 C_a} + \\dfrac{1}{G + j\\omega_0 C_b} = \\dfrac{1}{G_p + jB},\\; ' +

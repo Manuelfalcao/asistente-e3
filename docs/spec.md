@@ -33,7 +33,7 @@ Esta es la especificación del Asistente lista para construir. Reúne lo que se 
 - **Idioma:** interfaz en castellano, con voseo ("Corregí", "Completá").
 - **Cinco Calculadoras:** bobinas, filtros, Arreglos equivalentes, redes de adaptación y atenuadores resistivos π y T.
 - **Principios que valen para todas:**
-  - Cada resultado muestra la fórmula que usa y su referencia bibliográfica. Los pasos intermedios van desplegables y ocultos por defecto.
+  - Cada resultado da la fórmula que usa y su referencia bibliográfica. Las fórmulas con sus fuentes y los pasos intermedios van en desplegables cerrados por defecto.
   - El Asistente nunca bloquea un valor calculado por ser difícil de armar: lo muestra marcado como Valor dudoso o Valor impracticable (sección 5.6). Los únicos cortes son los que se listan en cada Calculadora (menos de una vuelta, 60 dB, Orden mayor que 10, etc.).
   - Un resultado se puede pasar a otra Calculadora: cada L va a la de bobinas y cada C o R a la de Arreglos equivalentes.
   - Lo que no sale de la bibliografía se marca: las Deducciones propias se aprueban aparte y tienen un plan B, y los Criterios prácticos van rotulados como tales.
@@ -151,7 +151,7 @@ Origen: [Stack técnico y estructura del código](issues/15-stack-tecnico.md), [
 ### 4.5 Resultados largos
 
 - **Una tarjeta debajo de otra** (en PC, en grilla). No hay carrusel.
-- Va primero la tarjeta con el resultado principal, la fórmula visible y los pasos intermedios desplegables. Después vienen las tarjetas de variantes, de vecinos o los 10 Arreglos.
+- Va primero la tarjeta con el resultado principal, con las fórmulas y los pasos intermedios en desplegables. Después vienen las tarjetas de variantes, de vecinos o los 10 Arreglos.
 - Una fórmula que no entra a lo ancho se corta en líneas y, si aún no entra, tiene scroll horizontal propio (sección 5.4). La página nunca tiene scroll horizontal.
 
 Origen: [Prototipo de navegación entre Calculadoras](issues/22-prototipo-navegacion.md) (prototipo en [`prototipos/navegacion/`](prototipos/navegacion/LEEME.md)).
@@ -224,9 +224,19 @@ Origen: [Reglas de la entrada flexible](issues/21-reglas-entrada-flexible.md).
 Cada Calculadora muestra, en este orden:
 
 1. **Avisos** de la Calculadora que afectan a todo el resultado (por ejemplo, la pérdida plana de un filtro con R_s ≠ R_L).
-2. **Resultado principal**, con la fórmula visible, su referencia bibliográfica (autor, obra, edición, ecuación o página) y los **pasos intermedios** en un desplegable cerrado por defecto. Los pasos muestran la fórmula de cada valor con los números sustituidos, con 4 cifras.
-3. **Tarjetas** de variantes, vecinos o resultados, cada una con sus valores, sus botones de pase y su bloque de motivos (sección 5.6).
-4. **Notas fijas** de construcción.
+2. **Resultado principal**.
+3. **Tarjetas** de variantes, vecinos o resultados.
+4. **Notas fijas** de construcción, al pie.
+
+Dentro de cada tarjeta, en este orden:
+
+1. Los valores, con sus rótulos y sus botones de pase.
+2. El bloque de motivos de los valores con aviso (sección 5.6), antes que cualquier desplegable.
+3. Los desplegables propios de la Calculadora, como "Frecuencias de la banda" en filtros o "Fuera de f₀" en redes.
+4. **Fórmulas y fuentes**: las fórmulas y su referencia bibliográfica (autor, obra, edición, ecuación o página).
+5. **Pasos intermedios**: la fórmula de cada valor con los números sustituidos, con 4 cifras.
+
+Todos los desplegables arrancan cerrados, para que la primera vista muestre solo los valores.
 
 Rótulos que puede llevar un valor o una fórmula:
 
@@ -268,7 +278,7 @@ Las Calculadoras de bobinas y de Arreglos equivalentes no pasan valores a otras.
 
 ### 5.6 Criterio común de valor impracticable
 
-Una función de `src/calculo/comun/` revisa **automáticamente cada L, C y R** del resultado de cualquier Calculadora, incluidos los Capacitores de sintonía y las combinaciones redondeadas de atenuadores. No hay excepciones en la primera versión (una Calculadora podría declararlas, con su motivo).
+Una función de `src/calculo/comun/` revisa **automáticamente cada L, C y R** del resultado de cualquier Calculadora, incluidos los Capacitores de sintonía. No hay excepciones en la primera versión (una Calculadora podría declararlas, con su motivo).
 
 **Montaje supuesto** (sin preguntarle al Alumno): Manhattan con terminales cortos. En la materia no se usa protoboard, así que no hay aviso por protoboard.
 
@@ -340,7 +350,7 @@ Origen: [Datos para los umbrales de valor impracticable en VHF](issues/19-datos-
 
 ### 5.7 Barrido en frecuencia
 
-Lo usan las redes de adaptación (ancho de banda, armónicas y pérdida), los resonadores acoplados (verificación del Orden) y los atenuadores (atenuación y adaptación con valores redondeados). Es un análisis ABCD con complejos de la red completa, entre R_s y R_L, con la ganancia de transductor:
+Lo usan las redes de adaptación (ancho de banda, armónicas y pérdida), y los resonadores acoplados (verificación del Orden). Es un análisis ABCD con complejos de la red completa, entre R_s y R_L, con la ganancia de transductor:
 
 ```
 |S21|² = 4·R_s·R_L / |A·R_L + B + C·R_s·R_L + D·R_s|²
@@ -504,7 +514,7 @@ Calcula filtros LC: escaleras π o T para los cuatro Tipos de filtro y, en pasa 
 | Q de las bobinas (Qu) | — | Editable, 100 por defecto, para la pérdida de Cohn (sección 7.8). Lo ingresa el Alumno |
 | L de los resonadores (solo resonadores acoplados) | nH | Propuesta por el Asistente y editable (sección 7.7) |
 
-- Con f0 y BW: `f1,2 = √(f0² + (BW/2)²) ∓ BW/2`. Con f1 y f2: `f0 = √(f1·f2)` y `BW = f2 − f1`. El resultado muestra siempre f1, f2, f0 y BW.
+- Con f0 y BW: `f1,2 = √(f0² + (BW/2)²) ∓ BW/2`. Con f1 y f2: `f0 = √(f1·f2)` y `BW = f2 − f1`. El resultado muestra siempre f1, f2, f0 y BW, en el desplegable "Frecuencias de la banda" debajo de los componentes. En resonadores acoplados la Frecuencia de sintonía queda a la vista.
 - El Orden va de 1 a 10 en todas las Aproximaciones.
 
 ### 7.2 Método
@@ -613,7 +623,7 @@ n resonadores LC paralelo en derivación, todos con la misma L, unidos por **Cap
 ```
  Rs ──┤C01├──┬──┤C12├──┬──┤C23├──┬──┤C34├── RL
              │         │         │
-          L ‖ C1    L ‖ C2    L ‖ C3
+          L || C1    L || C2    L || C3
 ```
 
 **Método:** Matthaei, Young y Jones, Fig. 8.11-1, despejado en L. Usa los g del prototipo de terminaciones iguales (sin Takahasi) y sirve para las tres Aproximaciones.
@@ -722,7 +732,7 @@ Busca los Arreglos equivalentes serie-paralelo de hasta 4 componentes de Valor c
 | Componente | Capacitor · Resistencia | Los inductores quedan afuera: para eso está la Calculadora de bobinas |
 | Valor buscado | pF o Ω | > 0. Llega precargado desde otras Calculadoras |
 | Serie | E6 · **E12** · E24 | Sin E48 ni E96 |
-| Umbral de error | % | Editable, 1 % por defecto (sección 8.4) |
+| Umbral de error | % | Editable, 5 % por defecto (sección 8.4) |
 | Tolerancia por defecto | % o pF | Editable por tipo: ±5 % para resistencias, ±5 % para capacitores de 10 pF o más y ±0,25 pF absolutos para los de menos de 10 pF |
 
 ### 8.2 Bloque de Inventario
@@ -763,22 +773,22 @@ y tiene un botón **"Editar Inventario"**.
 ### 8.4 Orden de los resultados
 
 1. Se agrupan los Arreglos de igual valor (tolerancia relativa de redondeo ~1e-9) y se conserva el de menos componentes.
-2. Los Arreglos con |Error del arreglo| por debajo del umbral (1 % por defecto) van primero, ordenados por cantidad de componentes y después por error. Los demás van detrás, ordenados por error.
+2. Los Arreglos con |Error del arreglo| por debajo del umbral (5 % por defecto) van primero, ordenados por cantidad de componentes y después por error. Los demás van detrás, ordenados por error.
 3. Se muestran los **10 mejores**, con hasta 4 componentes.
 
 ### 8.5 Salidas
 
 Una lista de 10 filas. Cada una muestra:
 
-- el Arreglo, con la conexión escrita con la palabra **"serie"** y el símbolo **"∥"** para paralelo, y paréntesis para agrupar: "39 pF serie 270 pF", "(27 pF serie 68 pF) ∥ 15 pF". No se usa "+", que con capacitores se leería como una suma;
+- el Arreglo, con la conexión escrita con la palabra **"serie"** y el símbolo **"||"** para paralelo, y paréntesis para agrupar: "39 pF serie 270 pF", "(27 pF serie 68 pF) || 15 pF". No se usa "+", que con capacitores se leería como una suma;
 - su valor;
-- el **Error del arreglo** con signo, `(V_arreglo − V_buscado)/V_buscado`;
+- el **Error del arreglo** con signo, `(V_arreglo − V_buscado)/V_buscado`, destacado en una píldora: es lo que se compara entre filas;
 - la cantidad de componentes y, si un valor se repite, "usa 3 × 10 pF";
 - la **Tolerancia del arreglo**, el rango de peor caso [V(todos al mínimo), V(todos al máximo)], que es exacto porque cualquier red serie-paralelo crece con cada componente.
 
 Notas:
 
-- Los Arreglos de 3 o 4 componentes llevan una nota fija y breve: en VHF cada componente y cada soldadura agregan L y C parásitas. Los parásitos no penalizan el orden (el umbral ya favorece a los Arreglos de pocos componentes) y no se pide la frecuencia de trabajo.
+- Si alguna fila tiene 3 o 4 componentes, las notas del pie llevan una sola vez la nota de VHF: cada componente y cada soldadura agregan L y C parásitas. Los parásitos no penalizan el orden (el umbral ya favorece a los Arreglos de pocos componentes) y no se pide la frecuencia de trabajo.
 - Cuando el valor llega desde atenuadores: en un Arreglo equivalente la potencia se reparte entre los componentes. La Calculadora no reparte potencia.
 - **Valor impracticable:** solo se aplica la C mínima al valor buscado (sección 5.6).
 - **Pasos intermedios:** la fórmula de serie y paralelo, cuántas combinaciones se evaluaron, la regla de orden y la cuenta de la Tolerancia del arreglo de la fila elegida.
@@ -885,7 +895,7 @@ Origen: [Redes de adaptación L, π y T: fórmulas y alcance](issues/05-redes-ad
 
 ## 10. Calculadora de atenuadores
 
-Calcula atenuadores resistivos T y π, con impedancias iguales o distintas, la disipación de cada resistencia y el efecto de usar Valores comerciales.
+Calcula atenuadores resistivos T y π, con impedancias iguales o distintas, y la disipación de cada resistencia. Los Valores comerciales se buscan pasando cada resistencia a Arreglos equivalentes (sección 10.4).
 
 ### 10.1 Entradas
 
@@ -897,9 +907,6 @@ Calcula atenuadores resistivos T y π, con impedancias iguales o distintas, la d
 | Mínima pérdida (botón) | — | — | Aparece con Z1 ≠ Z2: fija la atenuación en A_min y muestra la red L de dos resistencias |
 | Potencia de entrada (opcional) | W o dBm | vacío | dBm con el Selector de unidad. Aceptar dBm no es la Calculadora de conversión que quedó afuera |
 | Frecuencia (opcional) | MHz | vacío | Para el criterio de valor impracticable. Vacía: 300 MHz |
-| Redondeo | E6 · **E12** · E24 · Inventario de resistencias | | El Inventario se ofrece si hay uno guardado. Sin E96 |
-| Tolerancia | % | ±5 % | Editable, como en Arreglos equivalentes |
-| Ventana de atenuación | dB | ±0,1 dB | Editable, para las mejores combinaciones |
 
 - **El T y el π se muestran juntos**, cada uno con su esquema (lado a lado en PC, apilados en el celular). No hay selector de Topología (el prototipo de navegación tenía uno; se confirmó lo del ticket 13).
 
@@ -936,15 +943,8 @@ T:  P_R1 = P·R1/Z1        P_R3 = P·(Z1 − R1)²/(Z1·R3)        P_R2 = P·R2/
 
 ### 10.4 Valores comerciales
 
-- Se muestran el **redondeo al más cercano** (en escala logarítmica) y las **3 mejores combinaciones entre vecinos**: los 7 valores más cercanos de cada resistencia, sin forzar la simetría (7³ = 343 evaluaciones).
-  - Se ordenan por PR dentro de la ventana de atenuación (±0,1 dB por defecto).
-  - Si ninguna entra en la ventana, se muestran las 3 de menor error de atenuación, con un aviso.
-- Cada opción muestra, calculado con el barrido de la sección 5.7:
-  - la atenuación real;
-  - la PR de entrada y de salida en dB con la ROE equivalente ("30,5 dB (ROE 1,06)");
-  - el **peor caso por tolerancia**: la atenuación [mín, máx] y la PR mínima, con las 8 combinaciones de extremos.
-- El pad de mínima pérdida lleva el mismo tratamiento con 2 resistencias. Si el redondeo lo deja apenas debajo de A_min, la desadaptación se ve en las PR, sin aviso aparte.
-- **Cada resistencia calculada** tiene un botón de pase a Arreglos equivalentes (tipo resistencia), con la nota de que la potencia se reparte entre los componentes.
+- La Calculadora no redondea: **cada resistencia calculada** tiene un botón de pase a Arreglos equivalentes (tipo resistencia), con la nota de que la potencia se reparte entre los componentes. Ahí se elige la serie o el Inventario y se ven los mejores Arreglos con su error y su tolerancia.
+- Antes se mostraban acá el redondeo al más cercano y las 3 mejores combinaciones entre vecinos; se quitaron porque repetían lo que da el pase y cargaban la tarjeta.
 
 ### 10.5 Límites y avisos
 
@@ -956,7 +956,7 @@ T:  P_R1 = P·R1/Z1        P_R3 = P·(Z1 − R1)²/(Z1·R3)        P_R2 = P·R2/
 | A < 0,5 dB | Aviso: las resistencias en serie quedan del orden de la resistencia de los terminales |
 | A > 40 dB | Aviso: en VHF una sola sección no llega a esa atenuación real; conviene armar secciones de 10 a 20 dB en cascada. La cascada no se calcula: el Alumno puede usar la Calculadora dos veces |
 | Frecuencia vacía | Las resistencias se revisan a 300 MHz, y el aviso lo dice |
-| Cada resistencia ideal y redondeada | Valor dudoso o impracticable por el rango de R a esa frecuencia (sección 5.6). Con estos umbrales, el T de 20 dB (10 Ω en derivación) es dudoso a 150 MHz e impracticable a 300 MHz, y la resistencia de 1 Ω del T de 40 dB es impracticable en toda la banda |
+| Cada resistencia | Valor dudoso o impracticable por el rango de R a esa frecuencia (sección 5.6). Con estos umbrales, el T de 20 dB (10 Ω en derivación) es dudoso a 150 MHz e impracticable a 300 MHz, y la resistencia de 1 Ω del T de 40 dB es impracticable en toda la banda |
 | Siempre | Nota para VHF: resistencias de película o SMD, no de alambre, y terminales cortos |
 
 ### 10.6 Pasos intermedios
@@ -991,7 +991,7 @@ Resueltos con el Ayudante de cátedra al redactar la spec (2026-10-24):
 
 - **Bessel con R_s ≠ R_L en escaleras π y T:** no se calcula; se avisa y se ofrecen salidas (sección 7.4).
 - **Topología en atenuadores:** T y π juntos, como decidió [Alcance de la Calculadora de atenuadores](issues/13-alcance-atenuadores.md), aunque el prototipo de navegación tenía un selector (sección 10.1).
-- **Notación de los Arreglos:** "serie" y "∥", sin "+" (sección 8.5).
+- **Notación de los Arreglos:** "serie" y "||", sin "+" (sección 8.5).
 
 Quedan para la construcción:
 
@@ -1070,8 +1070,8 @@ Los valores numéricos de cada caso están en las investigaciones de [`research/
 **Arreglos equivalentes** (`research/busqueda-arreglos-equivalentes.md`)
 
 - *Referencia:* E6, E12 y E24 completas contra IEC 60063 (Vishay 31001), con las 8 excepciones de E24 a la vista; la cantidad de formas de conexión (OEIS A000084: 1, 2, 4, 10).
-- *Verificación:* en 37,3 pF E12, 47 pF y dos búsquedas de resistencias, el top-10 del meet-in-the-middle es igual al de la fuerza bruta. La Tolerancia del arreglo de 47 pF = 39 pF J ∥ 8,2 pF C (±4,7 %) va calculada a mano en el informe.
-- *Comportamiento:* Inventario por exclusión con Valores excluidos y valores extra; valores repetidos; umbral del 1 %; ±0,25 pF debajo de 10 pF; C mínima.
+- *Verificación:* en 37,3 pF E12, 47 pF y dos búsquedas de resistencias, el top-10 del meet-in-the-middle es igual al de la fuerza bruta. La Tolerancia del arreglo de 47 pF = 39 pF J || 8,2 pF C (±4,7 %) va calculada a mano en el informe.
+- *Comportamiento:* Inventario por exclusión con Valores excluidos y valores extra; valores repetidos; umbral del 1 % (el de los casos; por defecto es 5 %); ±0,25 pF debajo de 10 pF; C mínima.
 
 **Redes de adaptación** (`research/redes-adaptacion.md`)
 

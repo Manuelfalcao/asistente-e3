@@ -37,7 +37,7 @@ export const CALCULADORAS: readonly Calculadora[] = [
     id: 'atenuadores',
     nombre: 'Calculadora de atenuadores',
     nombreCorto: 'Atenuadores',
-    descripcion: 'Atenuadores T y π con resistencias comerciales.',
+    descripcion: 'Atenuadores T y π con impedancias iguales o distintas.',
   },
 ];
 

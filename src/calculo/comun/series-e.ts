@@ -1,7 +1,7 @@
 // Series E de valores comerciales (spec §8.3): IEC 60063:2015, con los valores de la tabla de décadas
 // de Vishay Dale, documento 31001. Se guardan como tablas y no se generan por fórmula: E6, E12 y E24
 // tienen valores históricos que no salen de redondear 10^(i/n) (en E24 son 8, de 2,7 a 8,2). Las
-// usan los Arreglos equivalentes y, con valores comerciales, los atenuadores.
+// usan los Arreglos equivalentes.
 
 export type SerieE = 'E6' | 'E12' | 'E24';
 

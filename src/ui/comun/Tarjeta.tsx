@@ -7,11 +7,14 @@ export interface Motivo {
   texto: string;
 }
 
-// Tarjeta de un resultado (spec §5.3): sus valores, los pasos intermedios en un desplegable
-// cerrado y, al pie, el bloque de motivos de los valores con aviso.
+// Tarjeta de un resultado (spec §5.3): sus valores, el bloque de motivos de los valores con aviso
+// y, al final, los desplegables cerrados: los propios de la Calculadora, las fórmulas con sus
+// fuentes y los pasos intermedios.
 export function TarjetaResultado({
   titulo,
   destacada = false,
+  desplegables,
+  formulas,
   pasos,
   motivos = [],
   sugerencia,
@@ -19,6 +22,9 @@ export function TarjetaResultado({
 }: {
   titulo?: ComponentChildren;
   destacada?: boolean;
+  // Los desplegables de la Calculadora, como "Fuera de f₀", antes que las fórmulas.
+  desplegables?: ComponentChildren;
+  formulas?: ComponentChildren;
   pasos?: ComponentChildren;
   motivos?: readonly Motivo[];
   sugerencia?: string;
@@ -28,7 +34,6 @@ export function TarjetaResultado({
     <section class={destacada ? 'tarjeta destacada' : 'tarjeta'}>
       {titulo && <h3 class="tarjeta-titulo">{titulo}</h3>}
       {children}
-      {pasos && <Desplegable titulo="Pasos intermedios">{pasos}</Desplegable>}
       {motivos.length > 0 && (
         <div class="motivos">
           <ul>
@@ -42,6 +47,9 @@ export function TarjetaResultado({
           <Rotulo tipo="criterio-practico" />
         </div>
       )}
+      {desplegables}
+      {formulas && <Desplegable titulo="Fórmulas y fuentes">{formulas}</Desplegable>}
+      {pasos && <Desplegable titulo="Pasos intermedios">{pasos}</Desplegable>}
     </section>
   );
 }

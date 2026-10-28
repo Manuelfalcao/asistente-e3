@@ -10,9 +10,8 @@ import type { DosCapas, VecinoDosCapas } from '../../calculo/bobinas/dos-capas';
 import { mensajeDeResultados } from '../../entrada/campo';
 import { formatearErrorRelativo, formatearValor } from '../../entrada/formato';
 import { CampoEntradaValor, type CampoEntrada, useCampoEntrada } from '../comun/CampoEntrada';
-import { Formula } from '../comun/Formula';
 import { Aviso } from '../comun/Franjas';
-import { Cita, FormaResultado, Pasos } from '../comun/Resultado';
+import { FormaResultado, FormulasYFuentes, Pasos } from '../comun/Resultado';
 import { Rotulo } from '../comun/Rotulo';
 import { TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
 import { type PaseDeValor, precargaDe } from '../pases';
@@ -26,8 +25,9 @@ import {
 } from './campos';
 
 // La Calculadora de bobinas (spec §6): las vueltas de una bobina solenoidal de aire de una y de dos
-// capas, cada una en su tarjeta con los dos vecinos en pasos de media vuelta, la SRF estimada, la
-// fórmula, la referencia y los pasos intermedios. Dos capas fuera de rango muestra solo el motivo.
+// capas, cada una en su tarjeta con los dos vecinos en pasos de media vuelta, la SRF estimada y,
+// en desplegables, la fórmula con su referencia y los pasos intermedios. Dos capas fuera de rango
+// muestra solo el motivo.
 export function Bobinas({ pase }: { pase?: PaseDeValor }) {
   const guardado = (campo: string) => ({ calculadora: 'bobinas', campo });
   // Un pase trae la L y, si la tiene, la frecuencia de evaluación del origen (spec §4.2).
@@ -210,6 +210,18 @@ function TarjetaUnaCapa({
     <TarjetaResultado
       titulo={`Una capa de ${henrios(buscada.valor)}`}
       destacada
+      formulas={
+        <FormulasYFuentes formulas={unaCapa.formulas} referencias={unaCapa.referencias}>
+          <p class="nota-tarjeta">
+            {unaCapa.diametro === 'rf' && (
+              <>
+                <Rotulo tipo="deduccion-propia" />{' '}
+              </>
+            )}
+            {unaCapa.notaDiametro}
+          </p>
+        </FormulasYFuentes>
+      }
       pasos={<Pasos pasos={unaCapa.pasos} />}
       motivos={motivosDe(resultado)}
     >
@@ -220,25 +232,11 @@ function TarjetaUnaCapa({
         ))}
       </div>
       <FilaSRF srf={srf} />
-      <p class="nota-tarjeta">
-        {unaCapa.diametro === 'rf' && (
-          <>
-            <Rotulo tipo="deduccion-propia" />{' '}
-          </>
-        )}
-        {unaCapa.notaDiametro}
-      </p>
       {unaCapa.notas.map((n) => (
         <p key={n} class="nota-tarjeta">
           {n}
         </p>
       ))}
-      <div class="formulas">
-        {unaCapa.formulas.map((f) => (
-          <Formula key={f} latex={f} />
-        ))}
-      </div>
-      <Cita referencias={unaCapa.referencias} />
     </TarjetaResultado>
   );
 }
@@ -255,10 +253,22 @@ function TarjetaDosCapas({ dosCapas, buscada }: { dosCapas: DosCapas; buscada: n
   }
   const exterior = ` · diámetro exterior ${formatearValor(dosCapas.diametroExterior, 'largo')}`;
   return (
-    <TarjetaResultado titulo={titulo} pasos={<Pasos pasos={dosCapas.pasos} />}>
-      {dosCapas.avisos.map((a) => (
-        <Aviso key={a.codigo}>{a.texto}</Aviso>
-      ))}
+    <TarjetaResultado
+      titulo={titulo}
+      formulas={
+        <FormulasYFuentes formulas={dosCapas.formulas} referencias={dosCapas.referencias}>
+          <p class="nota-tarjeta">
+            {dosCapas.correccion === 'maxwell' && (
+              <>
+                <Rotulo tipo="deduccion-propia" />{' '}
+              </>
+            )}
+            {dosCapas.notaFormula}
+          </p>
+        </FormulasYFuentes>
+      }
+      pasos={<Pasos pasos={dosCapas.pasos} />}
+    >
       <div class="vecinos" aria-label="Vecinos en pasos de media vuelta por capa">
         {dosCapas.vecinos.map((v) => (
           <FilaVecino
@@ -270,25 +280,15 @@ function TarjetaDosCapas({ dosCapas, buscada }: { dosCapas: DosCapas; buscada: n
         ))}
       </div>
       <FilaSRF srf={dosCapas.srf} />
-      <p class="nota-tarjeta">
-        {dosCapas.correccion === 'maxwell' && (
-          <>
-            <Rotulo tipo="deduccion-propia" />{' '}
-          </>
-        )}
-        {dosCapas.notaFormula}
-      </p>
+      {/* Después de las vueltas y la SRF: primero lo que se busca, después sus límites. */}
+      {dosCapas.avisos.map((a) => (
+        <Aviso key={a.codigo}>{a.texto}</Aviso>
+      ))}
       {dosCapas.notas.map((n) => (
         <p key={n} class="nota-tarjeta">
           {n}
         </p>
       ))}
-      <div class="formulas">
-        {dosCapas.formulas.map((f) => (
-          <Formula key={f} latex={f} />
-        ))}
-      </div>
-      <Cita referencias={dosCapas.referencias} />
     </TarjetaResultado>
   );
 }
