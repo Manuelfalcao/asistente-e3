@@ -6,7 +6,15 @@ import {
 } from '../src/calculo/filtros/filtros';
 import { type EntradaResonadores, calcularResonadores } from '../src/calculo/filtros/resonadores';
 import { paseDePerdidaPlana, pasesDeResonadores, pasesDelFiltro } from '../src/ui/filtros/pases';
-import { franjaVisible, pasar, textoDeFranja, volver } from '../src/ui/pases';
+import { leerCampo } from '../src/entrada/campo';
+import {
+  conValorCompleto,
+  franjaVisible,
+  pasar,
+  precargaDeF0,
+  textoDeFranja,
+  volver,
+} from '../src/ui/pases';
 
 // Los pases desde la Calculadora de filtros (spec §5.5): qué valor va a qué Calculadora y con qué
 // precarga.
@@ -161,5 +169,21 @@ describe('el aviso de pérdida plana', () => {
     expect(e2.activa).toBe('bobinas');
     expect(volver(e2).activa).toBe('redes');
     expect(volver(volver(e2))).toEqual({ activa: 'filtros', pila: [] });
+  });
+});
+
+describe('f₀ al llegar a Redes', () => {
+  it('en pasa banda llega el f₀ del filtro', () => {
+    const r = calculado({ ...pasaBanda, rl: 300 });
+    const p = precargaDeF0(paseDePerdidaPlana({ rs: 50, rl: 300 }, r));
+    expect(p).toMatchObject({ texto: '146', unidad: 'MHz', valor: r.banda!.f0 });
+  });
+
+  it('fuera de pasa banda el campo queda vacío: no vale un f₀ viejo que la franja no nombra', () => {
+    const r = calculado({ ...pasaBajos, rl: 300 });
+    const p = precargaDeF0(paseDePerdidaPlana({ rs: 50, rl: 300 }, r));
+    expect(p.texto).toBe('');
+    const leido = leerCampo(p.texto, { magnitud: 'frecuencia', nombre: 'f₀', unidad: p.unidad });
+    expect(conValorCompleto(leido, p, p.texto, p.unidad).estado).not.toBe('valido');
   });
 });

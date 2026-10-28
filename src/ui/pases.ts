@@ -146,6 +146,12 @@ export function precargaDe(valor: number, magnitud: Magnitud): Precarga {
   return { texto: escrito, valor };
 }
 
+// f₀ al llegar a Redes: el del filtro si era pasa banda; si no, el campo queda vacío, para que la
+// cuenta no use un f₀ viejo que la franja no nombra (spec §9.7).
+export function precargaDeF0(pase: PaseARedes): Precarga {
+  return pase.f0 === undefined ? { texto: '', valor: NaN } : precargaDe(pase.f0, 'frecuencia');
+}
+
 // Mientras el texto y el Selector de unidad sigan como llegaron, el valor es el completo y no el
 // que se lee de las 4 cifras.
 export function conValorCompleto(

@@ -34,7 +34,7 @@ import { Aviso } from '../comun/Franjas';
 import { Cita, FormaResultado, Pasos } from '../comun/Resultado';
 import { Rotulo } from '../comun/Rotulo';
 import { Desplegable, TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
-import { type Pase, type PaseARedes, paseDeComponente, precargaDe } from '../pases';
+import { type Pase, type PaseARedes, paseDeComponente, precargaDe, precargaDeF0 } from '../pases';
 import {
   F0,
   Q_BOBINA,
@@ -60,13 +60,9 @@ export function Redes({
 }) {
   const guardado = (campo: string) => ({ calculadora: 'redes', campo });
   const [topologia, setTopologia] = useOpcionGuardada(TOPOLOGIAS, 'L', guardado('topologia'));
-  // Desde el aviso de pérdida plana de un filtro llegan Rs y RL, y f₀ si era pasa banda (spec §9.7).
-  const f0 = useCampoEntrada(
-    F0,
-    '',
-    guardado('f0'),
-    pase?.f0 === undefined ? undefined : precargaDe(pase.f0, 'frecuencia'),
-  );
+  // Desde el aviso de pérdida plana de un filtro llegan Rs y RL, y f₀ si era pasa banda; si no, f₀
+  // queda vacío (spec §9.7).
+  const f0 = useCampoEntrada(F0, '', guardado('f0'), pase && precargaDeF0(pase));
   const rs = useCampoEntrada(
     RS,
     RS_POR_DEFECTO,
