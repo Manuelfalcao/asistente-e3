@@ -7,13 +7,16 @@ import {
 } from '../../calculo/filtros/resonadores';
 import { formatearValor } from '../../entrada/formato';
 import type { Escalera } from '../esquema';
+import { BotonPaseDe } from '../comun/BotonPase';
 import { Esquema } from '../comun/Esquema';
 import { Formula } from '../comun/Formula';
 import { Aviso } from '../comun/Franjas';
 import { Cita, FormaResultado, Pasos } from '../comun/Resultado';
 import { Rotulo } from '../comun/Rotulo';
 import { Desplegable, TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
+import type { Pase } from '../pases';
 import { APROXIMACIONES } from './campos';
+import { pasesDeResonadores } from './pases';
 
 // El resultado de la Topología de resonadores acoplados (spec §7.7): la Frecuencia de sintonía, la
 // L de los resonadores y los Capacitores de extremo, de acople y de sintonía, con el esquema. Los
@@ -82,10 +85,12 @@ export function ResultadoAcoplados({
   resultado,
   ripple,
   qBobina,
+  onPasar,
 }: {
   resultado: ResultadoResonadores;
   ripple: number | null;
   qBobina: number;
+  onPasar?: (pase: Pase) => void;
 }) {
   if (resultado.estado === 'corte') {
     return (
@@ -110,6 +115,11 @@ export function ResultadoAcoplados({
     return nivel && <Rotulo tipo={nivel} />;
   };
   const ohms = (x: number) => formatearValor(x, 'resistencia');
+  const pases = pasesDeResonadores(r);
+  const botonDe = (nombre: string) => {
+    const pase = pases.capacitores.get(nombre);
+    return pase && <BotonPaseDe pase={pase} onPasar={onPasar} />;
+  };
   return (
     <FormaResultado
       avisos={r.avisos.map((a) => (
@@ -167,6 +177,7 @@ export function ResultadoAcoplados({
                 <Rotulo tipo="criterio-practico" />
               </>
             }
+            pase={<BotonPaseDe pase={pases.l} onPasar={onPasar} />}
             detalle={
               `la de todos los resonadores; ` +
               (r.lPropuesta
@@ -181,6 +192,7 @@ export function ResultadoAcoplados({
               nombre={x.capacitor.nombre}
               valor={capacidad(x.capacitor.valor)}
               rotulos={marca(x.capacitor.nombre)}
+              pase={botonDe(x.capacitor.nombre)}
               detalle={
                 `Capacitor de extremo: lleva ${R_DEL_LADO[x.lado].texto} = ${ohms(x.r)} ` +
                 `a los ${ohms(x.rp)} que tiene que ver el resonador`
@@ -193,6 +205,7 @@ export function ResultadoAcoplados({
               nombre={a.capacitor.nombre}
               valor={capacidad(a.capacitor.valor)}
               rotulos={marca(a.capacitor.nombre)}
+              pase={botonDe(a.capacitor.nombre)}
               detalle={`Capacitor de acople, k = ${formatearValor(a.k, 'numero')}`}
             />
           ))}

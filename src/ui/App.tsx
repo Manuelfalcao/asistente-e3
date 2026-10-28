@@ -141,13 +141,17 @@ export function App() {
         )}
         <main class="calculadora">
           {activa.id === 'bobinas' ? (
-            <Bobinas pase={llegada} />
+            <Bobinas pase={llegada?.destino === 'bobinas' ? llegada : undefined} />
           ) : activa.id === 'filtros' ? (
-            <Filtros />
+            <Filtros onPasar={onPasar} />
           ) : activa.id === 'arreglos' ? (
-            <Arreglos pase={llegada} />
+            <Arreglos pase={llegada?.destino === 'arreglos' ? llegada : undefined} />
           ) : activa.id === 'redes' ? (
-            <Redes onIr={ir} onPasar={onPasar} />
+            <Redes
+              onIr={ir}
+              onPasar={onPasar}
+              pase={llegada?.destino === 'redes' ? llegada : undefined}
+            />
           ) : activa.id === 'atenuadores' ? (
             <Atenuadores onPasar={onPasar} />
           ) : (

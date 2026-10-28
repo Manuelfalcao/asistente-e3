@@ -18,6 +18,7 @@ import { mensajeDeResultados } from '../../entrada/campo';
 import { formatearValor } from '../../entrada/formato';
 import type { Escalera } from '../esquema';
 import { BotonesSegmentados } from '../comun/BotonesSegmentados';
+import { BotonPaseDe } from '../comun/BotonPase';
 import {
   CampoEntradaValor,
   intercambiar,
@@ -30,6 +31,7 @@ import { Aviso } from '../comun/Franjas';
 import { Cita, FormaResultado, Pasos } from '../comun/Resultado';
 import { Rotulo } from '../comun/Rotulo';
 import { Desplegable, TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
+import type { Pase } from '../pases';
 import {
   APROXIMACIONES,
   AS,
@@ -57,12 +59,14 @@ import {
   TOPOLOGIAS_PASA_BANDA,
 } from './campos';
 import { ResultadoAcoplados, ayudaDeL } from './Acoplados';
+import { paseDePerdidaPlana, pasesDelFiltro } from './pases';
 
 // La Calculadora de filtros (spec §7): escaleras π y T de los cuatro Tipos de filtro y, en pasa
 // banda, resonadores acoplados. Butterworth, Chebyshev y Bessel, con el Orden escrito o calculado
 // desde una atenuación, y con Rs ≠ RL por Takahasi (Bessel no). El resultado es el esquema con los
-// valores en orden desde la fuente y la pérdida de Cohn.
-export function Filtros() {
+// valores en orden desde la fuente y la pérdida de Cohn. Cada L y C se pasa a Bobinas o a Arreglos
+// equivalentes, y el aviso de pérdida plana a redes de adaptación (spec §5.5).
+export function Filtros({ onPasar }: { onPasar?: (pase: Pase) => void }) {
   const guardado = (campo: string) => ({ calculadora: 'filtros', campo });
   const [tipo, setTipo] = useOpcionGuardada(TIPOS, 'pasa-bajos', guardado('tipo'));
   const [aproximacion, setAproximacion] = useOpcionGuardada(
@@ -336,6 +340,7 @@ export function Filtros() {
               resultado={acoplado}
               ripple={esChebyshev ? vRipple : null}
               qBobina={vQ!}
+              onPasar={onPasar}
             />
           ) : (
             <p class="sin-resultado corregir">{mensaje}</p>
@@ -346,6 +351,7 @@ export function Filtros() {
             entrada={entrada}
             onButterworth={() => setAproximacion('butterworth')}
             onResonadores={() => setElegida('resonadores')}
+            onPasar={onPasar}
           />
         ) : (
           <p class="sin-resultado corregir">{mensaje}</p>
@@ -432,6 +438,7 @@ function Resultado({
   entrada,
   onButterworth,
   onResonadores,
+  onPasar,
 }: {
   resultado: ResultadoFiltro;
   entrada: EntradaFiltro;
@@ -439,6 +446,7 @@ function Resultado({
   onButterworth: () => void;
   // En pasa banda, a resonadores acoplados (spec §7.4 y §7.7).
   onResonadores: () => void;
+  onPasar?: (pase: Pase) => void;
 }) {
   if (resultado.estado === 'corte') {
     return (
@@ -474,12 +482,25 @@ function Resultado({
     bandaTexto(entrada, r);
   const nivel = (e: ElementoFiltro) =>
     r.revision.marcados.find((m) => m.nombre === e.nombre)?.nivel;
+  const pases = pasesDelFiltro(r);
   return (
     <FormaResultado
       avisos={[
         ...r.avisos.map((a) => (
           <Aviso key={a.codigo}>
             {a.texto}
+            {a.codigo === 'perdida-plana' && onPasar && (
+              <>
+                {' '}
+                <button
+                  type="button"
+                  class="boton-minima en-aviso"
+                  onClick={() => onPasar(paseDePerdidaPlana(entrada, r))}
+                >
+                  Pasar a redes de adaptación
+                </button>
+              </>
+            )}
             {a.codigo === 'perdida-plana' &&
               r.sugerenciaResonadores?.motivo === 'perdida-plana' && (
                 <BotonResonadores onClick={onResonadores} />
@@ -525,7 +546,7 @@ function Resultado({
             </>
           )}
           {r.ordenCalculado && <AtenuacionReal orden={r.ordenCalculado} />}
-          {r.elementos.map((e) => {
+          {r.elementos.map((e, i) => {
             const marca = nivel(e);
             const resonador = r.resonadores.find((x) => x.l === e || x.c === e);
             return (
@@ -534,6 +555,7 @@ function Resultado({
                 nombre={e.nombre}
                 valor={formatearValor(e.valor, e.componente === 'L' ? 'inductancia' : 'capacidad')}
                 rotulos={marca && <Rotulo tipo={marca} />}
+                pase={<BotonPaseDe pase={pases[i]} onPasar={onPasar} />}
                 detalle={
                   <>
                     {resonador && (

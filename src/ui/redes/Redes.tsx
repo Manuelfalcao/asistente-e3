@@ -34,7 +34,7 @@ import { Aviso } from '../comun/Franjas';
 import { Cita, FormaResultado, Pasos } from '../comun/Resultado';
 import { Rotulo } from '../comun/Rotulo';
 import { Desplegable, TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
-import { type Pase, paseDeComponente } from '../pases';
+import { type Pase, type PaseARedes, paseDeComponente, precargaDe } from '../pases';
 import {
   F0,
   Q_BOBINA,
@@ -52,15 +52,28 @@ import {
 export function Redes({
   onIr,
   onPasar,
+  pase,
 }: {
   onIr?: (id: IdCalculadora) => void;
   onPasar?: (pase: Pase) => void;
+  pase?: PaseARedes;
 }) {
   const guardado = (campo: string) => ({ calculadora: 'redes', campo });
   const [topologia, setTopologia] = useOpcionGuardada(TOPOLOGIAS, 'L', guardado('topologia'));
-  const f0 = useCampoEntrada(F0, '', guardado('f0'));
-  const rs = useCampoEntrada(RS, RS_POR_DEFECTO, guardado('rs'));
-  const rl = useCampoEntrada(RL, '', guardado('rl'));
+  // Desde el aviso de pérdida plana de un filtro llegan Rs y RL, y f₀ si era pasa banda (spec §9.7).
+  const f0 = useCampoEntrada(
+    F0,
+    '',
+    guardado('f0'),
+    pase?.f0 === undefined ? undefined : precargaDe(pase.f0, 'frecuencia'),
+  );
+  const rs = useCampoEntrada(
+    RS,
+    RS_POR_DEFECTO,
+    guardado('rs'),
+    pase && precargaDe(pase.rs, 'resistencia'),
+  );
+  const rl = useCampoEntrada(RL, '', guardado('rl'), pase && precargaDe(pase.rl, 'resistencia'));
   const qDiseno = useCampoEntrada(Q_DISENO, '', guardado('q-diseno'));
   const qBobina = useCampoEntrada(Q_BOBINA, Q_BOBINA_POR_DEFECTO, guardado('q-bobina'));
 

@@ -67,9 +67,8 @@ describe('pila de pases', () => {
   });
 
   it('los pases encadenados se apilan y volver deshace de a uno', () => {
-    // Hoy solo Redes y Atenuadores pasan valores, y a Calculadoras que no pasan; el encadenado
-    // llega con los pases desde Filtros hacia Redes (ticket 48). Se prueba con un pase a Redes.
-    const haciaRedes: Pase = { ...r1, origen: 'filtros', destino: 'redes' };
+    // Filtros pasa a Redes desde el aviso de pérdida plana, y Redes a Bobinas.
+    const haciaRedes: Pase = { origen: 'filtros', destino: 'redes', rs: 50, rl: 300 };
     const e1 = pasar({ activa: 'filtros', pila: [] }, haciaRedes);
     expect(e1.activa).toBe('redes');
 

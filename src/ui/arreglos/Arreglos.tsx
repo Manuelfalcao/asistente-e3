@@ -26,7 +26,7 @@ import { Formula } from '../comun/Formula';
 import { Cita, FormaResultado, Pasos } from '../comun/Resultado';
 import { Rotulo } from '../comun/Rotulo';
 import { TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
-import { type Pase, componenteDelPase, precargaDe } from '../pases';
+import { type PaseDeValor, componenteDelPase, precargaDe } from '../pases';
 import { useBusquedaArreglos } from './buscador';
 import { EditorInventario } from './EditorInventario';
 import { useInventario } from './inventario';
@@ -56,7 +56,7 @@ const SERIES: readonly Opcion<SerieE>[] = [
 // La Calculadora de Arreglos equivalentes (spec §8): los 10 mejores Arreglos de hasta 4 componentes
 // para el valor buscado, con la conexión, el Error del arreglo y la Tolerancia del arreglo. La
 // búsqueda corre en un Web Worker.
-export function Arreglos({ pase }: { pase?: Pase }) {
+export function Arreglos({ pase }: { pase?: PaseDeValor }) {
   const guardado = (campo: string) => ({ calculadora: 'arreglos', campo });
   const [componente, setComponente] = useOpcionGuardada(
     COMPONENTES,

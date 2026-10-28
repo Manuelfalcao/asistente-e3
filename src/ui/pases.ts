@@ -10,9 +10,19 @@ import type { IdCalculadora } from './calculadoras';
 
 export type MagnitudPasable = Extract<Magnitud, 'inductancia' | 'capacidad' | 'resistencia'>;
 
-export interface Pase {
+// Lo común a todo pase: de dónde sale, a dónde va y el aviso que la franja repite.
+interface PaseBase {
   origen: IdCalculadora;
-  destino: IdCalculadora;
+  // El aviso del valor en el origen: la franja repite el rótulo y su motivo.
+  nivel?: Nivel;
+  motivo?: string;
+  // Una nota que la franja agrega, como la de la potencia en los Arreglos equivalentes.
+  nota?: string;
+}
+
+// Una L a Bobinas, o una C o una R a Arreglos equivalentes.
+export interface PaseDeValor extends PaseBase {
+  destino: 'bobinas' | 'arreglos';
   // "C1": cómo lo nombra la Calculadora de origen.
   nombre: string;
   magnitud: MagnitudPasable;
@@ -20,12 +30,18 @@ export interface Pase {
   valor: number;
   // La frecuencia de evaluación del origen, en Hz: en bobinas llega como frecuencia de trabajo.
   frecuencia?: number;
-  // El aviso del valor en el origen: la franja repite el rótulo y su motivo.
-  nivel?: Nivel;
-  motivo?: string;
-  // Una nota que la franja agrega, como la de la potencia en los Arreglos equivalentes.
-  nota?: string;
 }
+
+// Desde el aviso de pérdida plana de un filtro con Rs ≠ RL a redes de adaptación (spec §9.7).
+export interface PaseARedes extends PaseBase {
+  destino: 'redes';
+  // En Ω y en Hz, con precisión completa. f₀ solo si el filtro es pasa banda.
+  rs: number;
+  rl: number;
+  f0?: number;
+}
+
+export type Pase = PaseDeValor | PaseARedes;
 
 const MAGNITUD_DE: Record<'L' | 'C' | 'R', MagnitudPasable> = {
   L: 'inductancia',
@@ -34,7 +50,7 @@ const MAGNITUD_DE: Record<'L' | 'C' | 'R', MagnitudPasable> = {
 };
 
 // Las L van a Bobinas; las C y las R, a Arreglos equivalentes (spec §5.5).
-export function crearPase(pase: Omit<Pase, 'destino'>): Pase {
+export function crearPase(pase: Omit<PaseDeValor, 'destino'>): PaseDeValor {
   return { ...pase, destino: pase.magnitud === 'inductancia' ? 'bobinas' : 'arreglos' };
 }
 
@@ -44,8 +60,8 @@ export function paseDeComponente(
   origen: IdCalculadora,
   componente: { componente: 'L' | 'C' | 'R'; nombre: string; valor: number },
   marcados: readonly { nombre: string; nivel: Nivel; motivo: string }[],
-  extra: Pick<Pase, 'frecuencia' | 'nota'> = {},
-): Pase {
+  extra: Pick<PaseDeValor, 'frecuencia' | 'nota'> = {},
+): PaseDeValor {
   const marca = marcados.find((m) => m.nombre === componente.nombre);
   return crearPase({
     origen,
@@ -58,13 +74,20 @@ export function paseDeComponente(
 }
 
 // El tipo de componente que el pase deja elegido en Arreglos equivalentes.
-export function componenteDelPase(pase: Pase): TipoComponente {
+export function componenteDelPase(pase: PaseDeValor): TipoComponente {
   return pase.magnitud === 'resistencia' ? 'resistencia' : 'capacitor';
 }
 
-// "C1 = 87,4 pF"
+// "C1 = 87,4 pF", o "Rs = 50 Ω, RL = 300 Ω, f₀ = 146 MHz"
 export function textoDeFranja(pase: Pase): string {
-  return `${pase.nombre} = ${formatearValor(pase.valor, pase.magnitud)}`;
+  if (pase.destino !== 'redes') {
+    return `${pase.nombre} = ${formatearValor(pase.valor, pase.magnitud)}`;
+  }
+  return [
+    `Rs = ${formatearValor(pase.rs, 'resistencia')}`,
+    `RL = ${formatearValor(pase.rl, 'resistencia')}`,
+    ...(pase.f0 === undefined ? [] : [`f₀ = ${formatearValor(pase.f0, 'frecuencia')}`]),
+  ].join(', ');
 }
 
 // ---------- La pila ----------

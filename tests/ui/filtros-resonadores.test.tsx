@@ -2,11 +2,12 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/preact';
 import type { FunctionComponent } from 'preact';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Pase } from '../../src/ui/pases';
 
 // La pantalla de la Calculadora de filtros con la Topología de resonadores acoplados (spec §7.7): lo
 // que el Alumno elige y lo que ve. El cálculo se prueba aparte; acá, que la pantalla lo muestre.
 
-let Filtros: FunctionComponent;
+let Filtros: FunctionComponent<{ onPasar?: (pase: Pase) => void }>;
 
 beforeAll(() => {
   // jsdom no tiene ResizeObserver, que usa el esquema para medir el ancho.

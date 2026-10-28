@@ -1,5 +1,5 @@
 import { type IdCalculadora, calculadora } from '../calculadoras';
-import type { Pase } from '../pases';
+import type { Pase, PaseDeValor } from '../pases';
 import { type Nivel, Punto, textoNivel } from './Rotulo';
 
 // "→ Bobinas" o "→ Arreglos" junto a un valor (spec §4.2). Con aviso, lleva el punto del nivel.
@@ -24,7 +24,13 @@ export function BotonPase({
 }
 
 // El botón de pase de un valor del resultado: al tocarlo, el armazón abre la otra Calculadora.
-export function BotonPaseDe({ pase, onPasar }: { pase: Pase; onPasar?: (pase: Pase) => void }) {
-  if (!onPasar || (pase.destino !== 'bobinas' && pase.destino !== 'arreglos')) return null;
+export function BotonPaseDe({
+  pase,
+  onPasar,
+}: {
+  pase: PaseDeValor;
+  onPasar?: (pase: Pase) => void;
+}) {
+  if (!onPasar) return null;
   return <BotonPase destino={pase.destino} nivel={pase.nivel} onClick={() => onPasar(pase)} />;
 }

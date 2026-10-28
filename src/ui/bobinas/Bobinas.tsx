@@ -15,7 +15,7 @@ import { Aviso } from '../comun/Franjas';
 import { Cita, FormaResultado, Pasos } from '../comun/Resultado';
 import { Rotulo } from '../comun/Rotulo';
 import { TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
-import { type Pase, precargaDe } from '../pases';
+import { type PaseDeValor, precargaDe } from '../pases';
 import {
   CABLE,
   CARRETE,
@@ -28,7 +28,7 @@ import {
 // La Calculadora de bobinas (spec §6): las vueltas de una bobina solenoidal de aire de una y de dos
 // capas, cada una en su tarjeta con los dos vecinos en pasos de media vuelta, la SRF estimada, la
 // fórmula, la referencia y los pasos intermedios. Dos capas fuera de rango muestra solo el motivo.
-export function Bobinas({ pase }: { pase?: Pase }) {
+export function Bobinas({ pase }: { pase?: PaseDeValor }) {
   const guardado = (campo: string) => ({ calculadora: 'bobinas', campo });
   // Un pase trae la L y, si la tiene, la frecuencia de evaluación del origen (spec §4.2).
   const inductancia = useCampoEntrada(

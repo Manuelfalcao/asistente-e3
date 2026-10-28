@@ -43,7 +43,7 @@ import { Cita, FormaResultado, Pasos } from '../comun/Resultado';
 import { Rotulo } from '../comun/Rotulo';
 import { useEstadoDeSesion } from '../comun/sesion';
 import { TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
-import { type Pase, paseDeComponente } from '../pases';
+import { type Pase, type PaseDeValor, paseDeComponente } from '../pases';
 import {
   ATENUACION,
   FRECUENCIA,
@@ -308,7 +308,7 @@ function Resultado({
 // Al pasar una resistencia a Arreglos equivalentes (spec §5.5).
 const NOTA_POTENCIA = 'En un Arreglo equivalente la potencia se reparte entre los componentes.';
 
-function paseDeResistencia(r: Resistencia, revision: Revision): Pase {
+function paseDeResistencia(r: Resistencia, revision: Revision): PaseDeValor {
   return paseDeComponente('atenuadores', r, revision.marcados, { nota: NOTA_POTENCIA });
 }
 
