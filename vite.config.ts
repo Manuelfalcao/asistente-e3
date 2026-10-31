@@ -38,14 +38,17 @@ const marcaDelAsistente: Plugin = {
   ],
 };
 
+// El commit en el que está el repo. En el workflow de la etiqueta es el aprobado, no el de la
+// etiqueta (que solo suma el asiento de la aprobación): por eso git va antes que GITHUB_SHA.
 function hashCorto(): string {
-  if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA.slice(0, 7);
   try {
-    return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
+    // Siempre 7 caracteres: --short alarga el hash si es ambiguo, y la historia entera del workflow
+    // de la etiqueta no es la del CI.
+    return execSync('git rev-parse HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
       .toString()
-      .trim();
+      .slice(0, 7);
   } catch {
-    return 'dev';
+    return process.env.GITHUB_SHA?.slice(0, 7) ?? 'dev';
   }
 }
 

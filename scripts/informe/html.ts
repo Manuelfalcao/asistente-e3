@@ -41,9 +41,8 @@ export interface DatosInforme {
   secciones: readonly SeccionInforme[];
   registro: readonly EntradaRegistro[];
   oraculos: readonly Oraculo[];
-  // El HTML de la sección de Cambios, que arma la publicación de la Versión (ticket 49). Null: el
-  // lugar queda vacío.
-  cambios: string | null;
+  // El HTML de la sección de Cambios desde la última Versión aprobada (cambios.ts).
+  cambios: string;
   fuente: {
     css: string;
     // Una data URI (o una URL) del woff2 de Latin Modern Math, o vacío.
@@ -53,7 +52,7 @@ export interface DatosInforme {
 
 // --- Texto ---------------------------------------------------------------------------------------
 
-function esc(texto: string): string {
+export function esc(texto: string): string {
   return texto
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -62,7 +61,7 @@ function esc(texto: string): string {
 }
 
 // Las opciones de la interfaz (src/ui/comun/Formula.tsx): en línea y cortando después de cada =.
-function formula(latex: string): string {
+export function formula(latex: string): string {
   const mathml = temml.renderToString(latex, { displayMode: false, wrap: 'tex' });
   return `<div class="formula">${mathml}</div>`;
 }
@@ -214,12 +213,8 @@ function seccionDeCasos(s: SeccionInforme, oraculos: readonly Oraculo[]): string
   );
 }
 
-function seccionDeCambios(cambios: string | null): string {
-  const titulo = '<h2>Cambios desde la última Versión aprobada</h2>';
-  return cambios === null
-    ? `<section id="cambios" data-vacia>${titulo}<p class="nota">Esta sección la llena la ` +
-        'publicación de la Versión. En este informe no hay una Versión aprobada con la que comparar.</p></section>'
-    : `<section id="cambios">${titulo}${cambios}</section>`;
+function seccionDeCambios(cambios: string): string {
+  return `<section id="cambios"><h2>Cambios desde la última Versión aprobada</h2>${cambios}</section>`;
 }
 
 function aprobacion(id: string, texto: string): string {

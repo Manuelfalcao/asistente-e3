@@ -27,11 +27,14 @@ jobs:
           name: html-unico
           path: dist-archivo/index.html
       # Con Vitest en rojo o un caso sin test el informe se escribe igual, y es justo el que hay que
-      # mirar: por eso corre y se sube aunque algún paso anterior haya fallado.
+      # mirar: por eso corre y se sube aunque algún paso anterior haya fallado. Va con su huella, que
+      # se guarda en docs/aprobaciones/ cuando la Cátedra aprueba la Versión.
       - run: npm run informe
         if: ${{ !cancelled() }}
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
           name: informe-de-casos
-          path: dist-informe/informe.html
+          path: |
+            dist-informe/informe.html
+            dist-informe/huella.json

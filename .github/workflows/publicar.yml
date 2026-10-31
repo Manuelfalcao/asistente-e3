@@ -1,0 +1,112 @@
+name: Publicar una Versión
+
+# Solo una etiqueta vX.Y.Z publica (spec §3.4, §13.7). Antes revisa la aprobación asentada en
+# docs/aprobaciones.md; después construye desde el commit aprobado, publica en GitHub Pages y crea
+# la Release con el HTML único y el Informe de casos. El paso a paso está en docs/publicar-version.md.
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  construir:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # El commit aprobado y la historia hasta el de la etiqueta.
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # La etiqueta coincide con package.json, la entrada de esa Versión está en docs/aprobaciones.md
+      # y del commit aprobado a la etiqueta solo cambió el asiento de la aprobación.
+      - id: aprobacion
+        run: npm run verificar-publicacion -- --etiqueta "$GITHUB_REF_NAME"
+      - run: cp "docs/aprobaciones/$GITHUB_REF_NAME.json" "$RUNNER_TEMP/huella-aprobada.json"
+      # Desde acá todo corre sobre el commit aprobado: es el que vio la Cátedra, y su hash es el que
+      # muestra el Asistente. package-lock.json es el mismo, así que node_modules sirve.
+      - run: git checkout --detach "${{ steps.aprobacion.outputs.commit }}"
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      # Deja además el HTML único en dist/, para el link "Descargar versión para PC".
+      - run: npm run build:archivo
+      # Sale con error si algún caso está en rojo o sin test: un caso en rojo bloquea la Versión.
+      - run: npm run informe
+      - name: La huella guardada es la del Informe de este commit
+        run: |
+          node --input-type=module -e "
+          import { readFileSync } from 'node:fs';
+          import { isDeepStrictEqual } from 'node:util';
+          const leer = (r) => JSON.parse(readFileSync(r, 'utf-8'));
+          if (!isDeepStrictEqual(leer('dist-informe/huella.json'), leer(process.env.RUNNER_TEMP + '/huella-aprobada.json'))) {
+            console.error('docs/aprobaciones/$GITHUB_REF_NAME.json no es la huella del Informe del commit aprobado.');
+            process.exit(1);
+          }"
+      - name: Archivos de la Release
+        run: |
+          mkdir release
+          cp dist-archivo/index.html "release/asistente-e3-$GITHUB_REF_NAME.html"
+          cp dist-informe/informe.html "release/informe-de-casos-$GITHUB_REF_NAME.html"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: release
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  # La Release se crea en borrador antes de tocar el sitio: si falla, los Alumnos no ven nada nuevo.
+  release:
+    needs: construir
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release
+          path: release
+      - run: |
+          gh release create "$GITHUB_REF_NAME" release/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --draft \
+            --title "Asistente E3 $GITHUB_REF_NAME" \
+            --notes "Versión aprobada por la Cátedra (ver docs/aprobaciones.md). Adjuntos: el HTML único, para abrir en PC sin instalar nada, y el Informe de casos que se aprobó."
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  publicar:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  anunciar:
+    needs: publicar
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - run: gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false
+        env:
+          GH_TOKEN: ${{ github.token }}

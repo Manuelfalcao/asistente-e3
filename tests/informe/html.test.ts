@@ -86,7 +86,7 @@ const base: DatosInforme = {
   secciones: [],
   registro: [],
   oraculos: [],
-  cambios: null,
+  cambios: '',
   fuente: { css: '', fuenteFormula: '' },
 };
 
@@ -148,11 +148,10 @@ describe('orden', () => {
     expect(orden).toEqual([...orden].sort((a, b) => a - b));
   });
 
-  it('deja el lugar de la sección de Cambios, vacío hasta que lo llene la publicación', () => {
-    expect(html()).toMatch(/id="cambios"[^>]*data-vacia/);
-    const lleno = html({ cambios: '<p>Casos nuevos: 2</p>' });
-    expect(lleno).toContain('<p>Casos nuevos: 2</p>');
-    expect(lleno).not.toContain('data-vacia');
+  it('la sección de Cambios lleva lo que le pasan', () => {
+    expect(html({ cambios: '<p>Casos nuevos: 2</p>' })).toMatch(
+      /id="cambios"><h2>[^<]*<\/h2><p>Casos nuevos: 2<\/p>/,
+    );
   });
 
   it('en cada Calculadora los casos van agrupados por clase, en el orden de la spec', () => {

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { REGISTRO } from '../../src/calculo/comun/registro';
 import type { AporteInforme } from '../../tests/casos-informe';
+import { type Huella, compararHuellas, huellaDelInforme, renderizarCambios } from './cambios';
 import { aportesDeTests, seccionesDeCasos } from './casos';
 import { type PruebaVitest, type ResumenEstados, resumenDeEstados } from './estado';
 import { type DatosInforme, renderizarInforme } from './html';
@@ -17,8 +18,9 @@ export interface OpcionesInforme {
   encabezado: DatosInforme['encabezado'];
   // Para los tests; por defecto, todos los informe.ts de tests/.
   aportes?: readonly AporteInforme[];
-  // El HTML de la sección de Cambios; lo arma la publicación de la Versión.
-  cambios?: string | null;
+  // La huella de la última Versión aprobada (docs/aprobaciones/vX.Y.Z.json), contra la que se arma
+  // la sección de Cambios. Null si no hay ninguna: todo es nuevo.
+  anterior: Huella | null;
 }
 
 function dataUri(ruta: string, tipo: string): string {
@@ -37,8 +39,10 @@ function cssDeTemml(raiz: string): string {
 export function generarInforme(opciones: OpcionesInforme): {
   html: string;
   resumen: ResumenEstados;
+  // Lo que se guarda al aprobar esta Versión, para medir contra ella los Cambios de la siguiente.
+  huella: Huella;
 } {
-  const { raiz, pruebas, encabezado, cambios = null } = opciones;
+  const { raiz, pruebas, encabezado, anterior } = opciones;
   const secciones = seccionesDeCasos(opciones.aportes ?? aportesDeTests(), pruebas);
   // Un caso con bandera de una Deducción que no está en el registro no tendría dónde mostrarse.
   const ids = new Set(REGISTRO.map((e) => e.id));
@@ -49,13 +53,14 @@ export function generarInforme(opciones: OpcionesInforme): {
       );
     }
   }
+  const huella = huellaDelInforme({ encabezado, secciones, registro: REGISTRO });
   const datos: DatosInforme = {
     encabezado,
     vitest: { total: pruebas.length, fallan: pruebas.filter((p) => p.estado === 'failed').length },
     secciones,
     registro: REGISTRO,
     oraculos: leerOraculos(join(raiz, 'tests/oraculos'), 'tests/oraculos'),
-    cambios,
+    cambios: renderizarCambios(compararHuellas(anterior, huella)),
     fuente: {
       css: `${cssDeTemml(raiz)}\n${readFileSync(join(raiz, 'scripts/informe/informe.css'), 'utf-8')}`,
       fuenteFormula: dataUri(
@@ -67,5 +72,6 @@ export function generarInforme(opciones: OpcionesInforme): {
   return {
     html: renderizarInforme(datos),
     resumen: resumenDeEstados(secciones.flatMap((s) => s.casos.map((c) => c.estado))),
+    huella,
   };
 }

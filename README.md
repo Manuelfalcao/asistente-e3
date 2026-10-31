@@ -2,17 +2,18 @@
 
 Calculadoras para dimensionar los componentes de circuitos de VHF. La especificación está en [`docs/spec.md`](docs/spec.md).
 
-| Comando                 | Qué hace                                                            |
-| ----------------------- | ------------------------------------------------------------------- |
-| `npm run dev`           | Servidor de desarrollo                                              |
-| `npm run build`         | PWA instalable en `dist/`                                           |
-| `npm run build:archivo` | HTML único autocontenido en `dist-archivo/index.html`               |
-| `npm run build:muestra` | Página de muestra del sistema visual en `dist-muestra/muestra.html` |
-| `npm run informe`       | Informe de casos para la Cátedra en `dist-informe/informe.html`     |
-| `npm run iconos`        | Arma los PNG del ícono del Asistente en `public/`                   |
-| `npm run fuente`        | Recorta Latin Modern Math para las fórmulas (Python con fontTools)  |
-| `npm run typecheck`     | `tsc --noEmit`                                                      |
-| `npm test`              | Vitest                                                              |
+| Comando                                              | Qué hace                                                            |
+| ---------------------------------------------------- | ------------------------------------------------------------------- |
+| `npm run dev`                                        | Servidor de desarrollo                                              |
+| `npm run build`                                      | PWA instalable en `dist/`                                           |
+| `npm run build:archivo`                              | HTML único autocontenido en `dist-archivo/index.html`               |
+| `npm run build:muestra`                              | Página de muestra del sistema visual en `dist-muestra/muestra.html` |
+| `npm run informe`                                    | Informe de casos para la Cátedra en `dist-informe/informe.html`     |
+| `npm run verificar-publicacion -- --etiqueta vX.Y.Z` | Lo que revisa el workflow de la etiqueta antes de publicar          |
+| `npm run iconos`                                     | Arma los PNG del ícono del Asistente en `public/`                   |
+| `npm run fuente`                                     | Recorta Latin Modern Math para las fórmulas (Python con fontTools)  |
+| `npm run typecheck`                                  | `tsc --noEmit`                                                      |
+| `npm test`                                           | Vitest                                                              |
 
 Node 24 (ver `.nvmrc`). La Versión sale de `package.json` más el hash corto del commit.
 
@@ -23,6 +24,10 @@ Los tests de pantalla (`tests/ui/*.test.tsx`) corren en jsdom con `@testing-libr
 - Colores, tipografía, tamaños y espaciado: `src/ui/tokens.css`. Las Calculadoras usan esas variables y nunca un color suelto; `tests/paleta.test.ts` verifica el contraste en el tema claro y en el oscuro ([ADR 1](docs/adr/0001-modo-oscuro-segun-el-sistema.md)).
 - Componentes base (tarjeta de resultado, forma del resultado, fórmula, cita, pasos intermedios, campos, rótulos, botón de pase, franjas, esquema en escalera): `src/ui/comun/`.
 - La página de muestra los presenta todos. No llega al Asistente: con `npm run dev` está en `/muestra.html`, y `npm run build:muestra` la arma como un HTML suelto para mirarla en el celular.
+
+## Publicación
+
+Solo una etiqueta `vX.Y.Z` publica en GitHub Pages y crea la Release con el HTML único y el Informe de casos (`.github/workflows/publicar.yml`). Un push a `main` no publica: deja los productos y el Informe como artefactos del CI. El workflow de la etiqueta no publica si la etiqueta no coincide con `package.json`, si falta la entrada de esa Versión en [`docs/aprobaciones.md`](docs/aprobaciones.md), si entre el commit aprobado y la etiqueta cambió algo más que el asiento, o si fallan `tsc --noEmit`, los tests o algún caso del Informe. Construye desde el commit aprobado, así el Asistente muestra el hash que vio la Cátedra. El paso a paso para el Ayudante de cátedra está en [`docs/publicar-version.md`](docs/publicar-version.md).
 
 ## Fórmulas
 
@@ -39,5 +44,5 @@ Los tests de pantalla (`tests/ui/*.test.tsx`) corren en jsdom con `@testing-libr
 - **El estado de un caso sale de Vitest**: el test que lo corre se llama como el caso (`it(caso.id, …)`), o empieza con `"<id>:"`. Un caso sin test queda "sin test", y uno con algún número fuera de la tolerancia queda en rojo aunque su test haya pasado. `npm run informe` sale con error si hay alguno de los dos, o si falla cualquier test.
 - **Los oráculos** de `tests/oraculos/` se describen solos con su comentario de cabecera y sus funciones exportadas.
 - **Una Deducción propia** va en `REGISTRO` (`src/calculo/comun/registro.ts`) con su `deduccion` en pasos y su `bandera`; los casos que se corren con la fórmula propia o con el plan B llevan `bandera: { deduccion: id, lado }` y el informe los muestra de los dos lados.
-- La sección de Cambios queda vacía hasta que la llene la publicación de la Versión (`cambios` de `generarInforme`).
+- **La sección de Cambios** compara contra la última Versión de `docs/aprobaciones.md`: el informe deja al lado su huella (`dist-informe/huella.json`: cada caso con sus valores, fórmulas y referencia, y el registro común), que al aprobar se guarda en `docs/aprobaciones/vX.Y.Z.json`. Sin ninguna aprobada dice que todo es nuevo.
 - Con `npm run informe -- --resultados r.json` usa un resultado de Vitest ya corrido.

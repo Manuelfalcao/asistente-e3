@@ -113,7 +113,13 @@ describe('secciones', () => {
       ],
     };
     expect(() =>
-      generarInforme({ raiz: process.cwd(), pruebas: [], encabezado, aportes: [conBandera] }),
+      generarInforme({
+        raiz: process.cwd(),
+        pruebas: [],
+        encabezado,
+        aportes: [conBandera],
+        anterior: null,
+      }),
     ).toThrow(/no-existe/);
   });
 
@@ -123,10 +129,11 @@ describe('secciones', () => {
 });
 
 describe('el informe completo', () => {
-  const { html, resumen } = generarInforme({
+  const { html, resumen, huella } = generarInforme({
     raiz: process.cwd(),
     pruebas: todosPasan(),
     encabezado,
+    anterior: null,
   });
 
   it('con todos los tests en verde no hay nada en rojo ni sin test', () => {
@@ -139,7 +146,7 @@ describe('el informe completo', () => {
   });
 
   it('sin el resultado de Vitest ningún caso está aprobado', () => {
-    const vacio = generarInforme({ raiz: process.cwd(), pruebas: [], encabezado });
+    const vacio = generarInforme({ raiz: process.cwd(), pruebas: [], encabezado, anterior: null });
     expect(vacio.resumen.ok).toBe(0);
     expect(vacio.resumen.sinTest).toBe(vacio.resumen.total);
   });
@@ -168,5 +175,20 @@ describe('el informe completo', () => {
 
   it('tiene las fórmulas de los pasos en MathML', () => {
     expect(html).toContain('<math');
+  });
+
+  it('sin una Versión aprobada, la sección de Cambios dice que todo es nuevo', () => {
+    expect(html).toContain(`todo es nuevo: ${resumen.total} casos`);
+  });
+
+  it('contra su propia huella no tiene cambios de cálculo, aunque cambien la Versión y el commit', () => {
+    const otra = generarInforme({
+      raiz: process.cwd(),
+      pruebas: todosPasan(),
+      encabezado: { ...encabezado, version: '0.2.0', commit: 'def5678' },
+      anterior: JSON.parse(JSON.stringify(huella)),
+    });
+    expect(otra.html).toContain('Sin cambios de cálculo');
+    expect(otra.html).toContain('v0.1.0');
   });
 });
