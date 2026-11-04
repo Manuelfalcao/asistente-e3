@@ -1,6 +1,6 @@
 // docs/aprobaciones.md (spec §13.7): cada Versión que aprueba la Cátedra, asentada por el Ayudante de
-// cátedra. El Informe de casos mide sus Cambios contra la última, y el workflow de la etiqueta no
-// publica sin la entrada de esa Versión con ese hash (spec §3.4).
+// cátedra. El Informe de casos mide sus Cambios contra la última. El workflow de la etiqueta no publica
+// sin la entrada de esa Versión con ese hash, salvo que no tenga cambios de cálculo (spec §3.4).
 //
 // Cada entrada es un título "## vX.Y.Z" con cuatro renglones:
 //
@@ -190,5 +190,48 @@ export function problemasDePublicacion(d: DatosPublicacion): string[] {
       `La entrada de ${d.etiqueta} aprueba Deducciones propias que no están en el registro: ` +
         `${desconocidas.join(', ')}.`,
     );
+  return problemas;
+}
+
+// Lo que define un cálculo: un cambio acá siempre pide una aprobación nueva, aunque ningún caso cambie.
+function esDeCalculo(archivo: string): boolean {
+  return archivo.startsWith('src/calculo/') || archivo.startsWith('src/entrada/');
+}
+
+export interface DatosSinCambios {
+  // "v0.2.0"
+  etiqueta: string;
+  versionPaquete: string;
+  // La última Versión aprobada.
+  ultima: Aprobacion;
+  // Los archivos que cambian de su commit al de la etiqueta; null si no es un antecesor.
+  cambiadosDesdeAprobado: readonly string[] | null;
+}
+
+// Para una etiqueta sin entrada propia (spec §13.7): lo que impide publicarla con la aprobación de la
+// última Versión; vacío si se puede. Que el Informe no tenga cambios de cálculo lo revisa el workflow
+// después, con scripts/verificar-sin-cambios.mjs.
+export function problemasSinCambios(d: DatosSinCambios): string[] {
+  const version = versionDeEtiqueta(d.etiqueta);
+  if (!version) return [`La etiqueta «${d.etiqueta}» no es vX.Y.Z.`];
+  const problemas: string[] = [];
+  if (version !== d.versionPaquete)
+    problemas.push(
+      `La etiqueta ${d.etiqueta} no coincide con la Versión de package.json (${d.versionPaquete}).`,
+    );
+  if (compararVersiones(version, d.ultima.version) <= 0)
+    problemas.push(`${d.etiqueta} no es posterior a v${d.ultima.version}, la última aprobada.`);
+  if (d.cambiadosDesdeAprobado === null) {
+    problemas.push(
+      `El commit de v${d.ultima.version} (${d.ultima.hash}) no es un antecesor del de la etiqueta.`,
+    );
+  } else {
+    const deCalculo = d.cambiadosDesdeAprobado.filter(esDeCalculo);
+    if (deCalculo.length)
+      problemas.push(
+        `Desde v${d.ultima.version} cambió el cálculo (${deCalculo.join(', ')}): esta Versión ` +
+          `necesita su entrada en docs/aprobaciones.md.`,
+      );
+  }
   return problemas;
 }

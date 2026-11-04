@@ -319,7 +319,7 @@ export function renderizarCambios(c: Cambios): string {
       `${contra}<p class="sin-cambios"><strong>Sin cambios de cálculo.</strong> Los casos, sus ` +
       'entradas, esperados, obtenidos y tolerancias, las fórmulas de los pasos, las referencias y ' +
       'las Deducciones propias y los Criterios prácticos son los mismos que en la Versión aprobada. ' +
-      'Esta Versión se puede aprobar mirando solo esta sección.</p>'
+      'Esta Versión no necesita una aprobación nueva: se publica con la de esa Versión.</p>'
     );
   }
   return [

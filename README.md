@@ -2,7 +2,7 @@
 
 El Asistente E3 calcula los componentes de los circuitos que se arman en la materia, sobre todo en VHF (30 a 300 MHz) y montados en Manhattan con componentes con terminales. Tiene cinco Calculadoras: bobinas, filtros, Arreglos equivalentes, redes de adaptación y atenuadores.
 
-Funciona en Android, iPhone y PC, también sin conexión. Cada resultado trae la fórmula que usa y de dónde sale, y la Cátedra aprueba cada Versión antes de que llegue a los Alumnos.
+Funciona en Android, iPhone y PC, también sin conexión. Cada resultado trae la fórmula que usa y de dónde sale, y la Cátedra aprueba todo cambio de cálculo antes de que llegue a los Alumnos.
 
 ## Cómo abrirlo
 

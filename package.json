@@ -12,6 +12,7 @@
     "test": "vitest run",
     "informe": "node scripts/informe.mjs",
     "verificar-publicacion": "node scripts/verificar-publicacion.mjs",
+    "verificar-sin-cambios": "node scripts/verificar-sin-cambios.mjs",
     "format": "prettier --write .",
     "iconos": "node scripts/iconos.mjs",
     "fuente": "python scripts/recortar-fuente.py"

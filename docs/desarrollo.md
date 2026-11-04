@@ -10,6 +10,7 @@ Lo que hace falta para construir, probar y publicar el Asistente. Lo que ve el A
 | `npm run build:muestra`                              | Página de muestra del sistema visual en `dist-muestra/muestra.html` |
 | `npm run informe`                                    | Informe de casos para la Cátedra en `dist-informe/informe.html`     |
 | `npm run verificar-publicacion -- --etiqueta vX.Y.Z` | Lo que revisa el workflow de la etiqueta antes de publicar          |
+| `npm run verificar-sin-cambios`                      | Sin entrada propia: que el Informe no tenga cambios de cálculo      |
 | `npm run iconos`                                     | Arma los PNG del ícono del Asistente en `public/`                   |
 | `npm run fuente`                                     | Recorta las fuentes de fórmulas y títulos (Python con fontTools)    |
 | `npm run typecheck`                                  | `tsc --noEmit`                                                      |
@@ -34,7 +35,7 @@ El botón "Ayuda" del encabezado muestra el [README](../README.md), desde el pri
 
 ## Publicación
 
-Solo una etiqueta `vX.Y.Z` publica en GitHub Pages y crea la Release con el HTML único y el Informe de casos (`.github/workflows/publicar.yml`). Un push a `main` no publica: deja los productos y el Informe como artefactos del CI. El workflow de la etiqueta no publica si la etiqueta no coincide con `package.json`, si falta la entrada de esa Versión en [`aprobaciones.md`](aprobaciones.md), si entre el commit aprobado y la etiqueta cambió algo más que el asiento, o si fallan `tsc --noEmit`, los tests o algún caso del Informe. Construye desde el commit aprobado, así el Asistente muestra el hash que vio la Cátedra. El paso a paso para el Ayudante de cátedra está en [`publicar-version.md`](publicar-version.md).
+Solo una etiqueta `vX.Y.Z` publica en GitHub Pages y crea la Release con el HTML único y el Informe de casos (`.github/workflows/publicar.yml`). Un push a `main` no publica: deja los productos y el Informe como artefactos del CI. El workflow de la etiqueta no publica si la etiqueta no coincide con `package.json` o si fallan `tsc --noEmit`, los tests o algún caso del Informe. Con entrada en [`aprobaciones.md`](aprobaciones.md), tampoco si entre el commit aprobado y la etiqueta cambió algo más que el asiento, y construye desde el commit aprobado, así el Asistente muestra el hash que vio la Cátedra. Sin entrada, la Versión tiene que no tener cambios de cálculo desde la última aprobada ([spec §13.7](spec.md)): no cambia `src/calculo/` ni `src/entrada/` y `npm run verificar-sin-cambios` da la sección de Cambios vacía. El paso a paso para el Ayudante de cátedra está en [`publicar-version.md`](publicar-version.md).
 
 ## Fórmulas
 

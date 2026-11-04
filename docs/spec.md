@@ -28,7 +28,7 @@ Esta es la especificación del Asistente lista para construir. Reúne lo que se 
 ## 1. Contexto y alcance
 
 - **Para quién:** Alumnos de una materia de electrónica de comunicaciones que arman circuitos, sobre todo en VHF (30 a 300 MHz), y los montan en Manhattan con componentes con terminales.
-- **Quién lo hace:** el Ayudante de cátedra lo diseña y lo mantiene con Claude Code y GitHub. La Cátedra aprueba cada Versión antes de que llegue a los Alumnos, que la reciben por WhatsApp como un link.
+- **Quién lo hace:** el Ayudante de cátedra lo diseña y lo mantiene con Claude Code y GitHub. La Cátedra aprueba todo cambio de cálculo antes de que llegue a los Alumnos (sección 13.7), que reciben el Asistente por WhatsApp como un link.
 - **Plataformas:** Android, iPhone y PC. Funciona sin conexión.
 - **Idioma:** interfaz en castellano, con voseo ("Corregí", "Completá").
 - **Cinco Calculadoras:** bobinas, filtros, Arreglos equivalentes, redes de adaptación y atenuadores resistivos π y T.
@@ -58,7 +58,7 @@ Origen: [mapa](map.md) (Notes), [Qué Calculadoras entran en la primera versión
 
 ### 2.2 Versiones y aviso de versión nueva
 
-- **Versión semántica manual** en `package.json` más el hash corto del commit. Las dos se ven en el encabezado del celular y, en PC, al pie del menú. La Cátedra aprueba una Versión concreta.
+- **Versión semántica manual** en `package.json` más el hash corto del commit. Las dos se ven en el encabezado del celular y, en PC, al pie del menú. La Cátedra aprueba una Versión concreta, y las siguientes sin cambios de cálculo se publican con esa aprobación (sección 13.7).
 - Cuando el service worker nuevo queda en espera, aparece una **franja arriba**, debajo del encabezado: "Hay una versión nueva · Recargar". Al recargar se conservan el Inventario y las entradas.
 - Se publica con `git push` de una etiqueta (sección 3.4). No se reenvía nada a los Alumnos.
 
@@ -103,7 +103,7 @@ Origen: [Formatos de distribución](issues/06-formatos-distribucion.md), [Protot
 ### 3.4 Publicación
 
 - **GitHub Actions**, en cada push a `main`: `tsc --noEmit`, los tests, los dos productos y el Informe de casos, que quedan como artefactos descargables para revisar el candidato.
-- **Solo una etiqueta `vX.Y.Z` publica en Pages** y crea una Release con el HTML único y el Informe adjuntos. El workflow no publica si fallan los tests o si `docs/aprobaciones.md` no tiene la entrada de esa Versión con ese hash (sección 13.7).
+- **Solo una etiqueta `vX.Y.Z` publica en Pages** y crea una Release con el HTML único y el Informe adjuntos. El workflow no publica si fallan los tests o si una Versión con cambios de cálculo no tiene su entrada en `docs/aprobaciones.md` con ese hash (sección 13.7).
 
 Origen: [Stack técnico y estructura del código](issues/15-stack-tecnico.md), [Casos de prueba e informe para la aprobación de la Cátedra](issues/24-casos-de-prueba-aprobacion.md).
 
@@ -1149,9 +1149,11 @@ Los **Criterios prácticos** se aprueban como criterio y no como fórmula; si no
 
 1. La Cátedra contesta "apruebo la vX.Y.Z" por el canal que use (mail o WhatsApp).
 2. El Ayudante de cátedra lo asienta en `docs/aprobaciones.md` del repo `asistente-e3`, con la Versión, el hash, la fecha, quién aprobó y qué Deducciones propias se aprobaron. Recién ahí crea la etiqueta.
-3. El workflow de la etiqueta no publica si falta la entrada con ese hash.
+3. El workflow de la etiqueta no publica una Versión con cambios de cálculo si falta la entrada con ese hash.
 
-- **Toda Versión necesita aprobación.** Una Versión sin cambios de cálculo se aprueba mirando solo la sección de Cambios.
+- **Toda Versión con cambios de cálculo necesita aprobación.** Una Versión sin cambios de cálculo, como una que solo cambia el aspecto, se publica con la aprobación de la última aprobada, sin entrada propia en `docs/aprobaciones.md`. Regla acordada con la Cátedra el 2026-11-04.
+- **Sin cambios de cálculo** quiere decir dos cosas, y el workflow de la etiqueta revisa las dos: no cambió ningún archivo de `src/calculo/` ni de `src/entrada/` desde el commit de la última aprobada, y el Informe da la sección de Cambios vacía: mismos casos, valores, tolerancias, fórmulas, referencias, Deducciones propias y Criterios prácticos. Lo demás de la interfaz, incluidos sus textos y su comportamiento, no pide aprobación.
+- **Los Cambios se miden siempre contra la última Versión aprobada,** no contra la última publicada: una Versión sin aprobación propia no corre la referencia.
 - **Un caso en rojo bloquea la Versión:** no existe la "falla aceptada". Si el que estaba mal era el caso (una referencia mal leída, una tolerancia mal puesta), se corrige en un commit con el motivo, y aparece en la sección de Cambios.
 
 Origen: [Casos de prueba e informe para la aprobación de la Cátedra](issues/24-casos-de-prueba-aprobacion.md).

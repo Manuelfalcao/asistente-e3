@@ -1,11 +1,14 @@
 // npm run verificar-publicacion -- --etiqueta vX.Y.Z: lo corre el workflow de la etiqueta antes de
 // publicar (spec §3.4, §13.7), sobre el commit de la etiqueta y con la historia entera de git.
 //
-// Revisa que la etiqueta coincida con la Versión de package.json, que docs/aprobaciones.md tenga la
-// entrada de esa Versión, que del commit aprobado al de la etiqueta solo haya cambiado el asiento de
-// la aprobación y que la huella guardada sea la de ese commit. Si está todo en regla escribe el hash
-// entero del commit aprobado en $GITHUB_OUTPUT (commit=...), para construir y publicar desde ahí; si
-// no, sale con código 1 y dice por qué.
+// Con una entrada de esa Versión en docs/aprobaciones.md, revisa que la etiqueta coincida con
+// package.json, que del commit aprobado al de la etiqueta solo haya cambiado el asiento y que la huella
+// guardada sea la de ese commit. Sin entrada propia, revisa que sea posterior a la última aprobada y
+// que desde ella no haya cambiado src/calculo/ ni src/entrada/: el workflow después compara las huellas.
+//
+// Si está todo en regla escribe en $GITHUB_OUTPUT el commit desde el que construir (commit=...), si se
+// publica con aprobación propia o sin cambios (modo=aprobada|sin-cambios) y la Versión cuya aprobación
+// vale (base=X.Y.Z). Si no, sale con código 1 y dice por qué.
 
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
@@ -54,8 +57,14 @@ const servidor = await createServer({
 });
 
 try {
-  const { leerAprobaciones, problemasDePublicacion, rutaDeHuella, versionDeEtiqueta } =
-    await servidor.ssrLoadModule('/scripts/informe/aprobaciones.ts');
+  const {
+    leerAprobaciones,
+    problemasDePublicacion,
+    problemasSinCambios,
+    rutaDeHuella,
+    ultimaAprobada,
+    versionDeEtiqueta,
+  } = await servidor.ssrLoadModule('/scripts/informe/aprobaciones.ts');
   const { REGISTRO } = await servidor.ssrLoadModule('/src/calculo/comun/registro.ts');
 
   const { version: versionPaquete } = JSON.parse(readFileSync(join(raiz, 'package.json'), 'utf-8'));
@@ -63,31 +72,48 @@ try {
   // Con una etiqueta que no es vX.Y.Z, problemasDePublicacion lo dice y no se busca nada más.
   const version = versionDeEtiqueta(etiqueta) ?? etiqueta;
   const aprobacion = aprobaciones.find((a) => a.version === version);
-  const entero = aprobacion ? commitAprobado(aprobacion.hash) : null;
+  const ultima = ultimaAprobada(aprobaciones);
+  // Sin entrada propia, la Versión se mide contra la última aprobada y se construye desde la etiqueta.
+  const conEntrada = aprobacion || !ultima;
+  const base = conEntrada ? aprobacion : ultima;
+  const entero = base ? commitAprobado(base.hash) : null;
+  // Las rutas de git son relativas a la raíz del repositorio, que es la de este proyecto.
+  const cambiadosDesdeAprobado = entero
+    ? git('diff', '--name-only', entero, 'HEAD').split('\n').filter(Boolean)
+    : null;
   const rutaHuella = join(raiz, rutaDeHuella(version));
   const huella = existsSync(rutaHuella) ? JSON.parse(readFileSync(rutaHuella, 'utf-8')) : null;
 
-  const problemas = problemasDePublicacion({
-    etiqueta,
-    versionPaquete,
-    aprobaciones,
-    idsDeducciones: REGISTRO.filter((e) => e.tipo === 'deduccion-propia').map((e) => e.id),
-    // Las rutas de git son relativas a la raíz del repositorio, que es la de este proyecto.
-    cambiadosDesdeAprobado: entero
-      ? git('diff', '--name-only', entero, 'HEAD').split('\n').filter(Boolean)
-      : null,
-    huellaAprobada: huella && { version: huella.version, commit: huella.commit },
-  });
+  const problemas = conEntrada
+    ? problemasDePublicacion({
+        etiqueta,
+        versionPaquete,
+        aprobaciones,
+        idsDeducciones: REGISTRO.filter((e) => e.tipo === 'deduccion-propia').map((e) => e.id),
+        cambiadosDesdeAprobado,
+        huellaAprobada: huella && { version: huella.version, commit: huella.commit },
+      })
+    : problemasSinCambios({ etiqueta, versionPaquete, ultima, cambiadosDesdeAprobado });
 
   if (problemas.length) {
     console.error(`No se publica ${etiqueta}:`);
     for (const p of problemas) console.error(`- ${p}`);
     process.exitCode = 1;
   } else {
+    const commit = conEntrada ? entero : git('rev-parse', 'HEAD');
     console.log(
-      `${etiqueta} aprobada el ${aprobacion.fecha} por ${aprobacion.aprobo}: commit ${entero}.`,
+      conEntrada
+        ? `${etiqueta} aprobada el ${aprobacion.fecha} por ${aprobacion.aprobo}: commit ${commit}.`
+        : `${etiqueta} sin entrada propia: se revisa que no cambie el cálculo desde ` +
+            `v${ultima.version}, aprobada el ${ultima.fecha}. Commit ${commit}.`,
     );
-    if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `commit=${entero}\n`);
+    if (process.env.GITHUB_OUTPUT) {
+      const modo = conEntrada ? 'aprobada' : 'sin-cambios';
+      appendFileSync(
+        process.env.GITHUB_OUTPUT,
+        `commit=${commit}\nmodo=${modo}\nbase=${base.version}\n`,
+      );
+    }
   }
 } finally {
   await servidor.close();
