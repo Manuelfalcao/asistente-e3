@@ -22,7 +22,7 @@ import {
   useCampoEntrada,
   useOpcionGuardada,
 } from '../comun/CampoEntrada';
-import { FormaResultado, FormulasYFuentes, Pasos } from '../comun/Resultado';
+import { FormaResultado, FormulasYFuentes, Pasos, SinResultado } from '../comun/Resultado';
 import { Rotulo } from '../comun/Rotulo';
 import { TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
 import { type PaseDeValor, componenteDelPase, precargaDe } from '../pases';
@@ -195,7 +195,7 @@ export function Arreglos({ pase }: { pase?: PaseDeValor }) {
       </div>
       <section class="resultados" aria-label="Resultados" aria-live="polite" aria-busy={calculando}>
         {mensaje !== null ? (
-          <p class="sin-resultado corregir">{mensaje}</p>
+          <SinResultado mensaje={mensaje} />
         ) : resultado ? (
           <Resultado resultado={resultado} calculando={calculando} />
         ) : (

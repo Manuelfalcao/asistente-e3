@@ -11,7 +11,7 @@ import { mensajeDeResultados } from '../../entrada/campo';
 import { formatearErrorRelativo, formatearValor } from '../../entrada/formato';
 import { CampoEntradaValor, type CampoEntrada, useCampoEntrada } from '../comun/CampoEntrada';
 import { Aviso } from '../comun/Franjas';
-import { FormaResultado, FormulasYFuentes, Pasos } from '../comun/Resultado';
+import { FormaResultado, FormulasYFuentes, Pasos, SinResultado } from '../comun/Resultado';
 import { Rotulo } from '../comun/Rotulo';
 import { TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
 import { type PaseDeValor, precargaDe } from '../pases';
@@ -81,7 +81,7 @@ export function Bobinas({ pase }: { pase?: PaseDeValor }) {
         {entrada ? (
           <Resultado resultado={calcularBobinas(entrada)} />
         ) : (
-          <p class="sin-resultado corregir">{mensaje}</p>
+          <SinResultado mensaje={mensaje} />
         )}
       </section>
     </div>

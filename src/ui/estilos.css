@@ -41,7 +41,34 @@ h3 {
 .contenido {
   flex: 1;
   min-width: 0;
-  padding-bottom: calc(var(--alto-pestanas) + env(safe-area-inset-bottom));
+  /* Las pestañas y el atajo no tapan el final de la página. */
+  padding-bottom: calc(var(--alto-pestanas) + env(safe-area-inset-bottom) + 4rem);
+}
+
+/* Celular y tablet en vertical: el atajo entre entradas y resultado. */
+.salto {
+  position: fixed;
+  right: var(--esp-4);
+  bottom: calc(var(--alto-pestanas) + env(safe-area-inset-bottom) + var(--esp-3));
+  z-index: 9;
+  min-height: var(--toque);
+  padding: 0 var(--esp-4);
+  border: 0;
+  border-radius: var(--radio-pildora);
+  background: var(--acento);
+  color: var(--sobre-acento);
+  font-size: var(--tam-3);
+  font-weight: 600;
+  /* Sin sombra: un filete del color del fondo lo separa de lo que tenga abajo. */
+  outline: 2px solid var(--fondo);
+  cursor: pointer;
+}
+.salto:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 2px;
+}
+.resultados {
+  scroll-margin-top: var(--esp-3);
 }
 
 .encabezado {
@@ -53,7 +80,7 @@ h3 {
   background: var(--superficie);
   border-bottom: 1px solid var(--borde);
 }
-.encabezado h2 {
+.encabezado h1 {
   margin: 0;
   font-size: var(--tam-5);
   font-weight: 600;
@@ -172,7 +199,8 @@ h3 {
   .armazon {
     flex-direction: row;
   }
-  .pestanas {
+  .pestanas,
+  .salto {
     display: none;
   }
   .contenido {

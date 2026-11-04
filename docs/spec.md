@@ -58,7 +58,7 @@ Origen: [mapa](map.md) (Notes), [Qué Calculadoras entran en la primera versión
 
 ### 2.2 Versiones y aviso de versión nueva
 
-- **Versión semántica manual** en `package.json` más el hash corto del commit. Las dos se ven en el encabezado (y en PC también al pie del menú). La Cátedra aprueba una Versión concreta.
+- **Versión semántica manual** en `package.json` más el hash corto del commit. Las dos se ven en el encabezado del celular y, en PC, al pie del menú. La Cátedra aprueba una Versión concreta.
 - Cuando el service worker nuevo queda en espera, aparece una **franja arriba**, debajo del encabezado: "Hay una versión nueva · Recargar". Al recargar se conservan el Inventario y las entradas.
 - Se publica con `git push` de una etiqueta (sección 3.4). No se reenvía nada a los Alumnos.
 
@@ -118,7 +118,9 @@ Origen: [Stack técnico y estructura del código](issues/15-stack-tecnico.md), [
 
 - Es el mismo código con un corte por ancho de pantalla. El valor exacto del corte se ajusta al construir.
 - **No hay pantalla de inicio:** el Asistente abre directo en una Calculadora (sección 4.4).
-- El encabezado muestra el nombre de la Calculadora y la Versión.
+- El encabezado muestra el nombre de la Calculadora, que es el título de la pantalla, y en el celular la Versión. En PC la Versión está al pie del menú: una sola vez alcanza.
+- **En el celular, un atajo entre las entradas y el resultado:** no entran juntos, así que un botón flotante lleva a lo que quedó fuera de la vista ("Ver resultado ↓", "Volver a las entradas ↑"). No aparece con todo a la vista ni cuando todavía no hay resultado.
+- **En PC, las entradas quedan a la vista** mientras se recorre un resultado largo.
 
 ### 4.2 Pase de un valor a otra Calculadora
 
@@ -138,6 +140,7 @@ Origen: [Stack técnico y estructura del código](issues/15-stack-tecnico.md), [
 - **Campos de opciones** (Tipo de filtro, Aproximación, Topología, serie E, tipo de componente, etc.): **etiqueta arriba** y botones segmentados a todo el ancho.
 - **Campos de valor:** **etiqueta al costado**, con el campo y el Selector de unidad en la misma fila, y el eco en vivo debajo del campo ("= 4,7 nH").
 - Teclado de texto completo, sin autocorrección (sección 5.1).
+- **Enter pasa al campo siguiente.** En el último cierra el teclado y, en el celular, lleva al resultado.
 
 ### 4.4 Estado y persistencia
 
@@ -203,9 +206,10 @@ Un campo de valor acepta número, prefijo y unidad opcionales, en notación RKM 
 
 **Eco y errores**
 
+- Un campo vacío muestra un **ejemplo** de cómo se puede escribir su magnitud: "ej. 4n7", "ej. 145M".
 - Debajo del campo hay un **eco en vivo** con el valor normalizado en el formato de salida: "= 4,7 nH".
 - Un valor que no se puede leer marca el campo en rojo con un motivo de una línea: *"No entiendo «4,7x»"*, *"Este campo es de capacidad (F)"*.
-- **Con un campo inválido no se calcula.** El área de resultados muestra *"Corregí: Diámetro del cable"* y no deja el resultado viejo. Con un campo obligatorio vacío muestra *"Completá: …"*.
+- **Con un campo inválido no se calcula.** El área de resultados muestra *"Corregí: Diámetro del cable"* y no deja el resultado viejo. Con un campo obligatorio vacío muestra *"Completá: …"*. Solo "Corregí" va en rojo: que falten datos no es un error, y es lo primero que ve un Alumno al abrir una Calculadora.
 
 **Teclado del celular:** `inputmode="text"`, con `autocorrect`, `autocapitalize` y `spellcheck` apagados. El teclado numérico no tiene letras y no permite escribir "4n7".
 

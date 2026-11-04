@@ -26,7 +26,7 @@ import { BotonPaseDe } from '../comun/BotonPase';
 import { Esquema } from '../comun/Esquema';
 import { Formula } from '../comun/Formula';
 import { Aviso } from '../comun/Franjas';
-import { FormaResultado, FormulasYFuentes, Pasos } from '../comun/Resultado';
+import { FormaResultado, FormulasYFuentes, Pasos, SinResultado } from '../comun/Resultado';
 import { Rotulo } from '../comun/Rotulo';
 import { useEstadoDeSesion } from '../comun/sesion';
 import { TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
@@ -146,7 +146,7 @@ export function Atenuadores({ onPasar }: { onPasar?: (pase: Pase) => void }) {
             onPasar={onPasar}
           />
         ) : (
-          <p class="sin-resultado corregir">{mensaje}</p>
+          <SinResultado mensaje={mensaje} />
         )}
       </section>
     </div>

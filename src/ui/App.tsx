@@ -14,6 +14,7 @@ import { Aviso, FranjaLlegada } from './comun/Franjas';
 import { vaciarSesion } from './comun/sesion';
 import { Filtros } from './filtros/Filtros';
 import { IconoCalculadora } from './comun/Icono';
+import { SaltoEntradasResultado } from './comun/Salto';
 import { FranjaVersionNueva } from './FranjaVersionNueva';
 import { Redes } from './redes/Redes';
 import { svgIconoAsistente } from './iconos';
@@ -84,10 +85,10 @@ export function App() {
   return (
     <div class="armazon">
       <nav class="menu-lateral" aria-label="Calculadoras">
-        <h1 class="marca">
+        <div class="marca">
           <span class="logo" aria-hidden="true" dangerouslySetInnerHTML={{ __html: LOGO }} />
           Asistente E3
-        </h1>
+        </div>
         <ul>
           {CALCULADORAS.map((c) => (
             <li key={c.id}>
@@ -118,7 +119,7 @@ export function App() {
 
       <div class="contenido">
         <header class="encabezado">
-          <h2>{activa.nombre}</h2>
+          <h1>{activa.nombre}</h1>
           <span class="version">{VERSION}</span>
         </header>
         <FranjaVersionNueva />
@@ -158,6 +159,7 @@ export function App() {
             <p class="vacia">Esta Calculadora todavía está vacía.</p>
           )}
         </main>
+        <SaltoEntradasResultado calculadora={activaId} />
       </div>
 
       <nav class="pestanas" aria-label="Calculadoras">

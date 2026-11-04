@@ -384,6 +384,11 @@
   border-radius: var(--radio-1);
   font-variant-numeric: tabular-nums;
 }
+/* El ejemplo del campo vacío se lee, y no se confunde con un valor escrito. */
+.campo-valor input::placeholder {
+  color: var(--texto-suave);
+  opacity: 1;
+}
 .campo-valor select,
 .campo-valor .unidad-fija {
   flex: none;
