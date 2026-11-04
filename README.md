@@ -1,51 +1,137 @@
 # Asistente E3
 
-Calculadoras para dimensionar los componentes de circuitos de VHF. La especificación está en [`docs/spec.md`](docs/spec.md).
+El Asistente E3 calcula los componentes de los circuitos que se arman en la materia, sobre todo en VHF (30 a 300 MHz) y montados en Manhattan con componentes con terminales. Tiene cinco Calculadoras: bobinas, filtros, Arreglos equivalentes, redes de adaptación y atenuadores.
 
-| Comando                                              | Qué hace                                                            |
-| ---------------------------------------------------- | ------------------------------------------------------------------- |
-| `npm run dev`                                        | Servidor de desarrollo                                              |
-| `npm run build`                                      | PWA instalable en `dist/`                                           |
-| `npm run build:archivo`                              | HTML único autocontenido en `dist-archivo/index.html`               |
-| `npm run build:muestra`                              | Página de muestra del sistema visual en `dist-muestra/muestra.html` |
-| `npm run informe`                                    | Informe de casos para la Cátedra en `dist-informe/informe.html`     |
-| `npm run verificar-publicacion -- --etiqueta vX.Y.Z` | Lo que revisa el workflow de la etiqueta antes de publicar          |
-| `npm run iconos`                                     | Arma los PNG del ícono del Asistente en `public/`                   |
-| `npm run fuente`                                     | Recorta las fuentes de fórmulas y títulos (Python con fontTools)    |
-| `npm run typecheck`                                  | `tsc --noEmit`                                                      |
-| `npm test`                                           | Vitest                                                              |
+Funciona en Android, iPhone y PC, también sin conexión. Cada resultado trae la fórmula que usa y de dónde sale, y la Cátedra aprueba cada Versión antes de que llegue a los Alumnos.
 
-Node 24 (ver `.nvmrc`). La Versión sale de `package.json` más el hash corto del commit.
+## Cómo abrirlo
 
-Los tests de pantalla (`tests/ui/*.test.tsx`) corren en jsdom con `@testing-library/preact`, y lo declaran en su primera línea (`// @vitest-environment jsdom`); el resto corre sin DOM.
+- **Desde el link:** abrí en el navegador el link que recibiste. Con eso ya podés usarlo.
+- **Instalado en Android:** en Chrome, abrí el menú ⋮ y elegí "Instalar app" o "Agregar a la pantalla principal".
+- **Instalado en iPhone:** en Safari, tocá Compartir y elegí "Agregar a inicio".
+- **Instalado en PC:** en Chrome o Edge, usá el ícono de instalar de la barra de direcciones.
+- **Como archivo en PC:** el link "Descargar versión para PC", al pie del menú, baja el Asistente en un solo archivo HTML. Sirve de respaldo si no podés instalarlo, pero puede no guardar tus datos: si es así, el Asistente te avisa.
 
-## Sistema visual
+Cuando hay una Versión nueva aparece la franja "Hay una versión nueva". Al recargar, conservás tus entradas y tu Inventario.
 
-- Colores, tipografía, tamaños y espaciado: `src/ui/tokens.css`. Las Calculadoras usan esas variables y nunca un color suelto; `tests/paleta.test.ts` verifica el contraste en el tema claro y en el oscuro ([ADR 1](docs/adr/0001-modo-oscuro-segun-el-sistema.md)).
-- Cada color tiene un solo trabajo ([spec §4.6](docs/spec.md)): `--tinta` para lo impreso, `--acento` para lo que se toca o está elegido, `--marco` para el menú y las pestañas, y `--tecla` y `--tecla-elegida` para las opciones. Ámbar y rojo quedan solo para los avisos.
-- Si cambia el acento claro, hay que cambiar `AZUL_DEL_ICONO` en `src/ui/iconos.ts` y correr `npm run iconos`.
-- Los títulos van en Source Serif 4 (licencia OFL, en `scripts/fuentes/OFL-source-serif-4.txt`), recortada a los caracteres de `scripts/fuentes/rangos-titulos.txt`. Como un recorte es una versión modificada y "Source" es un nombre reservado de la licencia, se llama "Titulos E3". Si un título nuevo usa un carácter que no está, `tests/fuente/titulos.test.ts` falla: hay que sumarlo a la lista y correr `npm run fuente`.
-- Componentes base (tarjeta de resultado, forma del resultado, fórmula, cita, pasos intermedios, campos, rótulos, botón de pase, franjas, esquema en escalera): `src/ui/comun/`.
-- La página de muestra los presenta todos. No llega al Asistente: con `npm run dev` está en `/muestra.html`, y `npm run build:muestra` la arma como un HTML suelto para mirarla en el celular.
+## Cómo se usa
 
-## Publicación
+Elegí una Calculadora en las pestañas de abajo (celular) o en el menú de la izquierda (PC) y completá sus campos. El resultado se calcula solo mientras escribís: no hay botón de calcular.
 
-Solo una etiqueta `vX.Y.Z` publica en GitHub Pages y crea la Release con el HTML único y el Informe de casos (`.github/workflows/publicar.yml`). Un push a `main` no publica: deja los productos y el Informe como artefactos del CI. El workflow de la etiqueta no publica si la etiqueta no coincide con `package.json`, si falta la entrada de esa Versión en [`docs/aprobaciones.md`](docs/aprobaciones.md), si entre el commit aprobado y la etiqueta cambió algo más que el asiento, o si fallan `tsc --noEmit`, los tests o algún caso del Informe. Construye desde el commit aprobado, así el Asistente muestra el hash que vio la Cátedra. El paso a paso para el Ayudante de cátedra está en [`docs/publicar-version.md`](docs/publicar-version.md).
+Si falta un dato, el resultado dice "Completá: …". Si un valor no se puede leer, el campo se marca en rojo con el motivo, el resultado dice "Corregí: …" y no se calcula hasta que lo arregles.
 
-## Fórmulas
+En el celular, un botón flotante te lleva de las entradas al resultado y de vuelta ("Ver resultado", "Volver a las entradas"). Enter pasa al campo siguiente.
 
-- El cálculo (`src/calculo/`) escribe las fórmulas como cadenas LaTeX con los números ya sustituidos; `src/ui/comun/Formula.tsx` las dibuja con Temml.
-- La fuente es Latin Modern Math (licencia GUST) recortada a los caracteres de `scripts/fuentes/rangos.txt`. Si una fórmula nueva usa un carácter que no está, `tests/fuente/fuente.test.ts` falla: hay que sumarlo a la lista y correr `npm run fuente` (`pip install fonttools brotli`).
+### Cómo escribir un valor
 
-## Informe de casos
+Los campos aceptan el número con su prefijo y su unidad, de varias formas. Debajo del campo, un eco te muestra cómo se leyó: "= 4,7 nH".
 
-`npm run informe` corre Vitest con el reporter JSON y arma `dist-informe/informe.html`: un HTML autocontenido con todos los Casos de prueba, las Deducciones propias, los Criterios prácticos y los oráculos, que la Cátedra revisa para aprobar una Versión ([spec §13.6](docs/spec.md)). "Guardar como PDF" da el PDF. El CI lo deja como artefacto en cada push a `main`; no entra en el Asistente.
+- **Con coma o con punto:** 4,7 y 4.7 son lo mismo. No hay separador de miles: "1.000" se lee como 1. Para mil, escribí 1000 o 1k.
+- **Con prefijo y unidad:** 4,7 nH, 4,7n, 0.0047u, 145M, 1,2 kΩ.
+- **En notación RKM (solo L, C y R):** 4n7, 2p2, 4k7, 1M5. En resistencias también R47 y 47R.
+- **En notación científica:** 4.7e-9, sin prefijo.
+- **Mayúsculas:** importan solo en m y M, y en p y P. 100m es 100 mili y 100M es 100 mega.
+- **Sin prefijo ni unidad:** el número se lee en la unidad del Selector de unidad, el desplegable junto al campo.
+- **Lo que escribís manda sobre el selector:** 4,7n con el selector en pF da 4,7 nF.
+- **Largos:** van siempre en mm, solo con el número.
 
-- **Una Calculadora nueva aparece sola**: sus tablas de casos van en `tests/calculo/<calculadora>/` y un `informe.ts` al lado las adapta (`AporteInforme`, en `tests/casos-informe.ts`): corre el cálculo con las entradas de cada caso y devuelve el obtenido, el error y los pasos. Se levanta con `import.meta.glob`, sin registrarlo en ningún lado del informe.
-- **Pero el test del informe sí lleva la lista**: `tests/informe/generar.test.ts` fija qué Calculadoras aportan casos ("y nada más por ahora"), para que un `informe.ts` no aparezca ni desaparezca sin querer. En el mismo commit que suma el `informe.ts` de una Calculadora, agregá su id a ese `Set` y corré `npm test` completo, no solo los tests de la Calculadora: si no, CI queda en rojo en `main`.
-- **La caché de módulos de Vitest está apagada** (`fsModuleCache: false` en `vite.config.ts`): no se entera de un archivo nuevo que entra en un `import.meta.glob`, así que en local el informe dejaba de ver el `informe.ts` nuevo mientras CI sí lo veía. No la vuelvas a prender; si alguna vez quedó una `node_modules/.vitest-cache` vieja, se puede borrar.
-- **El estado de un caso sale de Vitest**: el test que lo corre se llama como el caso (`it(caso.id, …)`), o empieza con `"<id>:"`. Un caso sin test queda "sin test", y uno con algún número fuera de la tolerancia queda en rojo aunque su test haya pasado. `npm run informe` sale con error si hay alguno de los dos, o si falla cualquier test.
-- **Los oráculos** de `tests/oraculos/` se describen solos con su comentario de cabecera y sus funciones exportadas.
-- **Una Deducción propia** va en `REGISTRO` (`src/calculo/comun/registro.ts`) con su `deduccion` en pasos y su `bandera`; los casos que se corren con la fórmula propia o con el plan B llevan `bandera: { deduccion: id, lado }` y el informe los muestra de los dos lados.
-- **La sección de Cambios** compara contra la última Versión de `docs/aprobaciones.md`: el informe deja al lado su huella (`dist-informe/huella.json`: cada caso con sus valores, fórmulas y referencia, y el registro común), que al aprobar se guarda en `docs/aprobaciones/vX.Y.Z.json`. Sin ninguna aprobada dice que todo es nuevo.
-- Con `npm run informe -- --resultados r.json` usa un resultado de Vitest ya corrido.
+### Cómo leer un resultado
+
+Arriba van los avisos que afectan a todo el resultado y el resultado principal. Después, las tarjetas con cada variante, y al pie las notas de construcción.
+
+Cada tarjeta muestra primero los valores. Los desplegables, cerrados al abrir, tienen el resto:
+
+- **Fórmulas y fuentes:** las fórmulas y su referencia bibliográfica.
+- **Pasos intermedios:** cada fórmula con los números sustituidos, para seguir la cuenta.
+
+Algunos valores llevan un rótulo que aclara de dónde salen:
+
+- **estimación:** un valor aproximado, como la autorresonancia de una bobina o una pérdida.
+- **criterio práctico:** una regla de montaje que no sale de la bibliografía.
+- **criterio de diseño:** una práctica habitual sin una fuente primaria, como el margen de potencia de 2× en atenuadores.
+- **deducción propia:** una fórmula o adaptación que no está publicada y que la Cátedra aprobó aparte.
+
+### Valor dudoso y Valor impracticable
+
+El Asistente revisa cada L, C y R calculada, suponiendo un montaje Manhattan con terminales cortos, y estima cuánto se apartaría del cálculo una vez armada:
+
+- **Valor dudoso (en ámbar):** se aparta un 20 % o más. Se puede construir con cuidado.
+- **Valor impracticable (en rojo):** se aparta un 50 % o más. No se va a comportar como se calculó.
+
+El valor se muestra igual, nunca se bloquea. Al pie de la tarjeta está el motivo con sus números y, si la Calculadora tiene una, la sugerencia para evitarlo.
+
+### Pasar un valor a otra Calculadora
+
+Junto a los valores del resultado hay botones de pase: "→ Bobinas" en una L y "→ Arreglos" en una C o una R. Te llevan a esa Calculadora con el valor ya cargado, con todos sus decimales, y una franja arriba te recuerda de dónde vino.
+
+- **Volver:** el botón de la franja te devuelve a la Calculadora anterior tal como estaba. Si encadenaste varios pases, deshace de a uno.
+- **Cambiar desde las pestañas o el menú:** se olvidan los pases hechos y ya no hay a dónde volver.
+- **El aviso viaja con el valor:** si era un Valor dudoso o impracticable, la franja lo repite con su motivo.
+- **Lo que no se pasa:** los Capacitores de sintonía de los resonadores acoplados, porque van con trimmer.
+
+### Qué se guarda
+
+El Asistente recuerda en ese dispositivo y en ese navegador lo que escribiste en cada Calculadora, tu Inventario y la última Calculadora abierta. No hace falta guardar nada a mano.
+
+El Inventario no se puede exportar: se pierde si cambiás de celular o si el navegador borra sus datos. En iPhone, la pestaña de Safari y el Asistente instalado no comparten los datos.
+
+## Las Calculadoras
+
+### Bobinas
+
+Calcula las vueltas y el largo de una bobina solenoidal de aire para la inductancia que buscás, siempre en una capa y en dos capas.
+
+- **Qué pide:** Inductancia buscada, Diámetro del carrete, Diámetro del cable con esmalte (si es desnudo o plateado, el diámetro desnudo) y Separación entre vueltas (cero es vueltas juntas). La Frecuencia de trabajo es opcional.
+- **Qué da:** por variante, las dos cantidades de vueltas más cercanas en pasos de media vuelta, con su L, su error y el Largo de la bobina. También la autorresonancia estimada.
+- **La Frecuencia de trabajo:** con ella, avisa si trabajás demasiado cerca de la autorresonancia.
+- **Al armarla:** los terminales suman inductancia y el metal cercano la baja. Estirar o comprimir la bobina ajusta la L.
+
+### Filtros
+
+Calcula filtros LC en escalera π o T para pasa bajos, pasa altos, pasa banda y rechaza banda y, solo en pasa banda, con la Topología de resonadores acoplados.
+
+- **Qué pide:** Tipo de filtro, Aproximación (Butterworth, Chebyshev con su ripple o Bessel), Topología, Orden, frecuencias, Rs, RL y Q de las bobinas.
+- **El Orden:** se escribe (de 1 a 10) o se calcula desde la atenuación As que querés a una frecuencia fs.
+- **Las frecuencias:** fc en pasa bajos y pasa altos; f1 y f2, o f0 y BW, en pasa banda y rechaza banda.
+- **Qué da:** el esquema con cada L y C en orden desde la fuente, y la pérdida estimada por el Q de las bobinas.
+- **Rs y RL distintas (π y T):** el filtro tiene pérdida plana y el Asistente lo avisa, con un pase a la Calculadora de redes.
+- **Resonadores acoplados:** todos usan la misma L, que el Asistente propone y podés cambiar. Este filtro sí adapta Rs y RL. La frecuencia a la que se ajusta cada resonador es la Frecuencia de sintonía, que no es la central de la banda.
+
+### Arreglos
+
+Busca las combinaciones en serie y en paralelo de hasta 4 Valores comerciales que mejor se acercan a un valor, en capacitores o en resistencias.
+
+- **Qué pide:** Componente, Valor buscado, serie (E6, E12 o E24), Umbral de error y tolerancias. Vienen con valores por defecto, salvo el Valor buscado.
+- **Qué da:** los 10 mejores Arreglos equivalentes, primero los que están por debajo del umbral y usan menos componentes. Cada uno con su valor, el Error del arreglo y la Tolerancia del arreglo, que es el rango de peor caso.
+- **Cómo se leen:** "39 pF serie 270 pF" o "(27 pF serie 68 pF) || 15 pF", donde || es paralelo.
+- **Sin Inventario propio:** usa la serie completa, de 1 pF a 10 nF o de 1 Ω a 10 MΩ.
+- **Con Inventario propio:** tocá "Editar Inventario". Hay uno por tipo de componente, y se carga por inclusión (la lista de lo que tenés) o por exclusión (una serie en un rango, tocando en la grilla los valores que te faltan).
+- **Cantidades:** el Inventario no las guarda. Si un Arreglo repite un valor, lo avisa ("usa 3 × 10 pF").
+- **En VHF:** cada componente y cada soldadura agregan L y C parásitas, así que conviene el Arreglo con menos componentes que te alcance.
+
+### Redes
+
+Calcula redes de adaptación L, π y T entre una fuente y una carga resistivas, a una frecuencia. Las cargas complejas no entran en esta Versión.
+
+- **Qué pide:** Topología, f₀, Rs, RL (el botón ⇄ las intercambia) y Q de la bobina. En π y T también el Q de diseño, y el campo te muestra el mínimo posible.
+- **Qué da:** una tarjeta por variante, con su esquema, cada L y C con su reactancia y si deja pasar la continua o la bloquea. También el barrido y la pérdida estimada.
+- **Valores exactos:** no se redondean a una serie. Para el ajuste fino, conviene un trimmer.
+- **Rs igual a RL:** en L ya está adaptada y no hace falta red. En π y T se calcula igual, pero la red solo filtra.
+
+### Atenuadores
+
+Calcula atenuadores resistivos T y π con impedancias iguales o distintas. Muestra los dos juntos para que los compares.
+
+- **Qué pide:** Atenuación A (hasta 60 dB), Z1 y Z2 (el botón ⇄ las intercambia). La Potencia de entrada, en W, mW o dBm, y la Frecuencia son opcionales.
+- **Qué da:** las tres resistencias de cada Topología, con un pase a Arreglos para buscar sus Valores comerciales.
+- **La Potencia de entrada:** con ella, muestra lo que disipa cada resistencia y la potencia nominal mínima sugerida, con un margen de 2×. La cuenta es para potencia continua: con señales moduladas, mirá la potencia de pico.
+- **La Frecuencia:** se usa para revisar las resistencias. Si la dejás vacía, se revisan a 300 MHz.
+- **Z1 y Z2 distintas:** hay una atenuación mínima posible. El botón "Mínima pérdida" la fija y muestra la red L de dos resistencias.
+- **Más de 40 dB:** en VHF una sola sección no llega a esa atenuación real. Conviene armar secciones de 10 a 20 dB en cascada, usando la Calculadora una vez por sección.
+- **Al armarlo:** usá resistencias de película o SMD, no de alambre, y terminales cortos.
+
+<!-- fin de la ayuda -->
+
+## Para quien mantiene el Asistente
+
+Cómo construirlo, probarlo y publicarlo está en [`docs/desarrollo.md`](docs/desarrollo.md), y la especificación completa en [`docs/spec.md`](docs/spec.md). El botón "Ayuda" del Asistente muestra este README hasta la línea anterior a esta sección.

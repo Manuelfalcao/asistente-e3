@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { formatearValor } from '../../src/entrada/formato';
+import { BLOQUES_AYUDA } from '../../src/ui/ayuda/texto';
 import { CALCULADORAS } from '../../src/ui/calculadoras';
 import { caracteresDeLaFuente } from './woff2';
 
@@ -22,6 +23,7 @@ const TEXTOS = [
   '0123456789 ,.:;()/+-%=·',
   'Red π de 50 Ω a 300 Ω en 145 MHz',
   ...MAGNITUDES.flatMap((m) => VALORES.map((v) => formatearValor(v, m))),
+  ...BLOQUES_AYUDA.flatMap((b) => (b.tipo === 'titulo' ? [b.texto] : [])),
 ];
 
 describe('fuente de los títulos', () => {

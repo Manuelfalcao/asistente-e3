@@ -1,0 +1,123 @@
+/* El botón del encabezado y la ventana de Ayuda. Se lee como el resto: reglas a tinta, sin sombras. */
+
+.encabezado-acciones {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--esp-3);
+}
+.boton-ayuda {
+  min-height: var(--toque);
+  padding: 0 var(--esp-3);
+  border: 1px solid var(--acento);
+  border-radius: var(--radio-1);
+  background: none;
+  color: var(--acento);
+  font-size: var(--tam-3);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* En un celular, la Versión va debajo del botón: al lado, le quita al título el ancho de una palabra. */
+@media (max-width: 480px) {
+  .encabezado-acciones {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--esp-1);
+  }
+  .encabezado-acciones .boton-ayuda {
+    order: -1;
+  }
+}
+
+/* En el celular ocupa toda la pantalla. */
+.ayuda {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: var(--fondo);
+  color: var(--texto);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.ayuda::backdrop {
+  background: var(--marco);
+  opacity: 0.85;
+}
+.ayuda-contenido {
+  min-height: 100%;
+}
+.ayuda-barra {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esp-3);
+  padding: var(--esp-2) var(--esp-4);
+  padding-top: max(var(--esp-2), env(safe-area-inset-top));
+  background: var(--marco);
+  border-bottom: 2px solid var(--tinta);
+}
+.ayuda-barra h2 {
+  margin: 0;
+  font-family: var(--fuente-titulo);
+  font-size: 1.3125rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--tinta);
+}
+.ayuda-texto {
+  padding: var(--esp-4);
+  padding-bottom: calc(var(--esp-6) + env(safe-area-inset-bottom));
+}
+.ayuda-texto p,
+.ayuda-texto ul {
+  margin: 0 0 var(--esp-3);
+}
+.ayuda-texto ul {
+  padding-left: var(--esp-5);
+}
+.ayuda-texto li + li {
+  margin-top: var(--esp-2);
+}
+.ayuda-texto h3 {
+  margin: var(--esp-6) 0 var(--esp-3);
+  padding-top: var(--esp-2);
+  border-top: 2px solid var(--tinta);
+  font-family: var(--fuente-titulo);
+  font-size: var(--tam-6);
+  font-weight: 600;
+  color: var(--tinta);
+}
+.ayuda-texto h4 {
+  margin: var(--esp-5) 0 var(--esp-2);
+  font-family: var(--fuente-titulo);
+  font-size: var(--tam-5);
+  font-weight: 600;
+  color: var(--tinta);
+}
+.ayuda-texto code {
+  font-size: 0.9em;
+}
+
+/* En PC, una ventana del ancho de un texto cómodo de leer. */
+@media (min-width: 900px) {
+  .ayuda {
+    width: min(46rem, calc(100vw - 4rem));
+    height: fit-content;
+    max-height: calc(100vh - 4rem);
+    margin: auto;
+    border: 2px solid var(--tinta);
+  }
+  .ayuda-barra {
+    padding-inline: var(--esp-5);
+  }
+  .ayuda-texto {
+    padding: var(--esp-5);
+  }
+}

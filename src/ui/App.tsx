@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { almacen } from '../almacen/almacen';
 import { Arreglos } from './arreglos/Arreglos';
 import { Atenuadores } from './atenuadores/Atenuadores';
+import { Ayuda } from './ayuda/Ayuda';
 import { Bobinas } from './bobinas/Bobinas';
 import {
   CALCULADORAS,
@@ -120,7 +121,10 @@ export function App() {
       <div class="contenido">
         <header class="encabezado">
           <h1>{activa.nombre}</h1>
-          <span class="version">{VERSION}</span>
+          <div class="encabezado-acciones">
+            <span class="version">{VERSION}</span>
+            <Ayuda />
+          </div>
         </header>
         <FranjaVersionNueva />
         {AVISAR_SIN_GUARDADO && (

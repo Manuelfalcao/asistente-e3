@@ -1,0 +1,55 @@
+# Desarrollo del Asistente E3
+
+Lo que hace falta para construir, probar y publicar el Asistente. Lo que ve el Alumno está en el [README](../README.md) y la especificación en [`spec.md`](spec.md).
+
+| Comando                                              | Qué hace                                                            |
+| ---------------------------------------------------- | ------------------------------------------------------------------- |
+| `npm run dev`                                        | Servidor de desarrollo                                              |
+| `npm run build`                                      | PWA instalable en `dist/`                                           |
+| `npm run build:archivo`                              | HTML único autocontenido en `dist-archivo/index.html`               |
+| `npm run build:muestra`                              | Página de muestra del sistema visual en `dist-muestra/muestra.html` |
+| `npm run informe`                                    | Informe de casos para la Cátedra en `dist-informe/informe.html`     |
+| `npm run verificar-publicacion -- --etiqueta vX.Y.Z` | Lo que revisa el workflow de la etiqueta antes de publicar          |
+| `npm run iconos`                                     | Arma los PNG del ícono del Asistente en `public/`                   |
+| `npm run fuente`                                     | Recorta las fuentes de fórmulas y títulos (Python con fontTools)    |
+| `npm run typecheck`                                  | `tsc --noEmit`                                                      |
+| `npm test`                                           | Vitest                                                              |
+
+Node 24 (ver `.nvmrc`). La Versión sale de `package.json` más el hash corto del commit.
+
+Los tests de pantalla (`tests/ui/*.test.tsx`) corren en jsdom con `@testing-library/preact`, y lo declaran en su primera línea (`// @vitest-environment jsdom`); el resto corre sin DOM.
+
+## Ayuda
+
+El botón "Ayuda" del encabezado muestra el [README](../README.md), desde el primer párrafo hasta la marca `<!-- fin de la ayuda -->`: cambiar ese texto cambia lo que lee el Alumno, sin nada más que tocar. `src/ui/ayuda/texto.ts` lo lee con un Markdown acotado (títulos `##` y `###`, párrafos, listas con `-`, `**negrita**`, `*cursiva*` y `` `código` ``), y `tests/ayuda/texto.test.ts` falla si aparece otra cosa, como una tabla o un link, o si falta una Calculadora. Lo que va después de la marca queda solo en el README.
+
+## Sistema visual
+
+- Colores, tipografía, tamaños y espaciado: `src/ui/tokens.css`. Las Calculadoras usan esas variables y nunca un color suelto; `tests/paleta.test.ts` verifica el contraste en el tema claro y en el oscuro ([ADR 1](adr/0001-modo-oscuro-segun-el-sistema.md)).
+- Cada color tiene un solo trabajo ([spec §4.6](spec.md)): `--tinta` para lo impreso, `--acento` para lo que se toca o está elegido, `--marco` para el menú y las pestañas, y `--tecla` y `--tecla-elegida` para las opciones. Ámbar y rojo quedan solo para los avisos.
+- Si cambia el acento claro, hay que cambiar `AZUL_DEL_ICONO` en `src/ui/iconos.ts` y correr `npm run iconos`.
+- Los títulos van en Source Serif 4 (licencia OFL, en `scripts/fuentes/OFL-source-serif-4.txt`), recortada a los caracteres de `scripts/fuentes/rangos-titulos.txt`. Como un recorte es una versión modificada y "Source" es un nombre reservado de la licencia, se llama "Titulos E3". Si un título nuevo usa un carácter que no está, `tests/fuente/titulos.test.ts` falla: hay que sumarlo a la lista y correr `npm run fuente`.
+- Componentes base (tarjeta de resultado, forma del resultado, fórmula, cita, pasos intermedios, campos, rótulos, botón de pase, franjas, esquema en escalera): `src/ui/comun/`.
+- La página de muestra los presenta todos. No llega al Asistente: con `npm run dev` está en `/muestra.html`, y `npm run build:muestra` la arma como un HTML suelto para mirarla en el celular.
+
+## Publicación
+
+Solo una etiqueta `vX.Y.Z` publica en GitHub Pages y crea la Release con el HTML único y el Informe de casos (`.github/workflows/publicar.yml`). Un push a `main` no publica: deja los productos y el Informe como artefactos del CI. El workflow de la etiqueta no publica si la etiqueta no coincide con `package.json`, si falta la entrada de esa Versión en [`aprobaciones.md`](aprobaciones.md), si entre el commit aprobado y la etiqueta cambió algo más que el asiento, o si fallan `tsc --noEmit`, los tests o algún caso del Informe. Construye desde el commit aprobado, así el Asistente muestra el hash que vio la Cátedra. El paso a paso para el Ayudante de cátedra está en [`publicar-version.md`](publicar-version.md).
+
+## Fórmulas
+
+- El cálculo (`src/calculo/`) escribe las fórmulas como cadenas LaTeX con los números ya sustituidos; `src/ui/comun/Formula.tsx` las dibuja con Temml.
+- La fuente es Latin Modern Math (licencia GUST) recortada a los caracteres de `scripts/fuentes/rangos.txt`. Si una fórmula nueva usa un carácter que no está, `tests/fuente/fuente.test.ts` falla: hay que sumarlo a la lista y correr `npm run fuente` (`pip install fonttools brotli`).
+
+## Informe de casos
+
+`npm run informe` corre Vitest con el reporter JSON y arma `dist-informe/informe.html`: un HTML autocontenido con todos los Casos de prueba, las Deducciones propias, los Criterios prácticos y los oráculos, que la Cátedra revisa para aprobar una Versión ([spec §13.6](spec.md)). "Guardar como PDF" da el PDF. El CI lo deja como artefacto en cada push a `main`; no entra en el Asistente.
+
+- **Una Calculadora nueva aparece sola**: sus tablas de casos van en `tests/calculo/<calculadora>/` y un `informe.ts` al lado las adapta (`AporteInforme`, en `tests/casos-informe.ts`): corre el cálculo con las entradas de cada caso y devuelve el obtenido, el error y los pasos. Se levanta con `import.meta.glob`, sin registrarlo en ningún lado del informe.
+- **Pero el test del informe sí lleva la lista**: `tests/informe/generar.test.ts` fija qué Calculadoras aportan casos ("y nada más por ahora"), para que un `informe.ts` no aparezca ni desaparezca sin querer. En el mismo commit que suma el `informe.ts` de una Calculadora, agregá su id a ese `Set` y corré `npm test` completo, no solo los tests de la Calculadora: si no, CI queda en rojo en `main`.
+- **La caché de módulos de Vitest está apagada** (`fsModuleCache: false` en `vite.config.ts`): no se entera de un archivo nuevo que entra en un `import.meta.glob`, así que en local el informe dejaba de ver el `informe.ts` nuevo mientras CI sí lo veía. No la vuelvas a prender; si alguna vez quedó una `node_modules/.vitest-cache` vieja, se puede borrar.
+- **El estado de un caso sale de Vitest**: el test que lo corre se llama como el caso (`it(caso.id, …)`), o empieza con `"<id>:"`. Un caso sin test queda "sin test", y uno con algún número fuera de la tolerancia queda en rojo aunque su test haya pasado. `npm run informe` sale con error si hay alguno de los dos, o si falla cualquier test.
+- **Los oráculos** de `tests/oraculos/` se describen solos con su comentario de cabecera y sus funciones exportadas.
+- **Una Deducción propia** va en `REGISTRO` (`src/calculo/comun/registro.ts`) con su `deduccion` en pasos y su `bandera`; los casos que se corren con la fórmula propia o con el plan B llevan `bandera: { deduccion: id, lado }` y el informe los muestra de los dos lados.
+- **La sección de Cambios** compara contra la última Versión de `docs/aprobaciones.md`: el informe deja al lado su huella (`dist-informe/huella.json`: cada caso con sus valores, fórmulas y referencia, y el registro común), que al aprobar se guarda en `docs/aprobaciones/vX.Y.Z.json`. Sin ninguna aprobada dice que todo es nuevo.
+- Con `npm run informe -- --resultados r.json` usa un resultado de Vitest ya corrido.

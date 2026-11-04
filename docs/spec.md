@@ -119,6 +119,7 @@ Origen: [Stack técnico y estructura del código](issues/15-stack-tecnico.md), [
 - Es el mismo código con un corte por ancho de pantalla. El valor exacto del corte se ajusta al construir.
 - **No hay pantalla de inicio:** el Asistente abre directo en una Calculadora (sección 4.4).
 - El encabezado muestra el nombre de la Calculadora, que es el título de la pantalla, y en el celular la Versión. En PC la Versión está al pie del menú: una sola vez alcanza.
+- **Ayuda:** un botón en el encabezado, en los dos anchos, abre encima de la Calculadora una ventana con las funciones del Asistente y cómo usarlo. No es una pestaña porque en el celular solo entran las cinco Calculadoras. Al cerrarla, la Calculadora sigue como estaba. El texto es el del README, hasta la marca `<!-- fin de la ayuda -->`.
 - **En el celular, un atajo entre las entradas y el resultado:** no entran juntos, así que un botón flotante lleva a lo que quedó fuera de la vista ("Ver resultado ↓", "Volver a las entradas ↑"). No aparece con todo a la vista ni cuando todavía no hay resultado.
 - **En PC, las entradas quedan a la vista** mientras se recorre un resultado largo.
 
