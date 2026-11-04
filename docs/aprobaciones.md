@@ -1,6 +1,6 @@
 # Aprobaciones de la Cátedra
 
-Cada Versión del Asistente que aprueba la Cátedra queda asentada acá (spec §13.7). El Ayudante de cátedra la asienta cuando llega el "apruebo la vX.Y.Z" y recién después crea la etiqueta: el workflow de la etiqueta no publica si falta la entrada de esa Versión con ese hash. El paso a paso está en [publicar-version.md](publicar-version.md).
+Cada Versión del Asistente que aprueba la Cátedra queda asentada acá (spec §13.7). El Ayudante de cátedra la asienta cuando llega el "apruebo la vX.Y.Z" y recién después crea la etiqueta: el workflow de la etiqueta no publica una Versión con cambios de cálculo si falta su entrada con ese hash. Una Versión sin cambios de cálculo no lleva entrada: se publica con la aprobación de la última de esta lista. El paso a paso está en [publicar-version.md](publicar-version.md).
 
 Cada entrada lleva:
 

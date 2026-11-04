@@ -4,6 +4,7 @@ import { REGISTRO } from '../../src/calculo/comun/registro';
 import {
   leerAprobaciones,
   problemasDePublicacion,
+  problemasSinCambios,
   ultimaAprobada,
 } from '../../scripts/informe/aprobaciones';
 
@@ -153,5 +154,44 @@ describe('antes de publicar una etiqueta', () => {
         cambiadosDesdeAprobado: ['docs/aprobaciones.md', 'docs/aprobaciones/v0.10.0.json'],
       }).join(),
     ).toMatch(/dos-capas/);
+  });
+});
+
+describe('una etiqueta sin entrada propia, sin cambios de cálculo', () => {
+  const ultima = ultimaAprobada(leerAprobaciones(md))!;
+  const bien = {
+    etiqueta: 'v0.11.0',
+    versionPaquete: '0.11.0',
+    ultima,
+    cambiadosDesdeAprobado: ['src/ui/tokens.css', 'src/ui/App.tsx', 'docs/spec.md'],
+  };
+
+  it('se publica si solo cambió lo que no es cálculo', () => {
+    expect(problemasSinCambios(bien)).toEqual([]);
+  });
+
+  it.each(['src/calculo/bobinas/bobinas.ts', 'src/entrada/leer.ts'])(
+    'un cambio en %s pide una aprobación nueva',
+    (archivo) => {
+      const cambiados = [...bien.cambiadosDesdeAprobado, archivo];
+      const problemas = problemasSinCambios({ ...bien, cambiadosDesdeAprobado: cambiados });
+      expect(problemas.join()).toContain(archivo);
+      expect(problemas.join()).toMatch(/docs\/aprobaciones\.md/);
+    },
+  );
+
+  it('tiene que ser posterior a la última aprobada y coincidir con package.json', () => {
+    const vieja = { ...bien, etiqueta: 'v0.9.0', versionPaquete: '0.9.0' };
+    expect(problemasSinCambios(vieja).join()).toMatch(/v0\.10\.0/);
+    expect(problemasSinCambios({ ...bien, versionPaquete: '0.12.0' }).join()).toMatch(
+      /package\.json/,
+    );
+    expect(problemasSinCambios({ ...bien, etiqueta: 'v0.11' }).join()).toMatch(/vX\.Y\.Z/);
+  });
+
+  it('el commit de la última aprobada tiene que estar en su historia', () => {
+    expect(problemasSinCambios({ ...bien, cambiadosDesdeAprobado: null }).join()).toMatch(
+      /cccccccccccc/,
+    );
   });
 });

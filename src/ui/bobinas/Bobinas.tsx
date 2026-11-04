@@ -11,7 +11,7 @@ import { mensajeDeResultados } from '../../entrada/campo';
 import { formatearErrorRelativo, formatearValor } from '../../entrada/formato';
 import { CampoEntradaValor, type CampoEntrada, useCampoEntrada } from '../comun/CampoEntrada';
 import { Aviso } from '../comun/Franjas';
-import { FormaResultado, FormulasYFuentes, Pasos } from '../comun/Resultado';
+import { FormaResultado, FormulasYFuentes, Pasos, SinResultado } from '../comun/Resultado';
 import { Rotulo } from '../comun/Rotulo';
 import { TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
 import { type PaseDeValor, precargaDe } from '../pases';
@@ -81,7 +81,7 @@ export function Bobinas({ pase }: { pase?: PaseDeValor }) {
         {entrada ? (
           <Resultado resultado={calcularBobinas(entrada)} />
         ) : (
-          <p class="sin-resultado corregir">{mensaje}</p>
+          <SinResultado mensaje={mensaje} />
         )}
       </section>
     </div>
@@ -95,11 +95,13 @@ const hz = (x: number) => formatearValor(x, 'frecuencia');
 function FilaBuscada({ resultado }: { resultado: ResultadoBobinas }) {
   const marca = resultado.revision.marcados[0]?.nivel;
   return (
-    <ValorResultado
-      nombre="L buscada"
-      valor={henrios(resultado.buscada.valor)}
-      rotulos={marca && <Rotulo tipo={marca} />}
-    />
+    <div class="fila-contexto">
+      <ValorResultado
+        nombre="L buscada"
+        valor={henrios(resultado.buscada.valor)}
+        rotulos={marca && <Rotulo tipo={marca} />}
+      />
+    </div>
   );
 }
 
@@ -187,15 +189,17 @@ function FilaVecino({
 
 function FilaSRF({ srf }: { srf: Autorresonancia }) {
   return (
-    <ValorResultado
-      nombre="SRF"
-      valor={hz(srf.estimada)}
-      rotulos={<Rotulo tipo="estimacion" />}
-      detalle={
-        `La menor entre el largo de hilo (${hz(srf.largoDeHilo)}) y Medhurst ` +
-        `(${hz(srf.medhurst)})`
-      }
-    />
+    <div class="fila-contexto">
+      <ValorResultado
+        nombre="SRF"
+        valor={hz(srf.estimada)}
+        rotulos={<Rotulo tipo="estimacion" />}
+        detalle={
+          `La menor entre el largo de hilo (${hz(srf.largoDeHilo)}) y Medhurst ` +
+          `(${hz(srf.medhurst)})`
+        }
+      />
+    </div>
   );
 }
 

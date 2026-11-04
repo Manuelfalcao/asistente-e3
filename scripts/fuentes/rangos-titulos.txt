@@ -1,0 +1,28 @@
+# Caracteres de Source Serif 4 que quedan en la fuente recortada de los títulos.
+# Lo lee scripts/recortar-fuente.py; tests/fuente/titulos.test.ts verifica que estén los que pueden
+# aparecer en un título. Un rango o un carácter por línea, en hexadecimal.
+
+0020-007E    # ASCII imprimible: cifras, letras, signos y paréntesis
+00A0         # espacio sin corte
+00B5         # µ (signo micro), como en "2,2 µH"
+00B7         # ·
+00C1         # Á É Í Ñ Ó Ú Ü, y las mismas en minúscula: los títulos en castellano
+00C9
+00CD
+00D1
+00D3
+00DA
+00DC
+00E1
+00E9
+00ED
+00F1
+00F3
+00FA
+00FC
+00D7         # ×
+03A9         # Ω
+03BC         # μ (la griega): la Entrada flexible también la acepta
+03C0         # π
+2013         # –
+2212         # −

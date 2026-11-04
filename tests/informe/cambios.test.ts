@@ -211,7 +211,7 @@ describe('comparar contra la última Versión aprobada', () => {
 describe('la sección de Cambios en HTML', () => {
   const anterior = huella(v1, [seccion('atenuadores', [revision('c1'), revision('c2')])]);
 
-  it('sin cambios de cálculo lo dice, para aprobar mirando solo esta sección', () => {
+  it('sin cambios de cálculo lo dice: no hace falta una aprobación nueva', () => {
     const html = renderizarCambios(
       compararHuellas(
         anterior,
@@ -221,7 +221,7 @@ describe('la sección de Cambios en HTML', () => {
     expect(html).toContain('v0.1.0');
     expect(html).toContain('aaaaaaa');
     expect(html).toContain('Sin cambios de cálculo');
-    expect(html).toContain('mirando solo esta sección');
+    expect(html).toContain('no necesita una aprobación nueva');
   });
 
   it('en la primera Versión dice que todo es nuevo', () => {

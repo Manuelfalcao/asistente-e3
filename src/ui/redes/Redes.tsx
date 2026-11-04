@@ -31,7 +31,7 @@ import {
 } from '../comun/CampoEntrada';
 import { Esquema } from '../comun/Esquema';
 import { Aviso } from '../comun/Franjas';
-import { FormaResultado, FormulasYFuentes, Pasos } from '../comun/Resultado';
+import { FormaResultado, FormulasYFuentes, Pasos, SinResultado } from '../comun/Resultado';
 import { Rotulo } from '../comun/Rotulo';
 import { Desplegable, TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
 import { type Pase, type PaseARedes, paseDeComponente, precargaDe, precargaDeF0 } from '../pases';
@@ -133,7 +133,7 @@ export function Redes({
       </section>
       <section class="resultados" aria-label="Resultados" aria-live="polite">
         {!entrada ? (
-          <p class="sin-resultado corregir">{mensaje}</p>
+          <SinResultado mensaje={mensaje} />
         ) : esL ? (
           <Resultado resultado={calcularRedL(entrada)} entrada={entrada} onPasar={onPasar} />
         ) : (
@@ -261,7 +261,7 @@ function ResultadoPiT({
     case 'corte':
       // Sin Q, lo pide con el mínimo a la vista, como cualquier campo que falta.
       if (resultado.codigo === 'falta-q') {
-        return <p class="sin-resultado corregir">{resultado.texto}</p>;
+        return <SinResultado mensaje={resultado.texto} />;
       }
       return (
         <FormaResultado

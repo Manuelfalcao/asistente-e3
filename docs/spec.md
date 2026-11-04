@@ -28,7 +28,7 @@ Esta es la especificación del Asistente lista para construir. Reúne lo que se 
 ## 1. Contexto y alcance
 
 - **Para quién:** Alumnos de una materia de electrónica de comunicaciones que arman circuitos, sobre todo en VHF (30 a 300 MHz), y los montan en Manhattan con componentes con terminales.
-- **Quién lo hace:** el Ayudante de cátedra lo diseña y lo mantiene con Claude Code y GitHub. La Cátedra aprueba cada Versión antes de que llegue a los Alumnos, que la reciben por WhatsApp como un link.
+- **Quién lo hace:** el Ayudante de cátedra lo diseña y lo mantiene con Claude Code y GitHub. La Cátedra aprueba todo cambio de cálculo antes de que llegue a los Alumnos (sección 13.7), que reciben el Asistente por WhatsApp como un link.
 - **Plataformas:** Android, iPhone y PC. Funciona sin conexión.
 - **Idioma:** interfaz en castellano, con voseo ("Corregí", "Completá").
 - **Cinco Calculadoras:** bobinas, filtros, Arreglos equivalentes, redes de adaptación y atenuadores resistivos π y T.
@@ -58,7 +58,7 @@ Origen: [mapa](map.md) (Notes), [Qué Calculadoras entran en la primera versión
 
 ### 2.2 Versiones y aviso de versión nueva
 
-- **Versión semántica manual** en `package.json` más el hash corto del commit. Las dos se ven en el encabezado (y en PC también al pie del menú). La Cátedra aprueba una Versión concreta.
+- **Versión semántica manual** en `package.json` más el hash corto del commit. Las dos se ven en el encabezado del celular y, en PC, al pie del menú. La Cátedra aprueba una Versión concreta, y las siguientes sin cambios de cálculo se publican con esa aprobación (sección 13.7).
 - Cuando el service worker nuevo queda en espera, aparece una **franja arriba**, debajo del encabezado: "Hay una versión nueva · Recargar". Al recargar se conservan el Inventario y las entradas.
 - Se publica con `git push` de una etiqueta (sección 3.4). No se reenvía nada a los Alumnos.
 
@@ -103,7 +103,7 @@ Origen: [Formatos de distribución](issues/06-formatos-distribucion.md), [Protot
 ### 3.4 Publicación
 
 - **GitHub Actions**, en cada push a `main`: `tsc --noEmit`, los tests, los dos productos y el Informe de casos, que quedan como artefactos descargables para revisar el candidato.
-- **Solo una etiqueta `vX.Y.Z` publica en Pages** y crea una Release con el HTML único y el Informe adjuntos. El workflow no publica si fallan los tests o si `docs/aprobaciones.md` no tiene la entrada de esa Versión con ese hash (sección 13.7).
+- **Solo una etiqueta `vX.Y.Z` publica en Pages** y crea una Release con el HTML único y el Informe adjuntos. El workflow no publica si fallan los tests o si una Versión con cambios de cálculo no tiene su entrada en `docs/aprobaciones.md` con ese hash (sección 13.7).
 
 Origen: [Stack técnico y estructura del código](issues/15-stack-tecnico.md), [Casos de prueba e informe para la aprobación de la Cátedra](issues/24-casos-de-prueba-aprobacion.md).
 
@@ -118,7 +118,10 @@ Origen: [Stack técnico y estructura del código](issues/15-stack-tecnico.md), [
 
 - Es el mismo código con un corte por ancho de pantalla. El valor exacto del corte se ajusta al construir.
 - **No hay pantalla de inicio:** el Asistente abre directo en una Calculadora (sección 4.4).
-- El encabezado muestra el nombre de la Calculadora y la Versión.
+- El encabezado muestra el nombre de la Calculadora, que es el título de la pantalla, y en el celular la Versión. En PC la Versión está al pie del menú: una sola vez alcanza.
+- **Ayuda:** un botón en el encabezado, en los dos anchos, abre encima de la Calculadora una ventana con las funciones del Asistente y cómo usarlo. No es una pestaña porque en el celular solo entran las cinco Calculadoras. Al cerrarla, la Calculadora sigue como estaba. El texto es el del README, hasta la marca `<!-- fin de la ayuda -->`.
+- **En el celular, un atajo entre las entradas y el resultado:** no entran juntos, así que un botón flotante lleva a lo que quedó fuera de la vista ("Ver resultado ↓", "Volver a las entradas ↑"). No aparece con todo a la vista ni cuando todavía no hay resultado.
+- **En PC, las entradas quedan a la vista** mientras se recorre un resultado largo.
 
 ### 4.2 Pase de un valor a otra Calculadora
 
@@ -135,9 +138,10 @@ Origen: [Stack técnico y estructura del código](issues/15-stack-tecnico.md), [
 
 ### 4.3 Campos
 
-- **Campos de opciones** (Tipo de filtro, Aproximación, Topología, serie E, tipo de componente, etc.): **etiqueta arriba** y botones segmentados a todo el ancho.
+- **Campos de opciones** (Tipo de filtro, Aproximación, Topología, serie E, tipo de componente, etc.): **etiqueta arriba** y botones segmentados a todo el ancho. La opción elegida queda un poco más clara que las demás, con una banda de color abajo (sección 4.6).
 - **Campos de valor:** **etiqueta al costado**, con el campo y el Selector de unidad en la misma fila, y el eco en vivo debajo del campo ("= 4,7 nH").
 - Teclado de texto completo, sin autocorrección (sección 5.1).
+- **Enter pasa al campo siguiente.** En el último cierra el teclado y, en el celular, lleva al resultado.
 
 ### 4.4 Estado y persistencia
 
@@ -155,6 +159,21 @@ Origen: [Stack técnico y estructura del código](issues/15-stack-tecnico.md), [
 - Una fórmula que no entra a lo ancho se corta en líneas y, si aún no entra, tiene scroll horizontal propio (sección 5.4). La página nunca tiene scroll horizontal.
 
 Origen: [Prototipo de navegación entre Calculadoras](issues/22-prototipo-navegacion.md) (prototipo en [`prototipos/navegacion/`](prototipos/navegacion/LEEME.md)).
+
+### 4.6 Aspecto
+
+La Calculadora se lee como una tabla de un manual de radio: secciones separadas por una regla a tinta, sin cajas ni sombras. La paleta es **Plano**, el azul de los planos de cianotipo, y cada color tiene un solo trabajo:
+
+| Color | Para qué |
+|---|---|
+| **Tinta** | Lo impreso: reglas, títulos y esquemas |
+| **Acento** | Lo que se toca o está elegido: la banda, los pases, los desplegables y el atajo |
+| **Marco** | El menú de PC, y el encabezado y las pestañas del celular: un tono más que el papel |
+| **Ámbar y rojo** | Solo los avisos de Valor dudoso e impracticable |
+
+- **Lo elegido se marca igual en toda la interfaz:** más claro y con una banda de color, en los botones segmentados, en el menú y en las pestañas, en los dos temas (`tests/paleta.test.ts` lo verifica).
+- Los títulos van en una serif, de la familia de las fórmulas: Source Serif 4 (licencia OFL), recortada con `fontTools` a un solo peso y a los caracteres de los títulos (12 KB en woff2) y embebida, como la de las fórmulas. Un recorte es una versión modificada y "Source" es un nombre reservado de esa licencia: por eso se llama "Titulos E3". Texto y números siguen con la fuente del sistema.
+- No hay animaciones más allá de la flecha de los desplegables.
 
 ## 5. Comportamiento común a todas las Calculadoras
 
@@ -203,9 +222,10 @@ Un campo de valor acepta número, prefijo y unidad opcionales, en notación RKM 
 
 **Eco y errores**
 
+- Un campo vacío muestra un **ejemplo** de cómo se puede escribir su magnitud: "ej. 4n7", "ej. 145M".
 - Debajo del campo hay un **eco en vivo** con el valor normalizado en el formato de salida: "= 4,7 nH".
 - Un valor que no se puede leer marca el campo en rojo con un motivo de una línea: *"No entiendo «4,7x»"*, *"Este campo es de capacidad (F)"*.
-- **Con un campo inválido no se calcula.** El área de resultados muestra *"Corregí: Diámetro del cable"* y no deja el resultado viejo. Con un campo obligatorio vacío muestra *"Completá: …"*.
+- **Con un campo inválido no se calcula.** El área de resultados muestra *"Corregí: Diámetro del cable"* y no deja el resultado viejo. Con un campo obligatorio vacío muestra *"Completá: …"*. Solo "Corregí" va en rojo: que falten datos no es un error, y es lo primero que ve un Alumno al abrir una Calculadora.
 
 **Teclado del celular:** `inputmode="text"`, con `autocorrect`, `autocapitalize` y `spellcheck` apagados. El teclado numérico no tiene letras y no permite escribir "4n7".
 
@@ -456,7 +476,7 @@ Ls  = μ0·π·(2a)²·N²·kL(2a/b)/(4b)
   - su error respecto de la L buscada, con signo;
   - el Largo de la bobina.
   
-  El más cercano se destaca.
+  El más cercano se destaca. Las vueltas son el dato central de la fila: van más grandes que su L, que queda al costado, en la misma vertical que la L buscada y la SRF.
 - En dos capas, además, el diámetro exterior.
 - **SRF estimada**, rotulada como estimación: la menor entre
   - el criterio del largo de hilo, `f ≈ c/(2·ℓw)` con `ℓw = √((π·D·N)² + ℓ²)`, y
@@ -1129,9 +1149,11 @@ Los **Criterios prácticos** se aprueban como criterio y no como fórmula; si no
 
 1. La Cátedra contesta "apruebo la vX.Y.Z" por el canal que use (mail o WhatsApp).
 2. El Ayudante de cátedra lo asienta en `docs/aprobaciones.md` del repo `asistente-e3`, con la Versión, el hash, la fecha, quién aprobó y qué Deducciones propias se aprobaron. Recién ahí crea la etiqueta.
-3. El workflow de la etiqueta no publica si falta la entrada con ese hash.
+3. El workflow de la etiqueta no publica una Versión con cambios de cálculo si falta la entrada con ese hash.
 
-- **Toda Versión necesita aprobación.** Una Versión sin cambios de cálculo se aprueba mirando solo la sección de Cambios.
+- **Toda Versión con cambios de cálculo necesita aprobación.** Una Versión sin cambios de cálculo, como una que solo cambia el aspecto, se publica con la aprobación de la última aprobada, sin entrada propia en `docs/aprobaciones.md`. Regla acordada con la Cátedra el 2026-11-04.
+- **Sin cambios de cálculo** quiere decir dos cosas, y el workflow de la etiqueta revisa las dos: no cambió ningún archivo de `src/calculo/` ni de `src/entrada/` desde el commit de la última aprobada, y el Informe da la sección de Cambios vacía: mismos casos, valores, tolerancias, fórmulas, referencias, Deducciones propias y Criterios prácticos. Lo demás de la interfaz, incluidos sus textos y su comportamiento, no pide aprobación.
+- **Los Cambios se miden siempre contra la última Versión aprobada,** no contra la última publicada: una Versión sin aprobación propia no corre la referencia.
 - **Un caso en rojo bloquea la Versión:** no existe la "falla aceptada". Si el que estaba mal era el caso (una referencia mal leída, una tolerancia mal puesta), se corrige en un commit con el motivo, y aparece en la sección de Cambios.
 
 Origen: [Casos de prueba e informe para la aprobación de la Cátedra](issues/24-casos-de-prueba-aprobacion.md).

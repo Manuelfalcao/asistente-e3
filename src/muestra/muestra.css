@@ -191,6 +191,15 @@
 .m-entradas {
   max-width: 30rem;
 }
+/* En el Asistente hay una sola: acá van dos seguidas. */
+.franja-llegada + .franja-llegada {
+  margin-top: var(--esp-2);
+}
+/* El atajo, en el flujo de la página y a la vista también en PC. */
+.salto.m-salto {
+  display: inline-block;
+  position: static;
+}
 .m-franja-version {
   margin: 0 calc(-1 * var(--esp-4));
 }

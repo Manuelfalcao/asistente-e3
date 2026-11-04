@@ -6,21 +6,29 @@
  * Los colores se verifican en tests/paleta.test.ts (WCAG AA en los dos temas). El tema oscuro
  * sigue al del sistema (docs/adr/0001-modo-oscuro-segun-el-sistema.md): es el :root de abajo,
  * dentro de @media, y solo redefine colores.
+ *
+ * La Calculadora se lee como una tabla de un manual de radio, a dos tintas y sin cajas. La paleta
+ * es «Plano», el azul de los planos de cianotipo, y cada color tiene un solo trabajo. Ámbar y rojo
+ * quedan solo para los avisos de Valor dudoso e impracticable.
  */
 :root {
   color-scheme: light dark;
 
   /* Paleta, tema claro */
-  --fondo: #f4f6f8;
-  --superficie: #ffffff;
-  --superficie-2: #eef1f5;
-  --texto: #16191d;
-  --texto-suave: #535b67;
-  --borde: #dde1e7;
-  --borde-campo: #858d99;
-  --acento: #1d4ed8;
+  --fondo: #f0f4f8;
+  --superficie: #fbfcfe;
+  --superficie-2: #e3eaf2;
+  --texto: #0f1c2b;
+  --texto-suave: #46566a;
+  --borde: #d2dce6;
+  --borde-campo: #6f8197;
+  --tinta: #134b85; /* lo impreso: reglas, títulos y esquemas */
+  --acento: #0f5fb8; /* lo que se toca o está elegido: la banda, los pases, los desplegables */
   --sobre-acento: #ffffff;
-  --acento-suave: #e6eefc;
+  --acento-suave: #d9e7f6;
+  --marco: #d4e2f0; /* el menú, y el encabezado y las pestañas del celular */
+  --tecla: #e3eaf2; /* las opciones */
+  --tecla-elegida: #fbfcfe; /* la opción elegida: siempre más clara, también en el tema oscuro */
   --dudoso: #b26a00;
   --dudoso-texto: #7a4000;
   --dudoso-fondo: #fff1d1;
@@ -28,10 +36,11 @@
   --impracticable-texto: #a1180f;
   --impracticable-fondo: #fde7e4;
   --error: var(--impracticable-texto);
-  --sombra: #e3e7ec; /* color de la sombra de las tarjetas */
 
-  /* Tipografía: la del sistema para texto y números; Latin Modern Math para las fórmulas */
+  /* Tipografía: la del sistema para texto y números; una serif para títulos, de la familia de las
+     fórmulas; Latin Modern Math para las fórmulas */
   --fuente-texto: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
+  --fuente-titulo: 'Titulos E3', Georgia, 'Noto Serif', serif;
   --fuente-formula: 'Latin Modern Math', 'STIX Two Math', 'Cambria Math', math;
   /* Latin Modern tiene el ojo más chico que las fuentes del sistema: así las x se igualan */
   --escala-formula: 1.15;
@@ -41,7 +50,7 @@
   --tam-2: 0.8125rem; /* 13 px: rótulos, eco y esquemas */
   --tam-3: 0.875rem; /* 14 px: texto secundario, referencias, motivos */
   --tam-4: 1rem; /* 16 px: texto, campos y botones */
-  --tam-5: 1.125rem; /* 18 px: títulos de tarjeta y encabezado */
+  --tam-5: 1.125rem; /* 18 px: títulos de tarjeta y valores de un resultado */
   --tam-6: 1.375rem; /* 22 px: el valor principal de un resultado */
   --interlineado: 1.45;
   --interlineado-titulo: 1.25;
@@ -54,34 +63,39 @@
   --esp-5: 1.5rem;
   --esp-6: 2rem;
 
-  --radio-1: 6px;
-  --radio-2: 12px;
-  --radio-pildora: 999px;
+  --radio-1: 2px;
+  --radio-2: 2px;
+  --radio-pildora: 2px;
 
   /* Objetivo táctil mínimo: todo lo que se toca mide al menos esto de alto y de ancho */
   --toque: 2.75rem;
   --alto-pestanas: 3.75rem;
   --ancho-menu: 17rem;
+  /* El nombre ocupa siempre lo mismo: los valores de una tarjeta arrancan en la misma vertical */
+  --col-nombre: min(5.75rem, 24vw);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --fondo: #0f1216;
-    --superficie: #181c22;
-    --superficie-2: #212731;
-    --texto: #e9ecf0;
-    --texto-suave: #a5aebb;
-    --borde: #2c323c;
-    --borde-campo: #6c7685;
-    --acento: #82a8ff;
-    --sobre-acento: #0b1530;
-    --acento-suave: #1b2a49;
+    --fondo: #10151b;
+    --superficie: #171d25;
+    --superficie-2: #212a34;
+    --texto: #e8eef5;
+    --texto-suave: #a6b3c2;
+    --borde: #2b3542;
+    --borde-campo: #71829a;
+    --tinta: #9cc7f2;
+    --acento: #74b3f5;
+    --sobre-acento: #06192e;
+    --acento-suave: #18324f;
+    --marco: #1a2532;
+    --tecla: #171d25;
+    --tecla-elegida: #2c3846;
     --dudoso: #eba53a;
     --dudoso-texto: #ffd58f;
     --dudoso-fondo: #3a2a0e;
     --impracticable: #ff6f61;
     --impracticable-texto: #ffb3aa;
     --impracticable-fondo: #431814;
-    --sombra: #0b0d10;
   }
 }

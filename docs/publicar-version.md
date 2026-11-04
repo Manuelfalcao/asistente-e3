@@ -25,9 +25,11 @@ En **Actions › CI**, abrí la corrida de ese commit y bajá el artefacto **inf
 
 Si el CI falló en algún paso, no sigas: el Informe igual está, y dice qué falló.
 
+**Si la sección Cambios dice "Sin cambios de cálculo"**, no hace falta pedir la aprobación ni asentar nada (spec §13.7). Saltá al paso 5 y creá la etiqueta sobre ese commit.
+
 ### 3. Pedir la aprobación
 
-Mandale `informe.html` a la Cátedra ("Guardar como PDF" da el PDF, si lo prefieren). Lo primero del Informe es la sección **Cambios desde la última Versión aprobada**: si dice "Sin cambios de cálculo", la Versión se puede aprobar mirando solo esa sección. Cada Deducción propia y cada Criterio práctico tiene su casilla aparte.
+Mandale `informe.html` a la Cátedra ("Guardar como PDF" da el PDF, si lo prefieren). Lo primero del Informe es la sección **Cambios desde la última Versión aprobada**. Cada Deducción propia y cada Criterio práctico tiene su casilla aparte.
 
 La Cátedra contesta "apruebo la vX.Y.Z" por el canal que use (mail o WhatsApp), y dice qué Deducciones propias aprueba.
 
@@ -46,14 +48,19 @@ Entre el commit aprobado y el de la etiqueta solo pueden cambiar esos dos archiv
 
 ### 5. Crear y empujar la etiqueta
 
-Sobre el commit del asiento (paso 4):
+Sobre el commit del asiento (paso 4) o, sin cambios de cálculo, sobre el commit del paso 1:
 
 ```bash
 git tag v0.2.0
 git push origin v0.2.0
 ```
 
-El workflow **Publicar una Versión** (Actions) revisa que la etiqueta coincida con `package.json`, que la entrada esté en `docs/aprobaciones.md` con ese hash y que la huella sea la de ese Informe; después vuelve a correr `tsc --noEmit`, los tests y el Informe sobre el commit aprobado, y si todo está en verde:
+El workflow **Publicar una Versión** (Actions) revisa que la etiqueta coincida con `package.json`, y después una de dos:
+
+- **Con entrada en `docs/aprobaciones.md`:** que tenga ese hash y que la huella sea la de ese Informe. Vuelve a correr `tsc --noEmit`, los tests y el Informe sobre el commit aprobado.
+- **Sin entrada:** que desde la última Versión aprobada no hayan cambiado `src/calculo/` ni `src/entrada/`. Corre `tsc --noEmit`, los tests y el Informe sobre el commit de la etiqueta, y que la sección de Cambios esté vacía. Si hay cambios de cálculo no publica: hace falta pedir la aprobación.
+
+Si todo está en verde:
 
 - crea la Release `vX.Y.Z` en borrador, con el HTML único y el Informe de casos adjuntos;
 - publica el sitio en GitHub Pages, con el link "Descargar versión para PC" apuntando al HTML único de esa Versión;

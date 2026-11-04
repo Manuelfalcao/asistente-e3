@@ -28,7 +28,7 @@ import {
 } from '../comun/CampoEntrada';
 import { Esquema } from '../comun/Esquema';
 import { Aviso } from '../comun/Franjas';
-import { FormaResultado, FormulasYFuentes, Pasos } from '../comun/Resultado';
+import { FormaResultado, FormulasYFuentes, Pasos, SinResultado } from '../comun/Resultado';
 import { Rotulo } from '../comun/Rotulo';
 import { Desplegable, TarjetaResultado, ValorResultado } from '../comun/Tarjeta';
 import type { Pase } from '../pases';
@@ -343,7 +343,7 @@ export function Filtros({ onPasar }: { onPasar?: (pase: Pase) => void }) {
               onPasar={onPasar}
             />
           ) : (
-            <p class="sin-resultado corregir">{mensaje}</p>
+            <SinResultado mensaje={mensaje} />
           )
         ) : entrada ? (
           <Resultado
@@ -354,7 +354,7 @@ export function Filtros({ onPasar }: { onPasar?: (pase: Pase) => void }) {
             onPasar={onPasar}
           />
         ) : (
-          <p class="sin-resultado corregir">{mensaje}</p>
+          <SinResultado mensaje={mensaje} />
         )}
       </section>
     </div>

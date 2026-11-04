@@ -1,3 +1,22 @@
+// Enter hace lo que el botón "Siguiente" del teclado del celular: en el último campo, cierra el
+// teclado y, donde el resultado queda debajo de las entradas, lo muestra.
+function alEnter(actual: HTMLInputElement) {
+  const campos = [...document.querySelectorAll<HTMLInputElement>('.entradas .campo-valor input')];
+  const i = campos.indexOf(actual);
+  if (i < 0) return;
+  const siguiente = campos[i + 1];
+  if (siguiente) {
+    siguiente.focus();
+    siguiente.select();
+    return;
+  }
+  actual.blur();
+  const pestanas = document.querySelector('.pestanas');
+  if (pestanas && getComputedStyle(pestanas).display !== 'none') {
+    document.querySelector('.resultados')?.scrollIntoView();
+  }
+}
+
 export interface SelectorDeUnidad {
   unidades: readonly string[];
   unidad: string;
@@ -23,6 +42,7 @@ export function CampoValor({
   unidadFija,
   lectura,
   ayuda,
+  ejemplo,
 }: {
   id: string;
   etiqueta: string;
@@ -34,6 +54,8 @@ export function CampoValor({
   lectura?: Lectura;
   // Una línea fija debajo de la lectura, como el mínimo de un campo: "Mínimo: 4,36".
   ayuda?: string;
+  // Cómo se puede escribir el valor, mientras el campo está vacío.
+  ejemplo?: string;
 }) {
   const idLectura = `${id}-lectura`;
   const invalido = lectura?.tipo === 'error';
@@ -45,6 +67,11 @@ export function CampoValor({
           id={id}
           type="text"
           inputMode="text"
+          enterKeyHint="next"
+          placeholder={ejemplo && `ej. ${ejemplo}`}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') alEnter(e.currentTarget);
+          }}
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="off"

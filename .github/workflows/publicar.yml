@@ -1,8 +1,9 @@
 name: Publicar una Versión
 
 # Solo una etiqueta vX.Y.Z publica (spec §3.4, §13.7). Antes revisa la aprobación asentada en
-# docs/aprobaciones.md; después construye desde el commit aprobado, publica en GitHub Pages y crea
-# la Release con el HTML único y el Informe de casos. El paso a paso está en docs/publicar-version.md.
+# docs/aprobaciones.md o, sin entrada propia, que no haya cambios de cálculo desde la última aprobada.
+# Después construye, publica en GitHub Pages y crea la Release con el HTML único y el Informe de casos.
+# El paso a paso está en docs/publicar-version.md.
 
 on:
   push:
@@ -18,6 +19,9 @@ concurrency:
 jobs:
   construir:
     runs-on: ubuntu-latest
+    outputs:
+      modo: ${{ steps.aprobacion.outputs.modo }}
+      base: ${{ steps.aprobacion.outputs.base }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,13 +32,16 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      # La etiqueta coincide con package.json, la entrada de esa Versión está en docs/aprobaciones.md
-      # y del commit aprobado a la etiqueta solo cambió el asiento de la aprobación.
+      # La etiqueta coincide con package.json. Con entrada en docs/aprobaciones.md, del commit aprobado
+      # a la etiqueta solo cambió el asiento. Sin entrada, no cambió src/calculo/ ni src/entrada/ desde
+      # la última aprobada.
       - id: aprobacion
         run: npm run verificar-publicacion -- --etiqueta "$GITHUB_REF_NAME"
-      - run: cp "docs/aprobaciones/$GITHUB_REF_NAME.json" "$RUNNER_TEMP/huella-aprobada.json"
-      # Desde acá todo corre sobre el commit aprobado: es el que vio la Cátedra, y su hash es el que
-      # muestra el Asistente. package-lock.json es el mismo, así que node_modules sirve.
+      - if: steps.aprobacion.outputs.modo == 'aprobada'
+        run: cp "docs/aprobaciones/$GITHUB_REF_NAME.json" "$RUNNER_TEMP/huella-aprobada.json"
+      # Desde acá todo corre sobre el commit aprobado (el que vio la Cátedra, cuyo hash muestra el
+      # Asistente) o, sin entrada propia, sobre el de la etiqueta. package-lock.json es el mismo cuando
+      # hay asiento, así que node_modules sirve.
       - run: git checkout --detach "${{ steps.aprobacion.outputs.commit }}"
       - run: npm run typecheck
       - run: npm test
@@ -43,7 +50,11 @@ jobs:
       - run: npm run build:archivo
       # Sale con error si algún caso está en rojo o sin test: un caso en rojo bloquea la Versión.
       - run: npm run informe
+      - name: Sin entrada propia, el Informe no tiene cambios de cálculo
+        if: steps.aprobacion.outputs.modo == 'sin-cambios'
+        run: npm run verificar-sin-cambios
       - name: La huella guardada es la del Informe de este commit
+        if: steps.aprobacion.outputs.modo == 'aprobada'
         run: |
           node --input-type=module -e "
           import { readFileSync } from 'node:fs';
@@ -84,9 +95,10 @@ jobs:
             --verify-tag \
             --draft \
             --title "Asistente E3 $GITHUB_REF_NAME" \
-            --notes "Versión aprobada por la Cátedra (ver docs/aprobaciones.md). Adjuntos: el HTML único, para abrir en PC sin instalar nada, y el Informe de casos que se aprobó."
+            --notes "$NOTAS Adjuntos: el HTML único, para abrir en PC sin instalar nada, y el Informe de casos."
         env:
           GH_TOKEN: ${{ github.token }}
+          NOTAS: ${{ needs.construir.outputs.modo == 'aprobada' && 'Versión aprobada por la Cátedra (ver docs/aprobaciones.md).' || format('Sin cambios de cálculo desde la v{0}, la última aprobada por la Cátedra (ver docs/aprobaciones.md).', needs.construir.outputs.base) }}
 
   publicar:
     needs: release

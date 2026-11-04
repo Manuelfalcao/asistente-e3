@@ -11,23 +11,24 @@
 
 /* ---------- Tarjeta de resultado ---------- */
 
+/* Una sección a tinta, sin caja, como en un manual. */
 .tarjeta {
   min-width: 0;
   margin: 0 0 var(--esp-3);
-  padding: var(--esp-4);
-  background: var(--superficie);
-  border: 1px solid var(--borde);
-  border-radius: var(--radio-2);
-  box-shadow: 0 1px 2px var(--sombra);
+  padding: var(--esp-3) 0 var(--esp-4);
+  border-top: 2px solid var(--tinta);
 }
 .tarjeta.destacada {
-  border-color: var(--acento);
-  box-shadow: inset 0 0 0 1px var(--acento);
+  border-top-width: 4px;
 }
 .tarjeta-titulo {
-  margin: 0 0 var(--esp-2);
+  margin: 0 0 var(--esp-3);
+  font-family: var(--fuente-titulo);
   font-size: var(--tam-5);
   font-weight: 600;
+  letter-spacing: -0.005em;
+  text-wrap: balance;
+  color: var(--tinta);
 }
 .tarjeta > :last-child {
   margin-bottom: 0;
@@ -37,16 +38,17 @@
 .grilla-tarjetas {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
-  gap: var(--esp-3);
+  gap: var(--esp-3) var(--esp-6);
   align-items: start;
 }
 .grilla-tarjetas > .tarjeta {
   margin: 0;
 }
 
+/* El nombre ocupa siempre lo mismo: los valores de una tarjeta arrancan en la misma vertical. */
 .valor-resultado {
   display: grid;
-  grid-template-columns: minmax(2.5rem, auto) minmax(0, 1fr) auto;
+  grid-template-columns: var(--col-nombre) minmax(0, 1fr) auto;
   column-gap: var(--esp-3);
   align-items: center;
   min-height: var(--toque);
@@ -54,11 +56,12 @@
   border-top: 1px solid var(--borde);
 }
 .valor-resultado .nombre {
-  font-weight: 600;
+  font-weight: 500;
+  overflow-wrap: anywhere;
 }
 .valor-resultado .valor {
-  font-size: var(--tam-4);
-  font-weight: 600;
+  font-size: var(--tam-5);
+  font-weight: 650;
 }
 /* Debajo del valor y también debajo del botón: "Valor impracticable" no entra al lado. */
 .valor-resultado .extra {
@@ -73,6 +76,15 @@
 .valor-resultado .accion {
   grid-column: 3;
   grid-row: 1;
+}
+/* En los celulares más angostos, el valor no choca con el pase. */
+@media (max-width: 350px) {
+  .valor-resultado {
+    column-gap: var(--esp-2);
+  }
+  .valor-resultado .pase > span[aria-hidden='true']:not(.punto) {
+    display: none;
+  }
 }
 
 /* Los números se alinean entre filas y no se cortan antes de la unidad. */
@@ -93,6 +105,7 @@
   overflow-x: auto;
   margin: var(--esp-2) 0;
   padding: var(--esp-1) 0;
+  color: var(--texto);
 }
 .formula math {
   font-family: var(--fuente-formula);
@@ -126,7 +139,8 @@
   min-height: var(--toque);
   list-style: none;
   color: var(--acento);
-  font-weight: 600;
+  font-size: var(--tam-3);
+  font-weight: 500;
   cursor: pointer;
 }
 .pasos > summary::-webkit-details-marker {
@@ -271,22 +285,55 @@
   align-items: center;
   gap: var(--esp-2);
   min-height: var(--toque);
-  padding: 0 var(--esp-3);
-  border: 1px solid var(--acento);
   border-radius: var(--radio-pildora);
-  background: var(--superficie);
   color: var(--acento);
   font-size: var(--tam-3);
-  font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
 }
+/* El pase, como una remisión impresa. */
+.pase {
+  padding: 0 var(--esp-2);
+  border: 0;
+  background: none;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.franja-llegada .volver {
+  padding: 0 var(--esp-3);
+  border: 1px solid var(--acento);
+  background: var(--superficie);
+  font-weight: 600;
+}
 .pase:hover,
+.pase:active,
 .franja-llegada .volver:hover {
   background: var(--acento-suave);
 }
+/*
+ * Junto a un valor, el pase no compite con él: se ve más chico y se sigue tocando con 44 px. En
+ * línea, para que el subrayado sea uno solo.
+ */
+.valor-resultado .pase {
+  position: relative;
+  display: inline-block;
+  min-height: 2.25rem;
+  line-height: 2.25rem;
+}
+.valor-resultado .pase::after {
+  content: '';
+  position: absolute;
+  inset: -0.25rem 0;
+}
+.valor-resultado .pase .punto {
+  margin-right: 0.4em;
+  vertical-align: 0.02em;
+}
 
 /* ---------- Botones segmentados ---------- */
+
+/* Lo elegido queda un poco más claro y lleva una banda de color abajo. */
 
 .segmentado {
   min-width: 0;
@@ -307,6 +354,7 @@
   display: flex;
   border: 1px solid var(--borde-campo);
   border-radius: var(--radio-1);
+  background: var(--tecla);
   overflow: hidden;
 }
 .segmento {
@@ -332,23 +380,25 @@
   justify-content: center;
   min-height: var(--toque);
   padding: var(--esp-1) var(--esp-2);
-  background: var(--superficie);
+  color: var(--texto-suave);
   font-size: var(--tam-3);
+  font-weight: 500;
   line-height: 1.2;
   text-align: center;
   overflow-wrap: anywhere;
 }
+.segmento input:hover + span {
+  color: var(--texto);
+}
 .segmento input:checked + span {
-  background: var(--acento);
-  color: var(--sobre-acento);
+  background: var(--tecla-elegida);
+  color: var(--texto);
   font-weight: 600;
+  box-shadow: inset 0 -3px 0 var(--acento);
 }
 .segmento input:focus-visible + span {
   outline: 2px solid var(--acento);
   outline-offset: -4px;
-}
-.segmento input:checked:focus-visible + span {
-  outline-color: var(--sobre-acento);
 }
 
 /* ---------- Campo de valor ---------- */
@@ -362,7 +412,7 @@
 }
 .campo-valor label {
   font-size: var(--tam-3);
-  font-weight: 600;
+  font-weight: 500;
   overflow-wrap: anywhere;
 }
 .campo-valor .control {
@@ -374,7 +424,6 @@
 .campo-valor .unidad-fija {
   min-height: var(--toque);
   border: 1px solid var(--borde-campo);
-  background: var(--superficie);
   font-size: var(--tam-4);
 }
 .campo-valor input {
@@ -382,7 +431,13 @@
   min-width: 0;
   padding: 0 var(--esp-3);
   border-radius: var(--radio-1);
+  background: var(--superficie);
   font-variant-numeric: tabular-nums;
+}
+/* El ejemplo del campo vacío se lee, y no se confunde con un valor escrito. */
+.campo-valor input::placeholder {
+  color: var(--texto-suave);
+  opacity: 1;
 }
 .campo-valor select,
 .campo-valor .unidad-fija {
@@ -390,6 +445,19 @@
   margin-left: -1px;
   padding: 0 var(--esp-2);
   border-radius: 0 var(--radio-1) var(--radio-1) 0;
+  background-color: var(--superficie-2);
+}
+/*
+ * El Selector de unidad se ve igual en todos los sistemas; el desplegable sigue siendo el nativo.
+ * El gris de la flecha es el único color suelto: una variable no entra en la url.
+ */
+.campo-valor select {
+  appearance: none;
+  padding-inline: var(--esp-2) 1.5rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  background-size: 0.625rem;
 }
 .campo-valor .control > input:not(:last-child) {
   border-radius: var(--radio-1) 0 0 var(--radio-1);
@@ -398,7 +466,6 @@
   display: flex;
   align-items: center;
   color: var(--texto-suave);
-  background: var(--superficie-2);
 }
 .campo-valor input:focus-visible,
 .campo-valor select:focus-visible {
@@ -451,13 +518,16 @@
   cursor: pointer;
 }
 
+/* Una banda, con el texto en el mismo borde que la Calculadora. */
 .franja-llegada {
-  margin-bottom: var(--esp-4);
-  padding: var(--esp-2) var(--esp-3);
+  padding: var(--esp-3) var(--esp-4);
   background: var(--acento-suave);
-  border-left: 4px solid var(--acento);
-  border-radius: var(--radio-1);
   font-size: var(--tam-3);
+}
+@media (min-width: 900px) {
+  .franja-llegada {
+    padding-inline: var(--esp-5);
+  }
 }
 .franja-llegada p {
   margin: var(--esp-1) 0;
@@ -489,7 +559,7 @@
   margin: 0 0 var(--esp-3);
   padding: var(--esp-2) var(--esp-3);
   background: var(--dudoso-fondo);
-  border-left: 4px solid var(--dudoso);
+  border-left: 3px solid var(--dudoso);
   border-radius: var(--radio-1);
   font-size: var(--tam-3);
 }
@@ -532,7 +602,8 @@
   gap: var(--esp-1);
   margin: var(--esp-2) 0 var(--esp-3);
   overflow-x: auto;
-  color: var(--texto);
+  /* El esquema, impreso a tinta; los nombres, en el color del texto. */
+  color: var(--tinta);
 }
 .esquema svg {
   flex: none;
@@ -552,13 +623,13 @@
 }
 .esquema .terminal,
 .esquema .conector circle {
-  fill: var(--superficie);
+  fill: var(--fondo);
   stroke: currentColor;
   stroke-width: 1.5;
 }
 .esquema text {
   /* el tamaño lo pone Esquema.tsx: es el mismo con el que esquema.ts reparte el ancho */
-  fill: currentColor;
+  fill: var(--texto);
   font-family: var(--fuente-texto);
 }
 .esquema .conector text {
@@ -578,20 +649,22 @@
   justify-self: start;
   min-height: var(--toque);
   padding: 0 var(--esp-3);
-  border: 1px solid var(--acento);
+  border: 1px solid var(--borde-campo);
   border-radius: var(--radio-pildora);
-  background: var(--superficie);
-  color: var(--acento);
+  background: var(--tecla);
+  color: var(--texto-suave);
   font-size: var(--tam-3);
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
 }
 .boton-minima:hover {
-  background: var(--acento-suave);
+  color: var(--texto);
 }
 .boton-minima[aria-pressed='true'] {
-  background: var(--acento);
-  color: var(--sobre-acento);
+  background: var(--tecla-elegida);
+  border-bottom: 3px solid var(--acento);
+  color: var(--texto);
+  font-weight: 600;
 }
 .enlace {
   padding: 0;
@@ -635,14 +708,45 @@
 .vecinos {
   margin: var(--esp-2) 0;
 }
+/*
+ * Lo que el Alumno vino a buscar son las vueltas: tienen el ancho y el tamaño de un valor principal.
+ * La L que dan queda al costado, más chica, en la misma vertical que lo que las acompaña: la L
+ * buscada y la SRF.
+ */
+.fila-contexto .valor-resultado,
 .vecino .valor-resultado {
-  padding-inline: var(--esp-2);
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
 }
-/* El más cercano a la L buscada: fondo de acento y borde, para que no dependa solo del color. */
-.vecino.destacado .valor-resultado {
+.fila-contexto .valor,
+.vecino .valor {
+  font-size: var(--tam-4);
+  font-weight: 500;
+}
+.vecino .nombre {
+  font-size: var(--tam-6);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums lining-nums;
+  line-height: var(--interlineado-titulo);
+}
+.fila-contexto .extra,
+.vecino .extra {
+  grid-column: 1 / -1;
+}
+/*
+ * El más cercano a la L buscada, y la fila elegida de los Arreglos: fondo de acento y una barra al
+ * margen, para que no dependa solo del color. Sobresalen con sombras planas: se pintan afuera de la
+ * fila sin correr el texto ni las líneas de las otras filas.
+ */
+.vecino.destacado .valor-resultado,
+.fila-arreglo.elegida label {
   background: var(--acento-suave);
-  border: 1px solid var(--acento);
+  border: 0;
   border-radius: var(--radio-1);
+  box-shadow:
+    -5px 0 0 var(--acento-suave),
+    var(--esp-2) 0 0 var(--acento-suave),
+    calc(-1 * var(--esp-2)) 0 0 var(--acento);
 }
 /* El total de vueltas de dos capas, debajo de las vueltas por capa. */
 .vecino .total {
@@ -667,16 +771,15 @@
 /* El bloque de Inventario, separado de las entradas (spec §8.2). */
 .bloque-inventario {
   margin-top: var(--esp-4);
-  padding: var(--esp-3) var(--esp-4);
-  border: 1px solid var(--borde);
-  border-radius: var(--radio-2);
-  background: var(--superficie-2);
+  padding: var(--esp-3) 0;
+  border-top: 2px solid var(--tinta);
 }
 .bloque-inventario h3 {
   margin: 0 0 var(--esp-1);
-  font-size: var(--tam-3);
+  font-family: var(--fuente-titulo);
+  font-size: var(--tam-5);
   font-weight: 600;
-  color: var(--texto-suave);
+  color: var(--tinta);
 }
 .bloque-inventario p {
   margin: 0;
@@ -758,7 +861,7 @@
   position: sticky;
   left: 0;
   width: 3.5rem;
-  background: var(--superficie-2);
+  background: var(--fondo);
   font-size: var(--tam-2);
   color: var(--texto-suave);
 }
@@ -844,7 +947,7 @@
   flex-wrap: wrap;
   gap: var(--esp-1) var(--esp-3);
   min-height: var(--toque);
-  padding: var(--esp-2);
+  padding: var(--esp-2) 0;
   border-top: 1px solid var(--borde);
   cursor: pointer;
 }
@@ -856,31 +959,41 @@
   outline: 2px solid var(--acento);
   outline-offset: 2px;
 }
-/* La fila elegida: fondo de acento y borde, para que no dependa solo del color. */
-.fila-arreglo.elegida label {
-  background: var(--acento-suave);
-  border: 1px solid var(--acento);
-  border-radius: var(--radio-1);
-}
 .fila-arreglo .conexion {
   flex-basis: 100%;
   font-weight: 600;
   overflow-wrap: anywhere;
 }
+/* El Error, que es lo que se compara, en la misma vertical en todas las filas. */
 .fila-arreglo .datos {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--esp-1) var(--esp-3);
+  display: grid;
+  grid-template-columns: 4.75rem auto minmax(0, 1fr);
+  gap: var(--esp-1) var(--esp-2);
   align-items: baseline;
+  width: 100%;
 }
-/* El Error del arreglo, en una píldora: es lo que se compara entre filas. */
-.fila-arreglo .error {
-  padding: 0.1em 0.6em;
-  border: 1px solid var(--borde);
-  border-radius: var(--radio-pildora);
-  background: var(--superficie-2);
+/* Cuántos componentes lleva, y si repite valores: dato secundario, en una línea. */
+.fila-arreglo .datos > span:nth-child(n + 3) {
   font-size: var(--tam-3);
   color: var(--texto-suave);
+  white-space: nowrap;
+}
+.fila-arreglo .datos > span:nth-child(n + 4) {
+  grid-column: 1 / -1;
+}
+@media (max-width: 370px) {
+  .fila-arreglo .datos > span:nth-child(n + 3) {
+    grid-column: 1 / -1;
+  }
+}
+.fila-arreglo .error {
+  justify-self: start;
+  padding: 0.1em 0.6em;
+  border: 1px solid var(--borde-campo);
+  border-radius: var(--radio-pildora);
+  font-size: var(--tam-3);
+  color: var(--texto-suave);
+  white-space: nowrap;
 }
 .fila-arreglo .error .valor {
   font-size: var(--tam-4);

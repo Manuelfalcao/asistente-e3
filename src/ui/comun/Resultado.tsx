@@ -3,6 +3,12 @@ import { citar } from '../../calculo/comun/referencia';
 import type { Paso, Referencia } from '../../calculo/comun/resultado';
 import { Formula } from './Formula';
 
+// Lo que ocupa el lugar del resultado. Que falten datos no es un error: solo lo inválido va en rojo.
+export function SinResultado({ mensaje }: { mensaje: string | null }) {
+  const clase = mensaje?.startsWith('Corregí') ? 'sin-resultado corregir' : 'sin-resultado';
+  return <p class={clase}>{mensaje}</p>;
+}
+
 // La forma del resultado de toda Calculadora (spec §5.3): los avisos arriba, el resultado
 // principal, las tarjetas y al final las notas fijas de construcción.
 export function FormaResultado({

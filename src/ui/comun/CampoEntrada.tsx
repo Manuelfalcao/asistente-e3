@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { almacen } from '../../almacen/almacen';
-import { opcionesDelSelector } from '../../entrada/campos';
+import { type Magnitud, opcionesDelSelector } from '../../entrada/campos';
 import {
   leerCampo,
   type EspecCampo,
@@ -80,6 +80,14 @@ function lecturaDe(estado: EstadoCampo): Lectura | undefined {
   }
 }
 
+const EJEMPLOS: Partial<Record<Magnitud, string>> = {
+  inductancia: '4n7',
+  capacidad: '2p2',
+  resistencia: '4k7',
+  frecuencia: '145M',
+  potencia: '100m',
+};
+
 // Campo de valor con la Entrada flexible: el eco en vivo debajo, o el motivo en rojo si no se lee.
 export function CampoEntradaValor({
   id,
@@ -114,6 +122,7 @@ export function CampoEntradaValor({
       unidadFija={conSelector ? undefined : (unidadFija ?? opciones[0])}
       lectura={lecturaDe(campo.estado)}
       ayuda={ayuda}
+      ejemplo={EJEMPLOS[spec.magnitud]}
     />
   );
 }
