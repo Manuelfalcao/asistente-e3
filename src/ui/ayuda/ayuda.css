@@ -25,7 +25,7 @@
     align-items: flex-end;
     gap: var(--esp-1);
   }
-  .encabezado-acciones .boton-ayuda {
+  .encabezado-acciones > .boton-ayuda {
     order: -1;
   }
 }
