@@ -43,6 +43,19 @@ describe('paleta', () => {
     },
   );
 
+  it.each(['claro', 'oscuro'] as const)(
+    'en el tema %s, la opción elegida es un poco más clara que las demás',
+    (tema) => {
+      const { tecla, 'tecla-elegida': elegida } = leerPaleta(tokens)[tema];
+      const [masClara] = [tecla, elegida].sort(
+        (a, b) => contraste(b, '#000') - contraste(a, '#000'),
+      );
+      expect(masClara).toBe(elegida);
+      expect(contraste(elegida, tecla)).toBeGreaterThanOrEqual(1.1);
+      expect(contraste(elegida, tecla)).toBeLessThanOrEqual(1.6);
+    },
+  );
+
   it('el ícono del Asistente usa el acento del tema claro', () => {
     expect(AZUL_DEL_ICONO).toBe(leerPaleta(tokens).claro.acento);
   });

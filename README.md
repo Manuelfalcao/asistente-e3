@@ -11,7 +11,7 @@ Calculadoras para dimensionar los componentes de circuitos de VHF. La especifica
 | `npm run informe`                                    | Informe de casos para la Cátedra en `dist-informe/informe.html`     |
 | `npm run verificar-publicacion -- --etiqueta vX.Y.Z` | Lo que revisa el workflow de la etiqueta antes de publicar          |
 | `npm run iconos`                                     | Arma los PNG del ícono del Asistente en `public/`                   |
-| `npm run fuente`                                     | Recorta Latin Modern Math para las fórmulas (Python con fontTools)  |
+| `npm run fuente`                                     | Recorta las fuentes de fórmulas y títulos (Python con fontTools)    |
 | `npm run typecheck`                                  | `tsc --noEmit`                                                      |
 | `npm test`                                           | Vitest                                                              |
 
@@ -22,6 +22,9 @@ Los tests de pantalla (`tests/ui/*.test.tsx`) corren en jsdom con `@testing-libr
 ## Sistema visual
 
 - Colores, tipografía, tamaños y espaciado: `src/ui/tokens.css`. Las Calculadoras usan esas variables y nunca un color suelto; `tests/paleta.test.ts` verifica el contraste en el tema claro y en el oscuro ([ADR 1](docs/adr/0001-modo-oscuro-segun-el-sistema.md)).
+- Cada color tiene un solo trabajo ([spec §4.6](docs/spec.md)): `--tinta` para lo impreso, `--acento` para lo que se toca o está elegido, `--marco` para el menú y las pestañas, y `--tecla` y `--tecla-elegida` para las opciones. Ámbar y rojo quedan solo para los avisos.
+- Si cambia el acento claro, hay que cambiar `AZUL_DEL_ICONO` en `src/ui/iconos.ts` y correr `npm run iconos`.
+- Los títulos van en Source Serif 4 (licencia OFL, en `scripts/fuentes/OFL-source-serif-4.txt`), recortada a los caracteres de `scripts/fuentes/rangos-titulos.txt`. Como un recorte es una versión modificada y "Source" es un nombre reservado de la licencia, se llama "Titulos E3". Si un título nuevo usa un carácter que no está, `tests/fuente/titulos.test.ts` falla: hay que sumarlo a la lista y correr `npm run fuente`.
 - Componentes base (tarjeta de resultado, forma del resultado, fórmula, cita, pasos intermedios, campos, rótulos, botón de pase, franjas, esquema en escalera): `src/ui/comun/`.
 - La página de muestra los presenta todos. No llega al Asistente: con `npm run dev` está en `/muestra.html`, y `npm run build:muestra` la arma como un HTML suelto para mirarla en el celular.
 

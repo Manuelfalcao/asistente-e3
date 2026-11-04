@@ -137,7 +137,7 @@ Origen: [Stack técnico y estructura del código](issues/15-stack-tecnico.md), [
 
 ### 4.3 Campos
 
-- **Campos de opciones** (Tipo de filtro, Aproximación, Topología, serie E, tipo de componente, etc.): **etiqueta arriba** y botones segmentados a todo el ancho.
+- **Campos de opciones** (Tipo de filtro, Aproximación, Topología, serie E, tipo de componente, etc.): **etiqueta arriba** y botones segmentados a todo el ancho. La opción elegida queda un poco más clara que las demás, con una banda de color abajo (sección 4.6).
 - **Campos de valor:** **etiqueta al costado**, con el campo y el Selector de unidad en la misma fila, y el eco en vivo debajo del campo ("= 4,7 nH").
 - Teclado de texto completo, sin autocorrección (sección 5.1).
 - **Enter pasa al campo siguiente.** En el último cierra el teclado y, en el celular, lleva al resultado.
@@ -158,6 +158,21 @@ Origen: [Stack técnico y estructura del código](issues/15-stack-tecnico.md), [
 - Una fórmula que no entra a lo ancho se corta en líneas y, si aún no entra, tiene scroll horizontal propio (sección 5.4). La página nunca tiene scroll horizontal.
 
 Origen: [Prototipo de navegación entre Calculadoras](issues/22-prototipo-navegacion.md) (prototipo en [`prototipos/navegacion/`](prototipos/navegacion/LEEME.md)).
+
+### 4.6 Aspecto
+
+La Calculadora se lee como una tabla de un manual de radio: secciones separadas por una regla a tinta, sin cajas ni sombras. La paleta es **Plano**, el azul de los planos de cianotipo, y cada color tiene un solo trabajo:
+
+| Color | Para qué |
+|---|---|
+| **Tinta** | Lo impreso: reglas, títulos y esquemas |
+| **Acento** | Lo que se toca o está elegido: la banda, los pases, los desplegables y el atajo |
+| **Marco** | El menú de PC, y el encabezado y las pestañas del celular: un tono más que el papel |
+| **Ámbar y rojo** | Solo los avisos de Valor dudoso e impracticable |
+
+- **Lo elegido se marca igual en toda la interfaz:** más claro y con una banda de color, en los botones segmentados, en el menú y en las pestañas, en los dos temas (`tests/paleta.test.ts` lo verifica).
+- Los títulos van en una serif, de la familia de las fórmulas: Source Serif 4 (licencia OFL), recortada con `fontTools` a un solo peso y a los caracteres de los títulos (12 KB en woff2) y embebida, como la de las fórmulas. Un recorte es una versión modificada y "Source" es un nombre reservado de esa licencia: por eso se llama "Titulos E3". Texto y números siguen con la fuente del sistema.
+- No hay animaciones más allá de la flecha de los desplegables.
 
 ## 5. Comportamiento común a todas las Calculadoras
 

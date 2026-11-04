@@ -8,6 +8,7 @@ import { Esquema } from '../ui/comun/Esquema';
 import { Formula } from '../ui/comun/Formula';
 import { Aviso, FranjaLlegada, FranjaVersion } from '../ui/comun/Franjas';
 import { IconoCalculadora } from '../ui/comun/Icono';
+import { SinResultado } from '../ui/comun/Resultado';
 import { Rotulo, type TipoRotulo } from '../ui/comun/Rotulo';
 import { TarjetaResultado, ValorResultado } from '../ui/comun/Tarjeta';
 import { svgIconoAsistente } from '../ui/iconos';
@@ -143,9 +144,9 @@ export function Muestra() {
       <Seccion titulo="Tipografía">
         <p>
           Texto y números con la fuente del sistema (Roboto en Android, San Francisco en iPhone,
-          Segoe UI en Windows): no suma peso al HTML único y se lee bien en el celular. Las fórmulas
-          van en Latin Modern Math, un 15 % más grandes para que las x de las dos fuentes queden a
-          la misma altura.
+          Segoe UI en Windows): no suma peso al HTML único y se lee bien en el celular. Los títulos
+          van en una serif, de la familia de las fórmulas. Las fórmulas van en Latin Modern Math, un
+          15 % más grandes para que las x de las dos fuentes queden a la misma altura.
         </p>
         <div class="m-escala">
           {[
@@ -153,7 +154,7 @@ export function Muestra() {
             ['2', '13 px', 'Rótulos, eco y esquemas'],
             ['3', '14 px', 'Texto secundario, referencias, motivos'],
             ['4', '16 px', 'Texto, campos y botones'],
-            ['5', '18 px', 'Títulos de tarjeta y encabezado'],
+            ['5', '18 px', 'Títulos de tarjeta y valores de un resultado'],
             ['6', '22 px', 'Valor principal de un resultado'],
           ].map(([n, px, uso]) => (
             <div key={n} class="m-tam">
@@ -310,6 +311,20 @@ export function Muestra() {
         <h3>Campos de valor</h3>
         <Campos />
 
+        <h3>Sin resultado</h3>
+        <div class="cuerpo-calculadora">
+          <div>
+            <SinResultado mensaje="Completá: Inductancia buscada" />
+            <SinResultado mensaje="Corregí: Diámetro del cable" />
+          </div>
+        </div>
+
+        <h3>Atajo entre las entradas y el resultado</h3>
+        <p class="m-nota">Solo en el celular, flotando sobre las pestañas.</p>
+        <button type="button" class="salto m-salto">
+          Ver resultado<span aria-hidden="true"> ↓</span>
+        </button>
+
         <h3>Rótulos</h3>
         <div class="m-fila">
           {(
@@ -445,6 +460,14 @@ function Campos() {
   return (
     <div class="m-entradas">
       <p class="m-nota">Las lecturas son de ejemplo: leer el texto es de la Entrada flexible.</p>
+      <CampoValor
+        id="m-vacio"
+        etiqueta="Campo vacío, con su ejemplo"
+        texto=""
+        onTexto={() => {}}
+        selector={{ unidades: ['nH', 'µH'], unidad: 'nH', onUnidad: () => {} }}
+        ejemplo="4n7"
+      />
       <CampoValor
         id="m-l"
         etiqueta="Inductancia buscada"

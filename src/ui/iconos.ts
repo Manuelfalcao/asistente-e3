@@ -25,7 +25,7 @@ export const ICONOS: Record<IdCalculadora, readonly string[]> = {
 
 // El azul del ícono es el --acento del tema claro (tests/paleta.test.ts lo verifica). Es uno solo:
 // el ícono no cambia con el tema (docs/adr/0001-modo-oscuro-segun-el-sistema.md).
-export const AZUL_DEL_ICONO = '#1d4ed8';
+export const AZUL_DEL_ICONO = '#0f5fb8';
 
 // Ícono del Asistente: "E3" sobre el azul, con las vueltas de una bobina debajo. Lo usan el menú
 // y scripts/iconos.mjs, que arma los PNG del Asistente instalado.

@@ -1,6 +1,15 @@
 @import './tokens.css';
 @import './comun/componentes.css';
 
+/* La serif de los títulos: Source Serif 4 recortada (scripts/recortar-fuente.py). En el HTML único va
+   embebida; en la PWA es un archivo aparte que queda en la caché. */
+@font-face {
+  font-family: 'Titulos E3';
+  src: url('./fuentes/titulos-recorte.woff2') format('woff2');
+  font-weight: 600;
+  font-display: swap;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -76,14 +85,18 @@ h3 {
   align-items: baseline;
   justify-content: space-between;
   gap: var(--esp-3);
-  padding: var(--esp-3) var(--esp-4);
-  background: var(--superficie);
-  border-bottom: 1px solid var(--borde);
+  padding: var(--esp-4) var(--esp-4) var(--esp-3);
+  background: var(--marco);
+  border-bottom: 2px solid var(--tinta);
 }
 .encabezado h1 {
   margin: 0;
-  font-size: var(--tam-5);
+  font-family: var(--fuente-titulo);
+  font-size: 1.3125rem;
   font-weight: 600;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+  color: var(--tinta);
   overflow-wrap: anywhere;
 }
 .encabezado .version {
@@ -107,38 +120,36 @@ h3 {
   grid-template-columns: minmax(0, 1fr);
   gap: var(--esp-5);
 }
-.cuerpo-calculadora .entradas {
-  max-width: 30rem;
-}
-/* El ⇄ entre Z1 y Z2, alineado con los campos. */
+/* El ⇄ va entre las dos etiquetas: no ocupa una fila entera entre Z1 y Z2. */
 .fila-intercambio {
-  display: grid;
-  grid-template-columns: minmax(6rem, 38%) minmax(0, 1fr);
-  column-gap: var(--esp-3);
-  margin: calc(-1 * var(--esp-2)) 0 var(--esp-1);
+  position: relative;
+  height: 0;
 }
 .intercambiar {
-  grid-column: 2;
-  justify-self: start;
+  position: absolute;
+  left: 0;
+  top: -2.25rem;
+  display: flex;
+  align-items: center;
   min-width: var(--toque);
   min-height: var(--toque);
-  border: 1px solid var(--borde-campo);
+  padding: 0;
+  border: 0;
   border-radius: var(--radio-1);
-  background: var(--superficie);
+  background: none;
   color: var(--acento);
   font-size: var(--tam-5);
   cursor: pointer;
 }
 .cuerpo-calculadora .sin-resultado {
   margin: 0;
-  padding: var(--esp-3) var(--esp-4);
-  border: 1px solid var(--borde);
-  border-radius: var(--radio-2);
-  background: var(--superficie);
+  padding: var(--esp-3) 0;
+  border-top: 2px solid var(--tinta);
   color: var(--texto-suave);
 }
 .cuerpo-calculadora .sin-resultado.corregir {
-  border-color: var(--impracticable);
+  padding-inline: var(--esp-3);
+  border-top-color: var(--impracticable);
   background: var(--impracticable-fondo);
   color: var(--impracticable-texto);
   font-weight: 600;
@@ -154,9 +165,11 @@ h3 {
   z-index: 10;
   display: flex;
   height: calc(var(--alto-pestanas) + env(safe-area-inset-bottom));
+  /* Las pestañas se separan del borde cuando el ancho alcanza para los cinco nombres. */
+  padding-inline: max(0px, calc((100vw - 340px) / 4));
   padding-bottom: env(safe-area-inset-bottom);
-  background: var(--superficie);
-  border-top: 1px solid var(--borde);
+  background: var(--marco);
+  border-top: 2px solid var(--tinta);
 }
 .pestanas button {
   flex: 1;
@@ -167,6 +180,7 @@ h3 {
   justify-content: center;
   gap: 2px;
   border: 0;
+  border-top: 3px solid transparent;
   background: none;
   padding: var(--esp-1) 0;
   font-size: var(--tam-1);
@@ -186,12 +200,21 @@ h3 {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Lo elegido se marca igual en toda la interfaz: más claro y con una banda de color. */
 .pestanas button.activa {
-  color: var(--acento);
+  background: var(--tecla-elegida);
+  border-top-color: var(--acento);
+  color: var(--texto);
   font-weight: 600;
 }
 .pestanas button.activa .icono {
-  background: var(--acento-suave);
+  color: var(--acento);
+}
+/* En los celulares más angostos "Atenuadores" no se corta. */
+@media (max-width: 350px) {
+  .pestanas button {
+    font-size: 0.6875rem;
+  }
 }
 
 /* Corte entre celular y PC: el único lugar donde está el valor (~900 px). */
@@ -206,12 +229,34 @@ h3 {
   .contenido {
     padding-bottom: 0;
   }
+  .encabezado {
+    padding: var(--esp-5) var(--esp-5) var(--esp-3);
+    background: var(--fondo);
+  }
+  .encabezado h1 {
+    font-size: 1.625rem;
+  }
+  /* La Versión ya está al pie del menú: una sola vez alcanza. */
+  .encabezado .version {
+    display: none;
+  }
   .calculadora {
     padding: var(--esp-5);
   }
   .cuerpo-calculadora {
     grid-template-columns: 24rem minmax(0, 1fr);
+    column-gap: var(--esp-6);
     align-items: start;
+  }
+  /* Las entradas quedan a la vista mientras se recorre un resultado largo. */
+  .cuerpo-calculadora > :first-child {
+    position: sticky;
+    top: var(--esp-4);
+    max-height: calc(100vh - 2 * var(--esp-4));
+    margin: -4px;
+    padding: 4px;
+    overflow-y: auto;
+    scrollbar-width: thin;
   }
   .menu-lateral {
     display: flex;
@@ -222,18 +267,19 @@ h3 {
     height: 100vh;
     width: var(--ancho-menu);
     flex: none;
-    border-right: 1px solid var(--borde);
-    background: var(--superficie);
+    border-right: 2px solid var(--tinta);
+    background: var(--marco);
   }
   .menu-lateral .marca {
     display: flex;
     align-items: center;
     gap: var(--esp-2);
-    margin: 0;
-    padding: var(--esp-4);
-    font-size: var(--tam-5);
-    font-weight: 700;
-    color: var(--acento);
+    padding: var(--esp-5) var(--esp-4) var(--esp-3);
+    font-family: var(--fuente-titulo);
+    font-size: 1.3125rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--tinta);
   }
   .menu-lateral .marca .logo {
     display: flex;
@@ -260,13 +306,14 @@ h3 {
     min-height: var(--toque);
     text-align: left;
     border: 0;
+    border-bottom: 3px solid transparent;
     border-radius: var(--radio-1);
     background: none;
     padding: var(--esp-2) var(--esp-3);
     cursor: pointer;
   }
   .menu-lateral li button:hover {
-    background: var(--superficie-2);
+    background: var(--tecla-elegida);
   }
   .menu-lateral .icono {
     grid-row: span 2;
@@ -274,9 +321,12 @@ h3 {
     color: var(--texto-suave);
   }
   .menu-lateral li button.activa {
-    background: var(--acento-suave);
+    background: var(--tecla-elegida);
+    border-bottom-color: var(--acento);
   }
-  .menu-lateral li button.activa .nombre,
+  .menu-lateral li button.activa .nombre {
+    color: var(--texto);
+  }
   .menu-lateral li button.activa .icono {
     color: var(--acento);
   }
@@ -284,7 +334,7 @@ h3 {
     font-weight: 600;
   }
   .menu-lateral .descripcion {
-    font-size: var(--tam-3);
+    font-size: var(--tam-2);
     color: var(--texto-suave);
   }
   .pie-menu {
@@ -292,7 +342,7 @@ h3 {
     flex-direction: column;
     gap: var(--esp-1);
     padding: var(--esp-3) var(--esp-4);
-    border-top: 1px solid var(--borde);
+    border-top: 1px solid var(--borde-campo);
     font-size: var(--tam-3);
     color: var(--texto-suave);
   }

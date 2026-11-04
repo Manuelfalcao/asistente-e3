@@ -21,7 +21,8 @@ const marcaDelAsistente: Plugin = {
       tag: 'meta',
       attrs: {
         name: 'theme-color',
-        content: PALETA[tema].superficie,
+        // La barra del navegador sigue al encabezado del celular.
+        content: PALETA[tema].marco,
         media: `(prefers-color-scheme: ${tema === 'claro' ? 'light' : 'dark'})`,
       },
       injectTo: 'head' as const,
@@ -115,7 +116,7 @@ export default defineConfig(({ mode }) => {
                 scope: './',
                 display: 'standalone',
                 background_color: PALETA.claro.fondo,
-                theme_color: PALETA.claro.superficie,
+                theme_color: PALETA.claro.marco,
                 icons: [
                   { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
                   { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },
