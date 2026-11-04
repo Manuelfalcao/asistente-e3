@@ -476,7 +476,7 @@ Ls  = μ0·π·(2a)²·N²·kL(2a/b)/(4b)
   - su error respecto de la L buscada, con signo;
   - el Largo de la bobina.
   
-  El más cercano se destaca.
+  El más cercano se destaca. Las vueltas son el dato central de la fila: van más grandes que su L, que queda al costado, en la misma vertical que la L buscada y la SRF.
 - En dos capas, además, el diámetro exterior.
 - **SRF estimada**, rotulada como estimación: la menor entre
   - el criterio del largo de hilo, `f ≈ c/(2·ℓw)` con `ℓw = √((π·D·N)² + ℓ²)`, y

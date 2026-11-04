@@ -709,6 +709,31 @@
   margin: var(--esp-2) 0;
 }
 /*
+ * Lo que el Alumno vino a buscar son las vueltas: tienen el ancho y el tamaño de un valor principal.
+ * La L que dan queda al costado, más chica, en la misma vertical que lo que las acompaña: la L
+ * buscada y la SRF.
+ */
+.fila-contexto .valor-resultado,
+.vecino .valor-resultado {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+}
+.fila-contexto .valor,
+.vecino .valor {
+  font-size: var(--tam-4);
+  font-weight: 500;
+}
+.vecino .nombre {
+  font-size: var(--tam-6);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums lining-nums;
+  line-height: var(--interlineado-titulo);
+}
+.fila-contexto .extra,
+.vecino .extra {
+  grid-column: 1 / -1;
+}
+/*
  * El más cercano a la L buscada, y la fila elegida de los Arreglos: fondo de acento y una barra al
  * margen, para que no dependa solo del color. Sobresalen con sombras planas: se pintan afuera de la
  * fila sin correr el texto ni las líneas de las otras filas.

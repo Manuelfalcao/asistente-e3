@@ -95,11 +95,13 @@ const hz = (x: number) => formatearValor(x, 'frecuencia');
 function FilaBuscada({ resultado }: { resultado: ResultadoBobinas }) {
   const marca = resultado.revision.marcados[0]?.nivel;
   return (
-    <ValorResultado
-      nombre="L buscada"
-      valor={henrios(resultado.buscada.valor)}
-      rotulos={marca && <Rotulo tipo={marca} />}
-    />
+    <div class="fila-contexto">
+      <ValorResultado
+        nombre="L buscada"
+        valor={henrios(resultado.buscada.valor)}
+        rotulos={marca && <Rotulo tipo={marca} />}
+      />
+    </div>
   );
 }
 
@@ -187,15 +189,17 @@ function FilaVecino({
 
 function FilaSRF({ srf }: { srf: Autorresonancia }) {
   return (
-    <ValorResultado
-      nombre="SRF"
-      valor={hz(srf.estimada)}
-      rotulos={<Rotulo tipo="estimacion" />}
-      detalle={
-        `La menor entre el largo de hilo (${hz(srf.largoDeHilo)}) y Medhurst ` +
-        `(${hz(srf.medhurst)})`
-      }
-    />
+    <div class="fila-contexto">
+      <ValorResultado
+        nombre="SRF"
+        valor={hz(srf.estimada)}
+        rotulos={<Rotulo tipo="estimacion" />}
+        detalle={
+          `La menor entre el largo de hilo (${hz(srf.largoDeHilo)}) y Medhurst ` +
+          `(${hz(srf.medhurst)})`
+        }
+      />
+    </div>
   );
 }
 
