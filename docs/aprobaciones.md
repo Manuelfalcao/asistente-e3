@@ -23,3 +23,10 @@ Una entrada de ejemplo:
 ```
 
 Las Versiones van de la más vieja a la más nueva, cada una con su título `## vX.Y.Z`.
+
+## v0.1.0
+
+- Hash: dbe8dfb
+- Fecha: 2026-11-03
+- Aprobó: Cátedra, en persona
+- Deducciones propias aprobadas: diametro-rf-una-capa, maxwell-externo-dos-capas, chebyshev-par-resonadores, divisor-capacitivo
