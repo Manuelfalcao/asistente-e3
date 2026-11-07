@@ -128,7 +128,12 @@ export default defineConfig(({ mode }) => {
                   },
                 ],
               },
-              workbox: { globPatterns: ['**/*.{js,css,html,png,svg,woff2,webmanifest}'] },
+              workbox: {
+                globPatterns: ['**/*.{js,css,html,png,svg,woff2,webmanifest}'],
+                // El HTML único se copia a dist/ después de este build, así que no está precacheado:
+                // sin esta excepción el service worker contesta su pedido con index.html.
+                navigateFallbackDenylist: [/asistente-e3\.html$/],
+              },
             }),
           ]),
     ],

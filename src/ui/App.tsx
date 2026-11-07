@@ -110,8 +110,9 @@ export function App() {
         </ul>
         <footer class="pie-menu">
           <div>{VERSION}</div>
+          {/* El nombre va explícito: Preact escribe un `download` suelto como download="true". */}
           {!ES_ARCHIVO && (
-            <a href="asistente-e3.html" download>
+            <a href="asistente-e3.html" download="asistente-e3.html">
               Descargar versión para PC
             </a>
           )}
